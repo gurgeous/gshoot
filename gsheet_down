@@ -1,0 +1,185 @@
+#!/usr/bin/env ruby
+
+#
+# Download a google sheet as a csv. If auth fails, try removing
+# ~/.gsheet_oauth2.json and running again.
+#
+
+require "bundler/inline"
+
+gemfile do
+  source "https://rubygems.org"
+  gem "csv"
+  gem "google-apis-drive_v3"
+  gem "google-apis-sheets_v4"
+  gem "launchy"
+  gem "slop"
+  gem "memoist"
+  gem "webrick"
+end
+
+require "google/api_client/auth/installed_app"
+require "google/api_client/auth/storage"
+require "google/api_client/auth/storages/file_store"
+require "google/api_client/client_secrets"
+require "google/apis/drive_v3"
+require "google/apis/sheets_v4"
+require "forwardable"
+require "json"
+require "pathname"
+
+class Main
+  extend Forwardable
+  extend Memoist
+
+  SECRETS = "#{ENV["HOME"]}/.client_secrets.json"
+  CREDENTIALS = "#{ENV["HOME"]}/.gsheet_oauth2.json"
+  GREEN = "\e[1;38;5;231;48;2;64;160;43m"
+  RED = "\e[1;38;5;231;48;2;210;15;57m"
+  RESET = "\e[0m"
+
+  attr_reader :options
+  def_delegators :options, :docfile, :output, :sheet
+
+  def initialize(options)
+    @options = options
+  end
+
+  def main
+    fatal "spreadsheet not found: #{docfile}" if !file
+    fatal "sheet not found in '#{file.name}': #{sheet}" if sheet && !title
+
+    banner "Writing #{values.length} rows to #{output}..."
+    CSV.open(output, "w") { |csv| values.each { csv << _1 } }
+  rescue Google::Apis::Error => e
+    fatal format_google_error(e)
+  end
+
+  def banner(str, color: GREEN)
+    puts "#{color}[#{Time.now.strftime("%H:%M:%S")}] #{str.ljust(72)} #{RESET}"
+  end
+
+  def fatal(str)
+    banner(str, color: RED)
+    exit 1 # rubocop:disable Rails/Exit
+  end
+
+  def auth
+    storage = Google::APIClient::Storage.new(Google::APIClient::FileStore.new(CREDENTIALS))
+    auth = storage.authorize
+    auth ||= begin
+      secrets = Google::APIClient::ClientSecrets.load(SECRETS)
+      flow = Google::APIClient::InstalledAppFlow.new(
+        client_id: secrets.client_id,
+        client_secret: secrets.client_secret,
+        scope: [
+          "https://www.googleapis.com/auth/drive.readonly",
+          "https://www.googleapis.com/auth/spreadsheets.readonly",
+        ]
+      )
+      flow.authorize(storage)
+    end
+    auth
+  end
+  memoize :auth
+
+  def file
+    banner "Searching Google Drive for '#{docfile}'..."
+    q = "mimeType='application/vnd.google-apps.spreadsheet' and trashed=false"
+    drive.list_files(q:, order_by: "modifiedTime desc,name").files.find { name_match?(_1.name, docfile) }
+  end
+  memoize :file
+
+  def format_google_error(error)
+    details = [error.message]
+    details << "status=#{error.status_code}" if error.respond_to?(:status_code) && error.status_code
+    body = google_error_body(error)
+    details << body if body && body != ""
+    "Google API error: #{details.join("\n")}"
+  end
+
+  def google_error_body(error)
+    body =
+      if error.respond_to?(:body) && error.body && error.body != ""
+        error.body
+      elsif error.respond_to?(:response) && error.response&.body && error.response.body != ""
+        error.response.body
+      end
+    return if !body
+
+    begin
+      JSON.pretty_generate(JSON.parse(body))
+    rescue JSON::ParserError
+      body
+    end
+  end
+
+  def title
+    titles = spreadsheet.sheets.map(&:properties).map(&:title)
+    if sheet
+      banner "Searching '#{file.name}' for sheet '#{sheet}'..."
+      titles.find { name_match?(_1, sheet) }
+    else
+      titles.first
+    end
+  end
+  memoize :title
+
+  def values
+    banner "Getting values..."
+    raw_values = sheets.get_spreadsheet_values(file.id, title).values || []
+    max = raw_values.map(&:length).max || 0
+    raw_values.map { _1 + [""] * (max - _1.length) }
+  end
+  memoize :values
+
+  def name_match?(lhs, rhs)
+    lhs.downcase == rhs.downcase
+  end
+
+  # one-liners
+  def drive = Google::Apis::DriveV3::DriveService.new.tap { _1.authorization = auth }
+  def sheets = Google::Apis::SheetsV4::SheetsService.new.tap { _1.authorization = auth }
+  def spreadsheet = sheets.get_spreadsheet(file.id)
+  memoize :drive, :sheets, :spreadsheet
+end
+
+#
+# OptionParser
+#
+
+options = {}.tap do |into|
+  parsed = Slop.parse do |o|
+    o.banner = "Usage: gsheet_down [options...] <gdocfile> [sheet]"
+    o.string("-o", "--output", "where to output the file")
+    o.bool("-h", "--help", "show this help") do
+      puts o
+      exit
+    end
+  end
+  into.merge!(parsed.to_h)
+  if parsed.args.length == 0
+    puts "gsheet_down: try 'gsheet_down --help' for more information"
+    exit
+  end
+  raise Slop::Error, "need <gdocfile> [sheet]" if parsed.args.length > 2
+  into[:docfile], into[:sheet] = parsed.args
+  into[:output] ||= begin
+    path = [into[:docfile], into[:sheet]].compact.join(" - ").gsub("/", "_")
+    Pathname("/tmp/#{path}.csv")
+  end
+  into[:output] = Pathname(into[:output]).expand_path
+rescue Slop::Error => ex
+  puts "gsheet_down: #{ex}"
+  puts "gsheet_down: try 'gsheet_down --help' for more information"
+  exit 1
+end
+
+# Hash => Data
+options = Data.define(*options.keys) do
+  options.keys.select { options[_1] == true || options[_1] == false }.each do
+    alias_method :"#{_1}?", _1
+  end
+end.new(*options.values)
+
+Main.new(options).main
