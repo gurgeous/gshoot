@@ -1,15 +1,80 @@
-[tasks]
-fmt = "gofmt -w $(find cmd internal -name '*.go')"
-lint = "golangci-lint run ./..."
-test = "go test ./..."
-build = "go build ./..."
+[env]
+_.path = ["{{config_root}}/zig-out/bin", '{{config_root}}/bin']
 
-[tasks.smoke]
+[settings]
+task.output = "quiet"
+
+[tools]
+gofumpt = "latest"
+golang = "latest"
+
+#
+# tasks
+#
+
+[tasks]
+
+# one-liners
+build = "go build ./...  && mise _banner '✓ build ✓'"
+lint = "go vet ./...  && mise _banner '✓ lint ✓'"
+test = "go test ./... && mise _banner '✓ test ✓'"
+
+fmt = """
+  gofumpt -w $(find cmd internal -name '*.go')
+  if command -v gci >/dev/null 2>&1; then
+    gci write -s standard -s default -s prefix(github.com/gurgeous/gshoot) cmd internal
+  else
+    mise _warning -- "skipping gci [not installed]"
+  fi
+"""
+
+init = """
+  if command -v gci >/dev/null 2>&1; then
+    mise _banner -- "installing gci..."
+    go install github.com/daixiang0/gci@latest
+  fi
+  mise _banner "✓ init ✓"
+"""
+
+smoke = """
+  mkdir -p tmp
+  go build -o tmp/gshoot ./cmd/gshoot
+  go run ./cmd/smoke --gshoot tmp/gshoot
+  mise _banner "✓ smoke ✓"
+"""
+
+check = """
+  mise lint ::: test ::: build
+  mise _banner -- "✓ check ✓"
+"""
+
+#
+# banner and friends
+#
+
+[tasks._banner]
+usage = 'flag "--bg <bg>" default="48;2;64;160;43" ; arg "<message>"'
+run = '''
+printf '\033[1;38;5;231;%sm[%s] %-72s\033[0m\n' "${usage_bg}" "$(date '+%H:%M:%S')" "${usage_message}"
+'''
+
+[tasks._warning]
+usage = 'arg "<message>"'
 run = [
-  "mkdir -p tmp",
-  "go build -o tmp/gshoot ./cmd/gshoot",
-  "go run ./cmd/smoke --gshoot tmp/gshoot"
+  { task = "_banner", args = [
+    "--bg",
+    "48;2;251;100;11",
+    "{{usage.message}}",
+  ] },
 ]
 
-[tasks.check]
-depends = ["lint", "test", "build"]
+[tasks._fatal]
+usage = 'arg "<message>"'
+run = [
+  { task = "_banner", args = [
+    "--bg",
+    "48;2;210;15;57",
+    "{{usage.message}}",
+  ] },
+  "exit 1",
+]
