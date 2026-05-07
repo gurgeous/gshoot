@@ -1,7 +1,0 @@
-#!/usr/bin/env bash
-
-set -euo pipefail
-
-mkdir -p tmp
-go build -o tmp/gshoot ./cmd/gshoot
-go run ./cmd/gshoot-smoke --gshoot tmp/gshoot

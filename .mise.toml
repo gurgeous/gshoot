@@ -1,14 +1,15 @@
-[tasks.test]
-run = "go test ./..."
-
-[tasks.build]
-run = "go build ./..."
+[tasks]
+fmt = "gofmt -w $(find cmd internal -name '*.go')"
+lint = "golangci-lint run ./..."
+test = "go test ./..."
+build = "go build ./..."
 
 [tasks.smoke]
-run = "bin/smoke"
+run = [
+  "mkdir -p tmp",
+  "go build -o tmp/gshoot ./cmd/gshoot",
+  "go run ./cmd/smoke --gshoot tmp/gshoot"
+]
 
 [tasks.check]
-run = [
-  "go test ./...",
-  "go build ./..."
-]
+depends = ["lint", "test", "build"]
