@@ -1,0 +1,14 @@
+[tasks.test]
+run = "go test ./..."
+
+[tasks.build]
+run = "go build ./..."
+
+[tasks.smoke]
+run = "bin/smoke"
+
+[tasks.check]
+run = [
+  "go test ./...",
+  "go build ./..."
+]

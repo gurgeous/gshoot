@@ -1,53 +1,44 @@
 # AGENTS
 
-## Priority
+## Project
 
-- This repo is a small Go CLI, not a framework or long-running service
-- Prefer `mise run` tasks over raw tool commands when tasks exist
-- Run the smallest relevant checks while working; run the full project check before commits
+- Small Go CLI, not a framework or service
+- Be succinct, especially in Markdown
+- Prefer `mise run` tasks when they exist
+- Run small relevant checks while working; run the full check before commits
 - Keep commit messages under 80 chars
-- Fail fast; prefer clear errors over defensive fallback behavior
 
 ## Layout
 
-- CLI entrypoints belong in `cmd/`
-- Helper scripts belong in `bin/`
-- Reusable implementation code should stay in small internal packages
-- Dev-time artifacts and scratch files belong in `tmp/`
+- CLI entrypoints in `cmd/`
+- Helper scripts in `bin/`
+- Reusable code in small internal packages
+- Dev-time artifacts in `tmp/`
 
-## Go Style
+## Style
 
-- Keep the CLI layer thin; put behavior in testable packages
-- Keep files and APIs small, direct, and easy to scan
-- Prefer early returns and straightforward control flow
-- Prefer small value types and explicit data flow over hidden state
-- Avoid unnecessary interfaces; introduce them only at real boundaries
-- Avoid clever abstractions and one-off helper layers
-- Be conservative about adding dependencies or globals
-- Add brief comments for exported types and functions when they help orientation
-- Keep comments light and useful
+- Keep the CLI thin and behavior testable
+- Prefer small, direct code with early returns and explicit data flow
+- Avoid unnecessary interfaces, clever abstractions, extra globals, and one-off helper layers
+- Keep comments brief and useful
+- Fail fast; prefer clear errors and actionable hints
 
-## Tooling
+## Dependencies
 
-- Use current, well-maintained Go libraries; do not reuse old deps just because they appear in sibling repos
-- Sibling repos such as `../vectro`, `../gohttpdisk`, and `../old_iconmap` are style/tooling references only
-- Re-evaluate dependency choices against the current ecosystem before adopting them
-- Examples:
-  - color output should consider current options rather than assuming `fatih/color`
-  - XDG/config helpers should be chosen based on current maintenance and fit
+- Use current, well-maintained Go libraries
+- Do not reuse old deps just because they appear in sibling repos
+- `../vectro`, `../gohttpdisk`, and `../old_iconmap` are style/tooling references only
+- Re-evaluate current options before choosing deps
 
 ## Tests
 
-- New behavior should usually come with tests
-- Bug fixes should usually add or update a test
+- Use TDD: write or extend the test or `gsmoke` coverage first, then implement
 - Keep unit tests deterministic and network-free
-- Prefer table-driven tests and small helpers when they reduce repetition
-- Put real API coverage in the manual smoke path, not ordinary unit tests
-- For smoke and other dev flows, write temporary files under `tmp/`
+- Put real API coverage in the manual smoke path
+- Write smoke and other temp files under `tmp/`
 
 ## Defaults
 
-- Match existing repo patterns unless there is a clear reason to improve them
+- Match repo patterns unless there is a clear improvement
 - Prefer direct implementations over speculative extensibility
 - Preserve user-visible behavior before redesigning it
-- When a file or sheet lookup fails, favor actionable errors and hints
