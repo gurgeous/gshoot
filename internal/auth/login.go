@@ -17,6 +17,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/gurgeous/gshoot/internal/output"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
@@ -30,14 +31,7 @@ type NoAuthError struct {
 }
 
 func (e *NoAuthError) Error() string {
-	clientPath := filepath.Join(e.ConfigDir, oauthClientFileName)
-	return fmt.Sprintf(
-		"no Google auth found for `gshoot %s`\n"+
-			"hint: run `gshoot auth login`\n"+
-			"setup: save a Google Desktop app OAuth client JSON to %s or pass `--client-secret`",
-		e.Command,
-		clientPath,
-	)
+	return fmt.Sprintf("gshoot: %s [no auth found]\n", e.Command)
 }
 
 // LoginOptions configures interactive browser login.
@@ -54,6 +48,7 @@ func Login(ctx context.Context, opts LoginOptions) error {
 	configDir := ConfigDir(opts.Env)
 	clientPath := filepath.Join(configDir, oauthClientFileName)
 	tokenPath := filepath.Join(configDir, oauthTokenFileName)
+	ui := output.New(opts.Stdout, opts.Stderr)
 
 	if err := os.MkdirAll(configDir, 0o700); err != nil {
 		return fmt.Errorf("create config dir: %w", err)
@@ -63,7 +58,7 @@ func Login(ctx context.Context, opts LoginOptions) error {
 		if err := importOAuthClient(opts.ClientSecretPath, clientPath); err != nil {
 			return err
 		}
-		fmt.Fprintf(opts.Stdout, "Saved OAuth client config to %s\n", clientPath)
+		ui.Success("Saved OAuth client config to " + clientPath)
 	}
 
 	cred, err := LoadCredentialFile(clientPath)
@@ -96,7 +91,7 @@ func Login(ctx context.Context, opts LoginOptions) error {
 		return err
 	}
 
-	fmt.Fprintf(opts.Stdout, "Login complete. Token saved to %s\n", tokenPath)
+	ui.Success("Login complete. Token saved to " + tokenPath)
 	return nil
 }
 
@@ -206,6 +201,7 @@ func friendlyLoginError(err error) error {
 }
 
 func browserLoginFlow(ctx context.Context, config *oauth2.Config, stdout, stderr io.Writer) (*oauth2.Token, error) {
+	ui := output.New(stdout, stderr)
 	state, err := randomState()
 	if err != nil {
 		return nil, fmt.Errorf("generate oauth state: %w", err)
@@ -219,11 +215,12 @@ func browserLoginFlow(ctx context.Context, config *oauth2.Config, stdout, stderr
 	config.RedirectURL = redirectURL
 
 	authURL := config.AuthCodeURL(state, oauth2.AccessTypeOffline, oauth2.SetAuthURLParam("prompt", "consent"))
-	fmt.Fprintf(stdout, "Open this URL if the browser does not open:\n%s\n", authURL)
+	ui.Info("Open this URL if the browser does not open:")
+	ui.Subtle(authURL)
 	if err := openBrowser(authURL); err != nil {
-		fmt.Fprintf(stderr, "warning: could not open browser automatically: %v\n", err)
+		ui.Warn("Could not open browser automatically: " + err.Error())
 	}
-	fmt.Fprintf(stdout, "Waiting for Google login at %s ...\n", callbackURL)
+	ui.Info("Waiting for Google login at " + callbackURL + " ...")
 
 	code, err := receive(ctx)
 	if err != nil {

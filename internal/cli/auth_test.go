@@ -55,8 +55,8 @@ func TestRunListNoAuthShowsFriendlyHint(t *testing.T) {
 	if code != 1 {
 		t.Fatalf("Run() code = %d, want 1", code)
 	}
-	if !strings.Contains(stderr.String(), "gshoot auth login") {
-		t.Fatalf("stderr = %q, want login hint", stderr.String())
+	if got, want := stderr.String(), "gshoot: list [no auth found]\n\n"; got != want {
+		t.Fatalf("stderr = %q, want %q", got, want)
 	}
 }
 

@@ -33,6 +33,9 @@ func TestRunRootHelp(t *testing.T) {
 			t.Fatalf("help output missing %q:\n%s", want, output)
 		}
 	}
+	if strings.Contains(output, "Flags:") {
+		t.Fatalf("help output = %q, want no flags section", output)
+	}
 
 	if stderr.Len() != 0 {
 		t.Fatalf("stderr = %q, want empty", stderr.String())
@@ -67,12 +70,12 @@ func TestRunSubcommandHelp(t *testing.T) {
 		args []string
 		want string
 	}{
-		{name: "auth", args: []string{"auth", "--help"}, want: "Authentication helpers"},
+		{name: "auth", args: []string{"auth", "--help"}, want: "Login (or logout) from Google Sheets"},
 		{name: "auth status", args: []string{"auth", "status", "--help"}, want: "Show auth status"},
 		{name: "auth logout", args: []string{"auth", "logout", "--help"}, want: "Clear cached OAuth token"},
-		{name: "up", args: []string{"up", "--help"}, want: "Upload CSV data"},
-		{name: "down", args: []string{"down", "--help"}, want: "Download sheet data"},
-		{name: "list", args: []string{"list", "--help"}, want: "List recent spreadsheets"},
+		{name: "up", args: []string{"up", "--help"}, want: "Upload a local CSV file to a Google Sheet"},
+		{name: "down", args: []string{"down", "--help"}, want: "Download a Google Sheet as CSV"},
+		{name: "list", args: []string{"list", "--help"}, want: "List your Google Sheets"},
 	}
 
 	for _, tt := range tests {

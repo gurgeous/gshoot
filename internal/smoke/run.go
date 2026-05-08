@@ -3,7 +3,6 @@ package smoke
 import (
 	"context"
 	"flag"
-	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -11,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/gurgeous/gshoot/internal/auth"
+	"github.com/gurgeous/gshoot/internal/output"
 	"golang.org/x/oauth2"
 )
 
@@ -49,6 +49,7 @@ type Client interface {
 
 // Run executes the manual smoke-test entrypoint.
 func Run(args []string, stdout, stderr io.Writer) int {
+	ui := output.New(stdout, stderr)
 	fs := flag.NewFlagSet("smoke", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 
@@ -67,7 +68,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	if len(gshootCommand) == 0 {
-		fmt.Fprintln(stderr, "missing gshoot command")
+		ui.Error("missing gshoot command")
 		return 1
 	}
 
@@ -77,53 +78,53 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		Command: auth.CommandUp,
 	})
 	if err != nil {
-		fmt.Fprintln(stderr, err)
+		ui.Error(err.Error())
 		return 1
 	}
 
 	tokenSource, err := newTokenSource(ctx, resolved)
 	if err != nil {
-		fmt.Fprintln(stderr, err)
+		ui.Error(err.Error())
 		return 1
 	}
 
 	client, err := newSmokeClient(ctx, tokenSource)
 	if err != nil {
-		fmt.Fprintln(stderr, err)
+		ui.Error(err.Error())
 		return 1
 	}
 
 	if err := mkdirAll(smokeTmpDir()); err != nil {
-		fmt.Fprintln(stderr, err)
+		ui.Error(err.Error())
 		return 1
 	}
 
-	fmt.Fprintf(stdout, "resetting %s/%s...\n", spreadsheetName, downSheetName)
+	ui.Info("resetting " + spreadsheetName + "/" + downSheetName + "...")
 	spreadsheetID, err := client.ResetDownFixture(ctx, spreadsheetName, downSheetName, downFixtureValues())
 	if err != nil {
-		fmt.Fprintln(stderr, err)
+		ui.Error(err.Error())
 		return 1
 	}
 
 	outputPath := filepath.Join(smokeTmpDir(), "smoke-down.csv")
 	command := append(append([]string(nil), gshootCommand...), "down", spreadsheetName, downSheetName, "--output", outputPath)
-	fmt.Fprintf(stdout, "running %s\n", strings.Join(command, " "))
+	ui.Info("running " + strings.Join(command, " "))
 	if err := runCommand(command[0], command[1:]...); err != nil {
-		fmt.Fprintln(stderr, err)
+		ui.Error(err.Error())
 		return 1
 	}
 
 	data, err := readFile(outputPath)
 	if err != nil {
-		fmt.Fprintln(stderr, err)
+		ui.Error(err.Error())
 		return 1
 	}
 	if string(data) != expectedDownCSV {
-		fmt.Fprintf(stderr, "unexpected down output:\n%s", data)
+		ui.Error("unexpected down output:\n" + string(data))
 		return 1
 	}
 
-	fmt.Fprintf(stdout, "smoke ok: https://docs.google.com/spreadsheets/d/%s/edit\n", spreadsheetID)
+	ui.Success("smoke ok: https://docs.google.com/spreadsheets/d/" + spreadsheetID + "/edit")
 	return 0
 }
 

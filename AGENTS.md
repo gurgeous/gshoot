@@ -3,6 +3,7 @@
 ## Project
 
 - After any non-Markdown change, run `mise check`
+- If user-facing text changes, ask before reverting it; usually fix tests instead
 - Small Go CLI, not a framework or service
 - Be succinct, especially in Markdown
 - Prefer `mise run` tasks when they exist

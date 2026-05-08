@@ -5,6 +5,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+
+	"github.com/gurgeous/gshoot/internal/output"
 )
 
 // Status summarizes the current auth state.
@@ -44,23 +46,25 @@ func InspectStatus(env Env) Status {
 
 // PrintStatus writes a friendly auth summary.
 func PrintStatus(w io.Writer, status Status) {
-	fmt.Fprintf(w, "Config dir: %s\n", status.ConfigDir)
-	fmt.Fprintf(w, "OAuth client: %s\n", presentLine(status.HasOAuthClient, status.OAuthClientPath))
-	fmt.Fprintf(w, "Cached token: %s\n", presentLine(status.HasCachedToken, status.OAuthTokenPath))
+	ui := output.New(w, w)
+
+	ui.Subtle("Config dir: " + status.ConfigDir)
+	ui.Subtle("OAuth client: " + presentLine(status.HasOAuthClient, status.OAuthClientPath))
+	ui.Subtle("Cached token: " + presentLine(status.HasCachedToken, status.OAuthTokenPath))
 
 	switch {
 	case status.LoggedIn:
-		fmt.Fprintf(w, "Status: authenticated via %s", status.ResolvedSource)
+		msg := fmt.Sprintf("Status: authenticated via %s", status.ResolvedSource)
 		if status.ResolvedPath != "" {
-			fmt.Fprintf(w, " (%s)", status.ResolvedPath)
+			msg += " (" + status.ResolvedPath + ")"
 		}
-		fmt.Fprintln(w)
+		ui.Success(msg)
 	case status.ReadyForLogin:
-		fmt.Fprintln(w, "Status: not logged in yet")
-		fmt.Fprintln(w, "Next step: run `gshoot auth login`")
+		ui.Warn("Status: not logged in yet")
+		ui.Info("Next step: run `gshoot auth login`")
 	default:
-		fmt.Fprintln(w, "Status: no auth configured")
-		fmt.Fprintln(w, "Next step: run `gshoot auth login --client-secret /path/to/client_secret.json`")
+		ui.Warn("Status: no auth configured")
+		ui.Info("Next step: run `gshoot auth login --client-secret /path/to/client_secret.json`")
 	}
 }
 

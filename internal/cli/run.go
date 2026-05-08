@@ -31,6 +31,14 @@ var (
 	}
 )
 
+const rootHelpTemplate = `{{with (or .Long .Short)}}{{.}}
+{{end}}
+gshoot [command]
+
+{{range .Commands}}{{if (and .IsAvailableCommand (not .IsAdditionalHelpTopicCommand))}}  {{rpad .Name .NamePadding }}{{.Short}}
+{{end}}{{end}}
+`
+
 // Run executes the gshoot CLI.
 func Run(args []string, stdout, stderr io.Writer) int {
 	cmd := newRootCmd(stdout, stderr)
@@ -47,16 +55,20 @@ func Run(args []string, stdout, stderr io.Writer) int {
 func newRootCmd(stdout, stderr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "gshoot",
-		Short:         "CSV to Google Sheets workflows",
+		Short:         "Magically import/export CSVs from Google Sheets.",
 		SilenceUsage:  true,
 		SilenceErrors: true,
+		CompletionOptions: cobra.CompletionOptions{
+			HiddenDefaultCmd: true,
+		},
 	}
 
 	cmd.SetOut(stdout)
 	cmd.SetErr(stderr)
+	cmd.SetHelpTemplate(rootHelpTemplate)
 	cmd.AddCommand(
 		newAuthCmd(stdout, stderr),
-		newStubCmd("up", "Upload CSV data to Google Sheets"),
+		newStubCmd("up", "Upload a local CSV file to a Google Sheet"),
 		newDownCmd(stdout, stderr),
 		newListCmd(stdout, stderr),
 	)
@@ -67,7 +79,7 @@ func newRootCmd(stdout, stderr io.Writer) *cobra.Command {
 func newAuthCmd(stdout, stderr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "auth",
-		Short: "Authentication helpers",
+		Short: "Login (or logout) from Google Sheets",
 	}
 	cmd.AddCommand(
 		newAuthLoginCmd(stdout, stderr),
@@ -134,7 +146,7 @@ func newDownCmd(stdout, stderr io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "down <spreadsheet> [sheet]",
-		Short: "Download sheet data",
+		Short: "Download a Google Sheet as CSV",
 		Args:  cobra.RangeArgs(1, 2),
 		RunE: func(_ *cobra.Command, args []string) error {
 			ctx := context.Background()
@@ -208,7 +220,7 @@ func newStubCmd(use, short string) *cobra.Command {
 func newListCmd(stdout, stderr io.Writer) *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
-		Short: "List recent spreadsheets",
+		Short: "List your Google Sheets",
 		Args:  cobra.NoArgs,
 		RunE: func(*cobra.Command, []string) error {
 			ctx := context.Background()
