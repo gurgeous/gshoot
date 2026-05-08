@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -13,6 +12,7 @@ import (
 	"github.com/gurgeous/gshoot/internal/auth"
 	"github.com/gurgeous/gshoot/internal/down"
 	"github.com/gurgeous/gshoot/internal/listing"
+	"github.com/gurgeous/gshoot/internal/ux"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"golang.org/x/oauth2"
@@ -36,6 +36,8 @@ var (
 
 // Run executes the gshoot CLI.
 func Run(args []string, stdout, stderr io.Writer) int {
+	ux.Init()
+
 	cmd := newRootCmd(stdout, stderr)
 	cmd.SetArgs(args)
 
@@ -52,7 +54,7 @@ func newRootCmd(stdout, stderr io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:           "gshoot",
-		Short:         "Magically import/export CSVs from Google Sheets.",
+		Short:         fmt.Sprintf("Magically %s from Google Sheets.", ux.Brand.Render("import/export CSVs")),
 		Example:       "",
 		SilenceUsage:  true,
 		SilenceErrors: true,
@@ -71,7 +73,7 @@ func newRootCmd(stdout, stderr io.Writer) *cobra.Command {
 
 	cmd.SetOut(stdout)
 	cmd.SetErr(stderr)
-	cmd.Flags().BoolVar(&showVersion, "version", false, "show gshoot version")
+	cmd.Flags().BoolVarP(&showVersion, "version", "v", false, "show gshoot version")
 	cmd.SetHelpFunc(func(command *cobra.Command, _ []string) {
 		writeHelp(stdout, command)
 	})
@@ -111,7 +113,6 @@ func newAuthLoginCmd(stdout, stderr io.Writer) *cobra.Command {
 		Args: noArgs("gshoot auth login"),
 		RunE: func(_ *cobra.Command, _ []string) error {
 			return loginAuth(context.Background(), auth.LoginOptions{
-				Env:              auth.NewEnv(nil),
 				ClientSecretPath: clientSecretPath,
 				Stdout:           stdout,
 				Stderr:           stderr,
@@ -128,7 +129,7 @@ func newAuthStatusCmd(stdout, _ io.Writer) *cobra.Command {
 		Short: "Show auth status",
 		Args:  noArgs("gshoot auth status"),
 		RunE: func(_ *cobra.Command, _ []string) error {
-			printAuthStatus(stdout, statusAuth(auth.NewEnv(nil)))
+			printAuthStatus(stdout, statusAuth())
 			return nil
 		},
 	}
@@ -141,7 +142,7 @@ func newAuthLogoutCmd(stdout, _ io.Writer) *cobra.Command {
 		Short: "Clear cached OAuth token",
 		Args:  noArgs("gshoot auth logout"),
 		RunE: func(_ *cobra.Command, _ []string) error {
-			removed, err := logoutAuth(auth.NewEnv(nil))
+			removed, err := logoutAuth()
 			if err != nil {
 				return err
 			}
@@ -170,7 +171,6 @@ func newDownCmd(stdout, _ io.Writer) *cobra.Command {
 		RunE: func(_ *cobra.Command, args []string) error {
 			ctx := context.Background()
 			resolved, err := resolveAuth(auth.Options{
-				Env:     auth.NewEnv(nil),
 				Command: auth.CommandDown,
 			})
 			if err != nil {
@@ -262,7 +262,6 @@ func newListCmd(stdout, _ io.Writer) *cobra.Command {
 		RunE: func(*cobra.Command, []string) error {
 			ctx := context.Background()
 			resolved, err := resolveAuth(auth.Options{
-				Env:     auth.NewEnv(nil),
 				Command: auth.CommandList,
 			})
 			if err != nil {
@@ -303,20 +302,31 @@ func newListCmd(stdout, _ io.Writer) *cobra.Command {
 	return cmd
 }
 
+//
+// help text
+//
+
 func writeHelp(w io.Writer, cmd *cobra.Command) {
 	if isRootCmd(cmd) {
 		writeRootHelp(w, cmd)
-		return
+	} else {
+		writeCommandHelp(w, cmd)
 	}
-	writeCommandHelp(w, cmd)
 }
 
 func writeRootHelp(w io.Writer, cmd *cobra.Command) {
+	fmt.Fprintf(w, "Usage: %s <command> [flags]\n", cmd.Name())
+
 	if text := commandSummary(cmd); text != "" {
-		fmt.Fprintln(w, text)
 		fmt.Fprintln(w)
+		fmt.Fprintln(w, text)
 	}
-	fmt.Fprintf(w, "USAGE\n  %s <command> <subcommand> [flags]\n", cmd.Name())
+
+	if flags := visibleFlags(cmd.LocalFlags()); len(flags) > 0 {
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "Flags:")
+		writeFlags(w, flags, cmd.NamePadding())
+	}
 
 	commands := availableCommands(cmd)
 	if len(commands) == 0 {
@@ -324,9 +334,13 @@ func writeRootHelp(w io.Writer, cmd *cobra.Command) {
 	}
 
 	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Commands:")
 	for _, sub := range commands {
 		fmt.Fprintf(w, "  %s%s\n", rpad(sub.Name(), cmd.NamePadding()), sub.Short)
 	}
+
+	fmt.Fprintln(w)
+	fmt.Fprintf(w, "Run %q for more information on a command.\n", "gshoot <command> --help")
 }
 
 func writeCommandHelp(w io.Writer, cmd *cobra.Command) {
@@ -344,24 +358,22 @@ func writeCommandHelp(w io.Writer, cmd *cobra.Command) {
 		}
 	}
 
-	if flags := trimmedFlagUsages(cmd.LocalFlags()); flags != "" {
+	if flags := visibleFlags(cmd.LocalFlags()); len(flags) > 0 {
 		fmt.Fprintln(w)
 		fmt.Fprintln(w, "FLAGS")
-		fmt.Fprint(w, indent(flags, "  "))
-		fmt.Fprintln(w)
+		writeFlags(w, flags, cmd.NamePadding())
 	}
 
-	if flags := trimmedFlagUsages(cmd.InheritedFlags()); flags != "" {
+	if flags := visibleFlags(cmd.InheritedFlags()); len(flags) > 0 {
 		fmt.Fprintln(w)
 		fmt.Fprintln(w, "INHERITED FLAGS")
-		fmt.Fprint(w, indent(flags, "  "))
-		fmt.Fprintln(w)
+		writeFlags(w, flags, cmd.NamePadding())
 	}
 
 	if example := strings.TrimSpace(cmd.Example); example != "" {
 		fmt.Fprintln(w)
 		fmt.Fprintln(w, "EXAMPLES")
-		fmt.Fprintln(w, indent(example, "  "))
+		fmt.Fprintln(w, indentBlock(example))
 	}
 }
 
@@ -387,23 +399,54 @@ func availableCommands(cmd *cobra.Command) []*cobra.Command {
 	return commands
 }
 
-func trimmedFlagUsages(flags *pflag.FlagSet) string {
-	if flags == nil {
-		return ""
-	}
-	return strings.TrimRight(flags.FlagUsages(), "\n")
+type helpFlag struct {
+	name string
+	help string
 }
 
-func indent(text, prefix string) string {
+func visibleFlags(flags *pflag.FlagSet) []helpFlag {
+	if flags == nil {
+		return nil
+	}
+	var out []helpFlag
+	flags.VisitAll(func(flag *pflag.Flag) {
+		if flag.Hidden || flag.Deprecated != "" {
+			return
+		}
+		name := "--" + flag.Name
+		if flag.Shorthand != "" && flag.ShorthandDeprecated == "" {
+			name = "-" + flag.Shorthand + ", " + name
+		}
+		if flag.Value.Type() != "bool" {
+			name += " " + flag.Value.Type()
+		}
+		out = append(out, helpFlag{name: name, help: flag.Usage})
+	})
+	return out
+}
+
+func writeFlags(w io.Writer, flags []helpFlag, minPadding int) {
+	padding := minPadding
+	for _, flag := range flags {
+		if len(flag.name) > padding {
+			padding = len(flag.name)
+		}
+	}
+	for _, flag := range flags {
+		fmt.Fprintf(w, "  %s%s\n", rpad(flag.name, padding+2), flag.help)
+	}
+}
+
+func indentBlock(text string) string {
 	if text == "" {
 		return ""
 	}
-	var buf bytes.Buffer
+	var buf strings.Builder
 	for i, line := range strings.Split(text, "\n") {
 		if i > 0 {
 			buf.WriteByte('\n')
 		}
-		buf.WriteString(prefix)
+		buf.WriteString("  ")
 		buf.WriteString(line)
 	}
 	return buf.String()

@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/gurgeous/gshoot/internal/output"
+	"github.com/gurgeous/gshoot/internal/ux"
 )
 
 // Status summarizes the current auth state.
@@ -23,8 +23,8 @@ type Status struct {
 }
 
 // InspectStatus gathers auth status without network access.
-func InspectStatus(env Env) Status {
-	configDir := ConfigDir(env)
+func InspectStatus() Status {
+	configDir := ConfigDir()
 	status := Status{
 		ConfigDir:       configDir,
 		OAuthClientPath: filepath.Join(configDir, oauthClientFileName),
@@ -34,7 +34,7 @@ func InspectStatus(env Env) Status {
 	status.HasCachedToken = fileExists(status.OAuthTokenPath)
 	status.ReadyForLogin = status.HasOAuthClient
 
-	resolved, err := Resolve(Options{Env: env, Command: CommandList})
+	resolved, err := Resolve(Options{Command: CommandList})
 	if err == nil {
 		status.ResolvedSource = resolved.Source.Kind
 		status.ResolvedPath = resolved.Source.Path
@@ -46,11 +46,9 @@ func InspectStatus(env Env) Status {
 
 // PrintStatus writes a friendly auth summary.
 func PrintStatus(w io.Writer, status Status) {
-	ui := output.New(w, w)
-
-	ui.Subtle("Config dir: " + status.ConfigDir)
-	ui.Subtle("OAuth client: " + presentLine(status.HasOAuthClient, status.OAuthClientPath))
-	ui.Subtle("Cached token: " + presentLine(status.HasCachedToken, status.OAuthTokenPath))
+	fmt.Fprintln(w, ux.Subtle.Render("Config dir: "+status.ConfigDir))
+	fmt.Fprintln(w, ux.Subtle.Render("OAuth client: "+presentLine(status.HasOAuthClient, status.OAuthClientPath)))
+	fmt.Fprintln(w, ux.Subtle.Render("Cached token: "+presentLine(status.HasCachedToken, status.OAuthTokenPath)))
 
 	switch {
 	case status.LoggedIn:
@@ -58,19 +56,19 @@ func PrintStatus(w io.Writer, status Status) {
 		if status.ResolvedPath != "" {
 			msg += " (" + status.ResolvedPath + ")"
 		}
-		ui.Success(msg)
+		fmt.Fprintln(w, ux.Success.Render(msg))
 	case status.ReadyForLogin:
-		ui.Warn("Status: not logged in yet")
-		ui.Info("Next step: run `gshoot auth login`")
+		fmt.Fprintln(w, ux.Warn.Render("Status: not logged in yet"))
+		fmt.Fprintln(w, ux.Info.Render("Next step: run `gshoot auth login`"))
 	default:
-		ui.Warn("Status: no auth configured")
-		ui.Info("Next step: run `gshoot auth login --client-secret /path/to/client_secret.json`")
+		fmt.Fprintln(w, ux.Warn.Render("Status: no auth configured"))
+		fmt.Fprintln(w, ux.Info.Render("Next step: run `gshoot auth login --client-secret /path/to/client_secret.json`"))
 	}
 }
 
 // Logout clears the cached OAuth session while keeping the client config.
-func Logout(env Env) (bool, error) {
-	tokenPath := filepath.Join(ConfigDir(env), oauthTokenFileName)
+func Logout() (bool, error) {
+	tokenPath := filepath.Join(ConfigDir(), oauthTokenFileName)
 	err := os.Remove(tokenPath)
 	if err == nil {
 		return true, nil

@@ -15,13 +15,9 @@ import (
 )
 
 func TestResolveMissingAuthGuidesLogin(t *testing.T) {
-	t.Parallel()
-
 	home := t.TempDir()
-	_, err := Resolve(Options{
-		Env:     NewEnv(map[string]string{"HOME": home}),
-		Command: CommandList,
-	})
+	withTestEnv(t, map[string]string{"HOME": home})
+	_, err := Resolve(Options{Command: CommandList})
 	if err == nil {
 		t.Fatal("Resolve() error = nil, want error")
 	}
@@ -36,13 +32,10 @@ func TestResolveMissingAuthGuidesLogin(t *testing.T) {
 }
 
 func TestLoginMissingClientSecretGuidance(t *testing.T) {
-	t.Parallel()
-
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
 	err := Login(context.Background(), LoginOptions{
-		Env:    NewEnv(map[string]string{"HOME": t.TempDir()}),
 		Stdout: &stdout,
 		Stderr: &stderr,
 	})
@@ -64,15 +57,13 @@ func TestLoginMissingClientSecretGuidance(t *testing.T) {
 }
 
 func TestLoginImportsClientAndSavesToken(t *testing.T) {
-	t.Parallel()
-
 	home := t.TempDir()
 	clientSecret := writeFile(t, filepath.Join(t.TempDir(), "client_secret.json"), `{"installed":{"client_id":"cid","client_secret":"secret","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","redirect_uris":["http://127.0.0.1"]}}`)
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
+	withTestEnv(t, map[string]string{"HOME": home})
 	err := Login(context.Background(), LoginOptions{
-		Env:              NewEnv(map[string]string{"HOME": home}),
 		ClientSecretPath: clientSecret,
 		Stdout:           &stdout,
 		Stderr:           &stderr,
@@ -114,13 +105,11 @@ func TestLoginImportsClientAndSavesToken(t *testing.T) {
 }
 
 func TestLoginFlowErrorAddsGoogleGuidance(t *testing.T) {
-	t.Parallel()
-
 	home := t.TempDir()
 	writeFile(t, filepath.Join(home, ".config", "gshoot", oauthClientFileName), `{"installed":{"client_id":"cid","client_secret":"secret","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","redirect_uris":["http://127.0.0.1"]}}`)
 
+	withTestEnv(t, map[string]string{"HOME": home})
 	err := Login(context.Background(), LoginOptions{
-		Env:    NewEnv(map[string]string{"HOME": home}),
 		Stdout: new(bytes.Buffer),
 		Stderr: new(bytes.Buffer),
 		RunFlow: func(context.Context, *oauth2.Config, io.Writer, io.Writer) (*oauth2.Token, error) {
@@ -144,13 +133,11 @@ func TestLoginFlowErrorAddsGoogleGuidance(t *testing.T) {
 }
 
 func TestLoginRejectsNonOAuthClientSecret(t *testing.T) {
-	t.Parallel()
-
 	home := t.TempDir()
 	clientSecret := writeFile(t, filepath.Join(t.TempDir(), "service-account.json"), `{"type":"service_account","client_email":"robot@example.com","private_key":"abc"}`)
 
+	withTestEnv(t, map[string]string{"HOME": home})
 	err := Login(context.Background(), LoginOptions{
-		Env:              NewEnv(map[string]string{"HOME": home}),
 		ClientSecretPath: clientSecret,
 		Stdout:           new(bytes.Buffer),
 		Stderr:           new(bytes.Buffer),
@@ -164,8 +151,6 @@ func TestLoginRejectsNonOAuthClientSecret(t *testing.T) {
 }
 
 func TestSelectLoopbackRedirect(t *testing.T) {
-	t.Parallel()
-
 	got, err := selectLoopbackRedirect([]string{
 		"https://example.com/callback",
 		"http://127.0.0.1/oauth2/callback",
@@ -179,8 +164,6 @@ func TestSelectLoopbackRedirect(t *testing.T) {
 }
 
 func TestSelectLoopbackRedirectMissing(t *testing.T) {
-	t.Parallel()
-
 	_, err := selectLoopbackRedirect([]string{"https://example.com/callback"})
 	if err == nil {
 		t.Fatal("selectLoopbackRedirect() error = nil, want error")
@@ -188,8 +171,6 @@ func TestSelectLoopbackRedirectMissing(t *testing.T) {
 }
 
 func TestFriendlyLoginErrorInvalidClient(t *testing.T) {
-	t.Parallel()
-
 	base := errors.New("invalid_client")
 	err := friendlyLoginError(base)
 	if !strings.Contains(err.Error(), "re-download") {
@@ -201,33 +182,29 @@ func TestFriendlyLoginErrorInvalidClient(t *testing.T) {
 }
 
 func TestInspectStatusReadyForLogin(t *testing.T) {
-	t.Parallel()
-
 	home := t.TempDir()
 	writeFile(t, filepath.Join(home, ".config", "gshoot", oauthClientFileName), `{"installed":{"client_id":"cid","client_secret":"secret","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","redirect_uris":["http://127.0.0.1"]}}`)
 
-	status := InspectStatus(NewEnv(map[string]string{"HOME": home}))
+	withTestEnv(t, map[string]string{"HOME": home})
+	status := InspectStatus()
 	if !status.HasOAuthClient || status.LoggedIn {
 		t.Fatalf("InspectStatus() = %#v, want ready-for-login state", status)
 	}
 }
 
 func TestInspectStatusAuthenticatedFromCachedToken(t *testing.T) {
-	t.Parallel()
-
 	home := t.TempDir()
 	writeFile(t, filepath.Join(home, ".config", "gshoot", oauthClientFileName), `{"installed":{"client_id":"cid","client_secret":"secret","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","redirect_uris":["http://127.0.0.1"]}}`)
 	writeFile(t, filepath.Join(home, ".config", "gshoot", oauthTokenFileName), `{"access_token":"a","refresh_token":"r","token_type":"Bearer","expiry":"3026-05-07T22:00:00Z"}`)
 
-	status := InspectStatus(NewEnv(map[string]string{"HOME": home}))
+	withTestEnv(t, map[string]string{"HOME": home})
+	status := InspectStatus()
 	if !status.LoggedIn || status.ResolvedSource != SourceKindCachedOAuth {
 		t.Fatalf("InspectStatus() = %#v, want cached-oauth logged-in state", status)
 	}
 }
 
 func TestPrintStatusNoAuth(t *testing.T) {
-	t.Parallel()
-
 	var out bytes.Buffer
 	PrintStatus(&out, Status{ConfigDir: "/tmp/gshoot"})
 	if !strings.Contains(out.String(), "auth login --client-secret") {
@@ -236,12 +213,11 @@ func TestPrintStatusNoAuth(t *testing.T) {
 }
 
 func TestLogout(t *testing.T) {
-	t.Parallel()
-
 	home := t.TempDir()
 	writeFile(t, filepath.Join(home, ".config", "gshoot", oauthTokenFileName), `{"access_token":"a","token_type":"Bearer","expiry":"3026-05-07T22:00:00Z"}`)
 
-	removed, err := Logout(NewEnv(map[string]string{"HOME": home}))
+	withTestEnv(t, map[string]string{"HOME": home})
+	removed, err := Logout()
 	if err != nil {
 		t.Fatalf("Logout() error = %v", err)
 	}
@@ -254,9 +230,8 @@ func TestLogout(t *testing.T) {
 }
 
 func TestLogoutMissingToken(t *testing.T) {
-	t.Parallel()
-
-	removed, err := Logout(NewEnv(map[string]string{"HOME": t.TempDir()}))
+	withTestEnv(t, map[string]string{"HOME": t.TempDir()})
+	removed, err := Logout()
 	if err != nil {
 		t.Fatalf("Logout() error = %v", err)
 	}

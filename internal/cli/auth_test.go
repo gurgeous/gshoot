@@ -55,8 +55,17 @@ func TestRunListNoAuthShowsFriendlyHint(t *testing.T) {
 	if code != 1 {
 		t.Fatalf("Run() code = %d, want 1", code)
 	}
-	if got, want := stderr.String(), "You will need to authenticate first.\n\nI apologize in advance, setting up auth with Google Sheets is\nannoyingly difficult for some reason. Don't blame gshoot.\n\nTry this first:\n\ngshoot auth status\n"; got != want {
-		t.Fatalf("stderr = %q, want %q", got, want)
+	got := stderr.String()
+	for _, want := range []string{
+		"You will need to authenticate first.",
+		"setting up auth with Google Sheets is",
+		"Don't blame gshoot.",
+		"Try this first:",
+		"gshoot auth status",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("stderr missing %q:\n%q", want, got)
+		}
 	}
 }
 
@@ -84,7 +93,7 @@ func TestRunAuthStatus(t *testing.T) {
 	restore := stubAuthLogin(t)
 	defer restore()
 
-	statusAuth = func(auth.Env) auth.Status {
+	statusAuth = func() auth.Status {
 		return auth.Status{ConfigDir: "/tmp/gshoot", ReadyForLogin: true}
 	}
 	printAuthStatus = func(w io.Writer, status auth.Status) {
@@ -110,7 +119,7 @@ func TestRunAuthLogout(t *testing.T) {
 	restore := stubAuthLogin(t)
 	defer restore()
 
-	logoutAuth = func(auth.Env) (bool, error) { return true, nil }
+	logoutAuth = func() (bool, error) { return true, nil }
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer

@@ -12,8 +12,6 @@ import (
 )
 
 func TestScopesForCommand(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name string
 		cmd  Command
@@ -47,8 +45,6 @@ func TestScopesForCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			if got := ScopesForCommand(tt.cmd); !reflect.DeepEqual(got, tt.want) {
 				t.Fatalf("ScopesForCommand() = %#v, want %#v", got, tt.want)
 			}
@@ -57,44 +53,39 @@ func TestScopesForCommand(t *testing.T) {
 }
 
 func TestScopesForCommandUnknown(t *testing.T) {
-	t.Parallel()
-
 	if got := ScopesForCommand(Command("wat")); got != nil {
 		t.Fatalf("ScopesForCommand() = %#v, want nil", got)
 	}
 }
 
 func TestConfigDir(t *testing.T) {
-	t.Parallel()
-
 	home := t.TempDir()
 	tests := []struct {
 		name string
-		env  Env
+		env  map[string]string
 		want string
 	}{
 		{
 			name: "override",
-			env:  NewEnv(map[string]string{"GSHOOT_CONFIG_DIR": "/tmp/gshoot-config", "HOME": home}),
+			env:  map[string]string{"GSHOOT_CONFIG_DIR": "/tmp/gshoot-config", "HOME": home},
 			want: "/tmp/gshoot-config",
 		},
 		{
 			name: "xdg",
-			env:  NewEnv(map[string]string{"XDG_CONFIG_HOME": "/tmp/xdg", "HOME": home}),
+			env:  map[string]string{"XDG_CONFIG_HOME": "/tmp/xdg", "HOME": home},
 			want: "/tmp/xdg/gshoot",
 		},
 		{
 			name: "home default",
-			env:  NewEnv(map[string]string{"HOME": home}),
+			env:  map[string]string{"HOME": home},
 			want: filepath.Join(home, ".config", "gshoot"),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			if got := ConfigDir(tt.env); got != tt.want {
+			withTestEnv(t, tt.env)
+			if got := ConfigDir(); got != tt.want {
 				t.Fatalf("ConfigDir() = %q, want %q", got, tt.want)
 			}
 		})
@@ -102,8 +93,6 @@ func TestConfigDir(t *testing.T) {
 }
 
 func TestResolveSourcePrecedence(t *testing.T) {
-	t.Parallel()
-
 	tempDir := t.TempDir()
 	home := filepath.Join(tempDir, "home")
 	explicitCreds := writeFile(t, filepath.Join(tempDir, "explicit.json"), `{"type":"service_account"}`)
@@ -112,48 +101,48 @@ func TestResolveSourcePrecedence(t *testing.T) {
 
 	tests := []struct {
 		name string
-		env  Env
+		env  map[string]string
 		want SourceKind
 		path string
 	}{
 		{
 			name: "raw token wins",
-			env: NewEnv(map[string]string{
+			env: map[string]string{
 				"GSHOOT_TOKEN":                   "token-123",
 				"GSHOOT_CREDENTIALS_FILE":        explicitCreds,
 				"GSHOOT_CONFIG_DIR":              tempDir,
 				"GOOGLE_APPLICATION_CREDENTIALS": adcCreds,
 				"HOME":                           home,
-			}),
+			},
 			want: SourceKindRawToken,
 		},
 		{
 			name: "credentials file env",
-			env: NewEnv(map[string]string{
+			env: map[string]string{
 				"GSHOOT_CREDENTIALS_FILE":        explicitCreds,
 				"GSHOOT_CONFIG_DIR":              tempDir,
 				"GOOGLE_APPLICATION_CREDENTIALS": adcCreds,
 				"HOME":                           home,
-			}),
+			},
 			want: SourceKindCredentialsFile,
 			path: explicitCreds,
 		},
 		{
 			name: "cached oauth before adc",
-			env: NewEnv(map[string]string{
+			env: map[string]string{
 				"GSHOOT_CONFIG_DIR":              tempDir,
 				"GOOGLE_APPLICATION_CREDENTIALS": adcCreds,
 				"HOME":                           home,
-			}),
+			},
 			want: SourceKindCachedOAuth,
 			path: cachedToken,
 		},
 		{
 			name: "adc env",
-			env: NewEnv(map[string]string{
+			env: map[string]string{
 				"GOOGLE_APPLICATION_CREDENTIALS": adcCreds,
 				"HOME":                           home,
-			}),
+			},
 			want: SourceKindApplicationDefaultCredentials,
 			path: adcCreds,
 		},
@@ -161,9 +150,8 @@ func TestResolveSourcePrecedence(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			got, err := Resolve(Options{Env: tt.env, Command: CommandDown})
+			withTestEnv(t, tt.env)
+			got, err := Resolve(Options{Command: CommandDown})
 			if err != nil {
 				t.Fatalf("Resolve() error = %v", err)
 			}
@@ -180,11 +168,11 @@ func TestResolveSourcePrecedence(t *testing.T) {
 				t.Fatalf("Resolve() token = %q, want raw token", got.Source.Token)
 			}
 
-			if got.OAuthClientPath != filepath.Join(ConfigDir(tt.env), oauthClientFileName) {
+			if got.OAuthClientPath != filepath.Join(ConfigDir(), oauthClientFileName) {
 				t.Fatalf("Resolve() OAuthClientPath = %q, want derived path", got.OAuthClientPath)
 			}
 
-			if got.OAuthTokenPath != filepath.Join(ConfigDir(tt.env), oauthTokenFileName) {
+			if got.OAuthTokenPath != filepath.Join(ConfigDir(), oauthTokenFileName) {
 				t.Fatalf("Resolve() OAuthTokenPath = %q, want derived path", got.OAuthTokenPath)
 			}
 		})
@@ -192,15 +180,11 @@ func TestResolveSourcePrecedence(t *testing.T) {
 }
 
 func TestResolveWellKnownADC(t *testing.T) {
-	t.Parallel()
-
 	home := t.TempDir()
 	adcPath := writeFile(t, filepath.Join(home, ".config", "gcloud", "application_default_credentials.json"), `{"type":"authorized_user","client_id":"adc","client_secret":"secret","refresh_token":"refresh"}`)
 
-	got, err := Resolve(Options{
-		Env:     NewEnv(map[string]string{"HOME": home}),
-		Command: CommandList,
-	})
+	withTestEnv(t, map[string]string{"HOME": home})
+	got, err := Resolve(Options{Command: CommandList})
 	if err != nil {
 		t.Fatalf("Resolve() error = %v", err)
 	}
@@ -215,13 +199,9 @@ func TestResolveWellKnownADC(t *testing.T) {
 }
 
 func TestResolveMissingAuth(t *testing.T) {
-	t.Parallel()
-
 	home := t.TempDir()
-	_, err := Resolve(Options{
-		Env:     NewEnv(map[string]string{"HOME": home}),
-		Command: CommandDown,
-	})
+	withTestEnv(t, map[string]string{"HOME": home})
+	_, err := Resolve(Options{Command: CommandDown})
 	if err == nil {
 		t.Fatal("Resolve() error = nil, want error")
 	}
@@ -241,15 +221,8 @@ func TestResolveMissingAuth(t *testing.T) {
 }
 
 func TestResolveExplicitCredentialFileMissing(t *testing.T) {
-	t.Parallel()
-
-	_, err := Resolve(Options{
-		Env: NewEnv(map[string]string{
-			"GSHOOT_CREDENTIALS_FILE": "/does/not/exist.json",
-			"HOME":                    t.TempDir(),
-		}),
-		Command: CommandDown,
-	})
+	withTestEnv(t, map[string]string{"GSHOOT_CREDENTIALS_FILE": "/does/not/exist.json", "HOME": t.TempDir()})
+	_, err := Resolve(Options{Command: CommandDown})
 	if err == nil {
 		t.Fatal("Resolve() error = nil, want error")
 	}
@@ -260,15 +233,8 @@ func TestResolveExplicitCredentialFileMissing(t *testing.T) {
 }
 
 func TestResolveApplicationCredentialsMissing(t *testing.T) {
-	t.Parallel()
-
-	_, err := Resolve(Options{
-		Env: NewEnv(map[string]string{
-			"GOOGLE_APPLICATION_CREDENTIALS": "/does/not/exist.json",
-			"HOME":                           t.TempDir(),
-		}),
-		Command: CommandList,
-	})
+	withTestEnv(t, map[string]string{"GOOGLE_APPLICATION_CREDENTIALS": "/does/not/exist.json", "HOME": t.TempDir()})
+	_, err := Resolve(Options{Command: CommandList})
 	if err == nil {
 		t.Fatal("Resolve() error = nil, want error")
 	}
@@ -279,16 +245,9 @@ func TestResolveApplicationCredentialsMissing(t *testing.T) {
 }
 
 func TestResolveExplicitCredentialFileCorrupt(t *testing.T) {
-	t.Parallel()
-
 	path := writeFile(t, filepath.Join(t.TempDir(), "bad.json"), `{"type":`)
-	_, err := Resolve(Options{
-		Env: NewEnv(map[string]string{
-			"GSHOOT_CREDENTIALS_FILE": path,
-			"HOME":                    t.TempDir(),
-		}),
-		Command: CommandDown,
-	})
+	withTestEnv(t, map[string]string{"GSHOOT_CREDENTIALS_FILE": path, "HOME": t.TempDir()})
+	_, err := Resolve(Options{Command: CommandDown})
 	if err == nil {
 		t.Fatal("Resolve() error = nil, want error")
 	}
@@ -299,15 +258,11 @@ func TestResolveExplicitCredentialFileCorrupt(t *testing.T) {
 }
 
 func TestResolveWellKnownADCCorrupt(t *testing.T) {
-	t.Parallel()
-
 	home := t.TempDir()
 	writeFile(t, filepath.Join(home, ".config", "gcloud", "application_default_credentials.json"), `{"type":`)
 
-	_, err := Resolve(Options{
-		Env:     NewEnv(map[string]string{"HOME": home}),
-		Command: CommandList,
-	})
+	withTestEnv(t, map[string]string{"HOME": home})
+	_, err := Resolve(Options{Command: CommandList})
 	if err == nil {
 		t.Fatal("Resolve() error = nil, want error")
 	}
@@ -318,15 +273,11 @@ func TestResolveWellKnownADCCorrupt(t *testing.T) {
 }
 
 func TestResolveCachedOAuthInvalid(t *testing.T) {
-	t.Parallel()
-
 	configDir := t.TempDir()
 	writeFile(t, filepath.Join(configDir, oauthTokenFileName), `{"access_token":`)
 
-	_, err := Resolve(Options{
-		Env:     NewEnv(map[string]string{"GSHOOT_CONFIG_DIR": configDir, "HOME": t.TempDir()}),
-		Command: CommandDown,
-	})
+	withTestEnv(t, map[string]string{"GSHOOT_CONFIG_DIR": configDir, "HOME": t.TempDir()})
+	_, err := Resolve(Options{Command: CommandDown})
 	if err == nil {
 		t.Fatal("Resolve() error = nil, want error")
 	}
@@ -337,12 +288,8 @@ func TestResolveCachedOAuthInvalid(t *testing.T) {
 }
 
 func TestResolveUnknownCommand(t *testing.T) {
-	t.Parallel()
-
-	_, err := Resolve(Options{
-		Env:     NewEnv(map[string]string{"HOME": t.TempDir()}),
-		Command: Command("wat"),
-	})
+	withTestEnv(t, map[string]string{"HOME": t.TempDir()})
+	_, err := Resolve(Options{Command: Command("wat")})
 	if err == nil {
 		t.Fatal("Resolve() error = nil, want error")
 	}
@@ -353,8 +300,6 @@ func TestResolveUnknownCommand(t *testing.T) {
 }
 
 func TestLoadCredentialFile(t *testing.T) {
-	t.Parallel()
-
 	tempDir := t.TempDir()
 
 	tests := []struct {
@@ -391,8 +336,6 @@ func TestLoadCredentialFile(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			path := writeFile(t, filepath.Join(tempDir, tt.name+".json"), tt.body)
 			got, err := LoadCredentialFile(path)
 			if err != nil {
@@ -407,8 +350,6 @@ func TestLoadCredentialFile(t *testing.T) {
 }
 
 func TestLoadCredentialFileUnsupported(t *testing.T) {
-	t.Parallel()
-
 	tests := []string{
 		`{"type":"external_account"}`,
 		`{}`,
@@ -427,8 +368,6 @@ func TestLoadCredentialFileUnsupported(t *testing.T) {
 }
 
 func TestLoadOAuthToken(t *testing.T) {
-	t.Parallel()
-
 	path := writeFile(t, filepath.Join(t.TempDir(), "oauth-token.json"), `{"access_token":"a","refresh_token":"r","token_type":"Bearer","expiry":"2026-05-07T22:00:00Z"}`)
 	got, err := LoadOAuthToken(path)
 	if err != nil {
@@ -444,8 +383,6 @@ func TestLoadOAuthToken(t *testing.T) {
 }
 
 func TestLoadOAuthTokenInvalidJSON(t *testing.T) {
-	t.Parallel()
-
 	path := writeFile(t, filepath.Join(t.TempDir(), "oauth-token.json"), `{"access_token":`)
 	_, err := LoadOAuthToken(path)
 	if err == nil {
@@ -454,8 +391,6 @@ func TestLoadOAuthTokenInvalidJSON(t *testing.T) {
 }
 
 func TestNewTokenSourceExpiredCachedOAuthWithoutClientConfig(t *testing.T) {
-	t.Parallel()
-
 	resolved := Resolved{
 		Scopes:          ScopesForCommand(CommandList),
 		OAuthClientPath: filepath.Join(t.TempDir(), "oauth-client.json"),
@@ -480,8 +415,6 @@ func TestNewTokenSourceExpiredCachedOAuthWithoutClientConfig(t *testing.T) {
 }
 
 func TestNewTokenSourceValidCachedOAuthWithoutClientConfig(t *testing.T) {
-	t.Parallel()
-
 	resolved := Resolved{
 		Scopes:          ScopesForCommand(CommandList),
 		OAuthClientPath: filepath.Join(t.TempDir(), "oauth-client.json"),
@@ -510,8 +443,6 @@ func TestNewTokenSourceValidCachedOAuthWithoutClientConfig(t *testing.T) {
 }
 
 func TestLoadMissingFiles(t *testing.T) {
-	t.Parallel()
-
 	_, err := LoadCredentialFile("/does/not/exist.json")
 	if !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("LoadCredentialFile() error = %v, want os.ErrNotExist", err)
