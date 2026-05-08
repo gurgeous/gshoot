@@ -14,6 +14,8 @@ var (
 	Warn    lipgloss.Style
 	Error   lipgloss.Style
 	Subtle  lipgloss.Style
+	// DotsFrames is a compact spinner sequence suitable for inline progress.
+	DotsFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 )
 
 // Default to dark. Later, we can look at the terminal to get a better answer
@@ -23,21 +25,15 @@ func init() {
 
 // Init from term (or GSHOOT_THEME for testing)
 func Init() {
-	switch env.GSHOOT_THEME {
-	case "":
-		// auto detect
+	if env.GSHOOT_THEME == "" {
 		setStyles(lipgloss.LightDark(lipgloss.HasDarkBackground(os.Stdin, os.Stdout)))
-	case "light":
-		// hardcode light
-		setStyles(lipgloss.LightDark(false))
-	default:
-		// GSHOOT_THEME is set to something other than light, so use dark
-		setStyles(lipgloss.LightDark(true))
+		return
 	}
+	setStyles(lipgloss.LightDark(env.GSHOOT_THEME != "light"))
 }
 
 func setStyles(ld lipgloss.LightDarkFunc) {
-	Brand = lipgloss.NewStyle().Foreground(ld(lipgloss.Color(Tailwind.Rose.c500), lipgloss.Color(Tailwind.Blue.c500))).Bold(true)
+	Brand = lipgloss.NewStyle().Foreground(ld(lipgloss.Color(Tailwind.Blue.c600), lipgloss.Color(Tailwind.Blue.c400))).Bold(true)
 	Info = lipgloss.NewStyle().Foreground(ld(lipgloss.Color(Tailwind.Blue.c600), lipgloss.Color(Tailwind.Blue.c400))).Bold(true)
 	Success = lipgloss.NewStyle().Foreground(ld(lipgloss.Color(Tailwind.Green.c700), lipgloss.Color(Tailwind.Green.c400))).Bold(true)
 	Warn = lipgloss.NewStyle().Foreground(ld(lipgloss.Color(Tailwind.Amber.c700), lipgloss.Color(Tailwind.Amber.c400))).Bold(true)

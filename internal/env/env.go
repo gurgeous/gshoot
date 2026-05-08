@@ -3,6 +3,10 @@ package env
 
 import "os"
 
+//
+// all env vars used by gshoot
+//
+
 var (
 	// GOOGLE_APPLICATION_CREDENTIALS points to ADC credentials JSON.
 	GOOGLE_APPLICATION_CREDENTIALS = os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
