@@ -33,7 +33,7 @@ func TestRunDownSmoke(t *testing.T) {
 	}
 	runCommand = func(name string, args ...string) error {
 		ran = append(ran, append([]string{name}, args...))
-		return os.WriteFile(filepath.Join(tempDir, "gsmoke-down.csv"), []byte(expectedDownCSV), 0o644)
+		return os.WriteFile(filepath.Join(tempDir, "smoke-down.csv"), []byte(expectedDownCSV), 0o644)
 	}
 	smokeTmpDir = func() string { return tempDir }
 
@@ -48,12 +48,12 @@ func TestRunDownSmoke(t *testing.T) {
 	if len(ran) != 1 {
 		t.Fatalf("runCommand() calls = %d, want 1", len(ran))
 	}
-	want := []string{"/tmp/gshoot", "down", "gsmoke", "down-basic", "--output", filepath.Join(tempDir, "gsmoke-down.csv")}
+	want := []string{"/tmp/gshoot", "down", "gshoot-smoke", "down-basic", "--output", filepath.Join(tempDir, "smoke-down.csv")}
 	if strings.Join(ran[0], "\x00") != strings.Join(want, "\x00") {
 		t.Fatalf("runCommand() = %#v, want %#v", ran[0], want)
 	}
 
-	if !strings.Contains(stdout.String(), "gsmoke") || !strings.Contains(stdout.String(), "down-basic") {
+	if !strings.Contains(stdout.String(), "gshoot-smoke") || !strings.Contains(stdout.String(), "down-basic") {
 		t.Fatalf("stdout = %q, want fixture summary", stdout.String())
 	}
 	if stderr.Len() != 0 {

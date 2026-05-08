@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	spreadsheetName = "gsmoke"
+	spreadsheetName = "gshoot-smoke"
 	downSheetName   = "down-basic"
 	expectedDownCSV = "name,count\nalpha,1\nbeta,2\n"
 )
@@ -34,7 +34,7 @@ var (
 		return cmd.Run()
 	}
 	smokeTmpDir = func() string {
-		return filepath.Join("tmp", "smoke")
+		return filepath.Join("tmp", "output")
 	}
 	readFile = os.ReadFile
 	mkdirAll = func(path string) error {
@@ -49,7 +49,7 @@ type Client interface {
 
 // Run executes the manual smoke-test entrypoint.
 func Run(args []string, stdout, stderr io.Writer) int {
-	fs := flag.NewFlagSet("gshoot-smoke", flag.ContinueOnError)
+	fs := flag.NewFlagSet("smoke", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 
 	gshootPath := fs.String("gshoot", "", "path to the gshoot binary")
@@ -105,7 +105,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 
-	outputPath := filepath.Join(smokeTmpDir(), "gsmoke-down.csv")
+	outputPath := filepath.Join(smokeTmpDir(), "smoke-down.csv")
 	command := append(append([]string(nil), gshootCommand...), "down", spreadsheetName, downSheetName, "--output", outputPath)
 	fmt.Fprintf(stdout, "running %s\n", strings.Join(command, " "))
 	if err := runCommand(command[0], command[1:]...); err != nil {
