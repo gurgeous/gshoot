@@ -19,6 +19,7 @@ import (
 )
 
 var (
+	version         = "dev"
 	resolveAuth     = auth.Resolve
 	newTokenSource  = auth.NewTokenSource
 	loginAuth       = auth.Login
@@ -47,6 +48,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 }
 
 func newRootCmd(stdout, stderr io.Writer) *cobra.Command {
+	var showVersion bool
+
 	cmd := &cobra.Command{
 		Use:           "gshoot",
 		Short:         "Magically import/export CSVs from Google Sheets.",
@@ -56,10 +59,19 @@ func newRootCmd(stdout, stderr io.Writer) *cobra.Command {
 		CompletionOptions: cobra.CompletionOptions{
 			HiddenDefaultCmd: true,
 		},
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if showVersion {
+				fmt.Fprintf(stdout, "gshoot %s\n", version)
+				return nil
+			}
+			writeHelp(stdout, cmd)
+			return nil
+		},
 	}
 
 	cmd.SetOut(stdout)
 	cmd.SetErr(stderr)
+	cmd.Flags().BoolVar(&showVersion, "version", false, "show gshoot version")
 	cmd.SetHelpFunc(func(command *cobra.Command, _ []string) {
 		writeHelp(stdout, command)
 	})

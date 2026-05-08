@@ -42,6 +42,28 @@ func TestRunRootHelp(t *testing.T) {
 	}
 }
 
+func TestRunVersion(t *testing.T) {
+	t.Parallel()
+
+	origVersion := version
+	version = "1.2.3"
+	defer func() { version = origVersion }()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run([]string{"--version"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0", code)
+	}
+	if got, want := stdout.String(), "gshoot 1.2.3\n"; got != want {
+		t.Fatalf("stdout = %q, want %q", got, want)
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+}
+
 func TestRunUnknownCommand(t *testing.T) {
 	t.Parallel()
 
