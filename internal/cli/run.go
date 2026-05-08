@@ -144,7 +144,7 @@ func newAuthLogoutCmd(stdout, _ io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newDownCmd(stdout, stderr io.Writer) *cobra.Command {
+func newDownCmd(stdout, _ io.Writer) *cobra.Command {
 	var outputPath string
 
 	cmd := &cobra.Command{
@@ -241,7 +241,7 @@ func downArgs(_ *cobra.Command, args []string) error {
 	return fmt.Errorf("expected `gshoot down <spreadsheet> [sheet]`")
 }
 
-func newListCmd(stdout, stderr io.Writer) *cobra.Command {
+func newListCmd(stdout, _ io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Short:   "List your Google Sheets",

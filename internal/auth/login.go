@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/gurgeous/gshoot/internal/output"
 	"golang.org/x/oauth2"
@@ -23,6 +24,8 @@ import (
 )
 
 var openBrowser = openBrowserURL
+
+const oauthReadHeaderTimeout = 5 * time.Second
 
 // NoAuthError reports that no usable auth source exists.
 type NoAuthError struct {
@@ -159,11 +162,11 @@ func writePrivateFile(path string, data []byte) error {
 	defer os.Remove(tmpPath)
 
 	if _, err := tmp.Write(data); err != nil {
-		tmp.Close()
+		_ = tmp.Close()
 		return err
 	}
 	if err := tmp.Chmod(0o600); err != nil {
-		tmp.Close()
+		_ = tmp.Close()
 		return err
 	}
 	if err := tmp.Close(); err != nil {
@@ -284,7 +287,7 @@ func startLoopbackReceiver(redirectRaw, state string) (string, string, func(cont
 	redirectURL.Host = listener.Addr().String()
 	codeCh := make(chan string, 1)
 	errCh := make(chan error, 1)
-	server := &http.Server{}
+	server := &http.Server{ReadHeaderTimeout: oauthReadHeaderTimeout}
 	mux := http.NewServeMux()
 	mux.HandleFunc(redirectURL.Path, func(w http.ResponseWriter, r *http.Request) {
 		defer server.Shutdown(context.Background())

@@ -115,8 +115,16 @@ func (s Service) Download(ctx context.Context, spreadsheetName, sheetName string
 // WriteCSV writes rows as CSV.
 func WriteCSV(w io.Writer, rows [][]string) error {
 	writer := csv.NewWriter(w)
-	writer.WriteAll(rows)
-	return writer.Error()
+	for _, row := range rows {
+		if err := writer.Write(row); err != nil {
+			return err
+		}
+	}
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func findSpreadsheet(items []DriveSpreadsheet, target string) (DriveSpreadsheet, bool) {
@@ -149,18 +157,18 @@ func chooseSheet(sheets []Sheet, target string) (Sheet, bool) {
 }
 
 func rectangularize(rows [][]string) [][]string {
-	max := 0
+	maxWidth := 0
 	for _, row := range rows {
-		if len(row) > max {
-			max = len(row)
+		if len(row) > maxWidth {
+			maxWidth = len(row)
 		}
 	}
 
 	out := make([][]string, 0, len(rows))
 	for _, row := range rows {
 		copyRow := append([]string(nil), row...)
-		if len(copyRow) < max {
-			copyRow = append(copyRow, make([]string, max-len(copyRow))...)
+		if len(copyRow) < maxWidth {
+			copyRow = append(copyRow, make([]string, maxWidth-len(copyRow))...)
 		}
 		out = append(out, copyRow)
 	}

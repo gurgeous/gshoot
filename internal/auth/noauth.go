@@ -8,7 +8,7 @@ import (
 )
 
 // WriteNoAuthError renders a richer, styled no-auth guidance card.
-func WriteNoAuthError(w io.Writer, err *NoAuthError) {
+func WriteNoAuthError(w io.Writer, _ *NoAuthError) {
 	ui := output.New(w, w)
 	ui.Error("You will need to authenticate first.")
 	fmt.Fprintln(w)

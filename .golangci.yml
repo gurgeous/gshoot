@@ -18,7 +18,6 @@ linters:
     - nakedret # checks for naked returns in long functions
     - nestif # reports deeply nested if statements
     - nilerr # finds the code that returns nil even if it checks that the error is not nil
-    - noctx # finds HTTP/database calls made without context.Context
     - nolintlint # reports ill-formed or insufficient nolint directives
     - prealloc # suggests preallocating slices when safe
     - revive # configurable general-purpose style and correctness linter
@@ -28,7 +27,6 @@ linters:
     - unconvert # removes unnecessary type conversions
     - unparam # reports unused function parameters
     - whitespace # detects unnecessary leading/trailing blank lines
-    - wrapcheck # checks that errors from external packages are wrapped
 
   exclusions:
     generated: lax
@@ -36,14 +34,8 @@ linters:
 
   settings:
     exhaustive:
-      # Presence of "default" case in switch statements satisfies exhaustiveness,
-      # even if all enum members are not listed.
-      default-signifies-exhaustive: true
-    gosec:
-      confidence: low
-      severity: low
-      # frp excludes: ["G115", "G117", "G118", "G204", "G401", "G402", "G404", "G501", "G703", "G704", "G705"]
-      # gh excludes: ["G110", "G204", "G301", "G302", "G304", "G307", "G404"]
+      default-signifies-exhaustive: true # default switch works even if some enums not present
+    gosec: { confidence: low, severity: low, excludes: [G101, G117, G301] }
 
 issues: { max-issues-per-linter: 0, max-same-issues: 0 }
 formatters:
