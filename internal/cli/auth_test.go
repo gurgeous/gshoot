@@ -55,7 +55,7 @@ func TestRunListNoAuthShowsFriendlyHint(t *testing.T) {
 	if code != 1 {
 		t.Fatalf("Run() code = %d, want 1", code)
 	}
-	if got, want := stderr.String(), "gshoot: list [no auth found]\n"+helpHint+"\n"; got != want {
+	if got, want := stderr.String(), "You will need to authenticate first.\n\nI apologize in advance, setting up auth with Google Sheets is\nannoyingly difficult for some reason. Don't blame gshoot.\n\nTry this first:\n\ngshoot auth status\n"; got != want {
 		t.Fatalf("stderr = %q, want %q", got, want)
 	}
 }
