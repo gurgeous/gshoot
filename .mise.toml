@@ -20,6 +20,7 @@ golang = "latest"
 # one-liners
 build = "mkdir -p tmp/bin && go build -o tmp/bin/gshoot ./cmd/gshoot"
 build-smoke = "mkdir -p tmp/bin && go build -o tmp/bin/smoke ./cmd/smoke"
+ci = "mise check"
 lint = "go vet  ./... && mise _banner '✓ lint ✓'"
 test = "go test ./... && mise _banner '✓ test ✓'"
 
