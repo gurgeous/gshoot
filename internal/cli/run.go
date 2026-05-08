@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -13,10 +14,12 @@ import (
 	"github.com/gurgeous/gshoot/internal/down"
 	"github.com/gurgeous/gshoot/internal/listing"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"golang.org/x/oauth2"
 )
 
 var (
+	version         = "dev"
 	resolveAuth     = auth.Resolve
 	newTokenSource  = auth.NewTokenSource
 	loginAuth       = auth.Login
@@ -37,7 +40,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	cmd.SetArgs(args)
 
 	if err := cmd.Execute(); err != nil {
-		fmt.Fprintln(stderr, err)
+		writeError(stderr, err)
 		return 1
 	}
 
@@ -45,18 +48,36 @@ func Run(args []string, stdout, stderr io.Writer) int {
 }
 
 func newRootCmd(stdout, stderr io.Writer) *cobra.Command {
+	var showVersion bool
+
 	cmd := &cobra.Command{
 		Use:           "gshoot",
-		Short:         "CSV to Google Sheets workflows",
+		Short:         "Magically import/export CSVs from Google Sheets.",
+		Example:       "",
 		SilenceUsage:  true,
 		SilenceErrors: true,
+		CompletionOptions: cobra.CompletionOptions{
+			HiddenDefaultCmd: true,
+		},
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if showVersion {
+				fmt.Fprintf(stdout, "gshoot %s\n", version)
+				return nil
+			}
+			writeHelp(stdout, cmd)
+			return nil
+		},
 	}
 
 	cmd.SetOut(stdout)
 	cmd.SetErr(stderr)
+	cmd.Flags().BoolVar(&showVersion, "version", false, "show gshoot version")
+	cmd.SetHelpFunc(func(command *cobra.Command, _ []string) {
+		writeHelp(stdout, command)
+	})
 	cmd.AddCommand(
 		newAuthCmd(stdout, stderr),
-		newStubCmd("up", "Upload CSV data to Google Sheets"),
+		newStubCmd("up", "Upload a local CSV file to a Google Sheet"),
 		newDownCmd(stdout, stderr),
 		newListCmd(stdout, stderr),
 	)
@@ -67,7 +88,7 @@ func newRootCmd(stdout, stderr io.Writer) *cobra.Command {
 func newAuthCmd(stdout, stderr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "auth",
-		Short: "Authentication helpers",
+		Short: "Login (or logout) from Google Sheets",
 	}
 	cmd.AddCommand(
 		newAuthLoginCmd(stdout, stderr),
@@ -83,7 +104,11 @@ func newAuthLoginCmd(stdout, stderr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "login",
 		Short: "Run browser OAuth login",
-		Args:  cobra.NoArgs,
+		Example: strings.Join([]string{
+			"gshoot auth login",
+			"  gshoot auth login --client-secret ~/Downloads/client_secret.json",
+		}, "\n"),
+		Args: noArgs("gshoot auth login"),
 		RunE: func(_ *cobra.Command, _ []string) error {
 			return loginAuth(context.Background(), auth.LoginOptions{
 				Env:              auth.NewEnv(nil),
@@ -98,22 +123,23 @@ func newAuthLoginCmd(stdout, stderr io.Writer) *cobra.Command {
 }
 
 func newAuthStatusCmd(stdout, _ io.Writer) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "status",
 		Short: "Show auth status",
-		Args:  cobra.NoArgs,
+		Args:  noArgs("gshoot auth status"),
 		RunE: func(_ *cobra.Command, _ []string) error {
 			printAuthStatus(stdout, statusAuth(auth.NewEnv(nil)))
 			return nil
 		},
 	}
+	return cmd
 }
 
 func newAuthLogoutCmd(stdout, _ io.Writer) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "logout",
 		Short: "Clear cached OAuth token",
-		Args:  cobra.NoArgs,
+		Args:  noArgs("gshoot auth logout"),
 		RunE: func(_ *cobra.Command, _ []string) error {
 			removed, err := logoutAuth(auth.NewEnv(nil))
 			if err != nil {
@@ -127,15 +153,20 @@ func newAuthLogoutCmd(stdout, _ io.Writer) *cobra.Command {
 			return nil
 		},
 	}
+	return cmd
 }
 
-func newDownCmd(stdout, stderr io.Writer) *cobra.Command {
+func newDownCmd(stdout, _ io.Writer) *cobra.Command {
 	var outputPath string
 
 	cmd := &cobra.Command{
 		Use:   "down <spreadsheet> [sheet]",
-		Short: "Download sheet data",
-		Args:  cobra.RangeArgs(1, 2),
+		Short: "Download a Google Sheet as CSV",
+		Example: strings.Join([]string{
+			"gshoot down Budget",
+			"  gshoot down Budget Q1 --output q1.csv",
+		}, "\n"),
+		Args: downArgs,
 		RunE: func(_ *cobra.Command, args []string) error {
 			ctx := context.Background()
 			resolved, err := resolveAuth(auth.Options{
@@ -198,18 +229,36 @@ func newDownCmd(stdout, stderr io.Writer) *cobra.Command {
 }
 
 func newStubCmd(use, short string) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   use,
 		Short: short,
 		Run:   func(*cobra.Command, []string) {},
 	}
+	return cmd
 }
 
-func newListCmd(stdout, stderr io.Writer) *cobra.Command {
-	return &cobra.Command{
-		Use:   "list",
-		Short: "List recent spreadsheets",
-		Args:  cobra.NoArgs,
+func noArgs(usage string) cobra.PositionalArgs {
+	return func(_ *cobra.Command, args []string) error {
+		if len(args) == 0 {
+			return nil
+		}
+		return fmt.Errorf("expected `%s`", usage)
+	}
+}
+
+func downArgs(_ *cobra.Command, args []string) error {
+	if len(args) >= 1 && len(args) <= 2 {
+		return nil
+	}
+	return fmt.Errorf("expected `gshoot down <spreadsheet> [sheet]`")
+}
+
+func newListCmd(stdout, _ io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "list",
+		Short:   "List your Google Sheets",
+		Example: "  gshoot list",
+		Args:    noArgs("gshoot list"),
 		RunE: func(*cobra.Command, []string) error {
 			ctx := context.Background()
 			resolved, err := resolveAuth(auth.Options{
@@ -251,4 +300,118 @@ func newListCmd(stdout, stderr io.Writer) *cobra.Command {
 			return nil
 		},
 	}
+	return cmd
+}
+
+func writeHelp(w io.Writer, cmd *cobra.Command) {
+	if isRootCmd(cmd) {
+		writeRootHelp(w, cmd)
+		return
+	}
+	writeCommandHelp(w, cmd)
+}
+
+func writeRootHelp(w io.Writer, cmd *cobra.Command) {
+	if text := commandSummary(cmd); text != "" {
+		fmt.Fprintln(w, text)
+		fmt.Fprintln(w)
+	}
+	fmt.Fprintf(w, "USAGE\n  %s <command> <subcommand> [flags]\n", cmd.Name())
+
+	commands := availableCommands(cmd)
+	if len(commands) == 0 {
+		return
+	}
+
+	fmt.Fprintln(w)
+	for _, sub := range commands {
+		fmt.Fprintf(w, "  %s%s\n", rpad(sub.Name(), cmd.NamePadding()), sub.Short)
+	}
+}
+
+func writeCommandHelp(w io.Writer, cmd *cobra.Command) {
+	if text := commandSummary(cmd); text != "" {
+		fmt.Fprintln(w, text)
+		fmt.Fprintln(w)
+	}
+	fmt.Fprintf(w, "USAGE\n  %s\n", cmd.UseLine())
+
+	if commands := availableCommands(cmd); len(commands) > 0 {
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "COMMANDS")
+		for _, sub := range commands {
+			fmt.Fprintf(w, "  %s%s\n", rpad(sub.Name(), cmd.NamePadding()), sub.Short)
+		}
+	}
+
+	if flags := trimmedFlagUsages(cmd.LocalFlags()); flags != "" {
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "FLAGS")
+		fmt.Fprint(w, indent(flags, "  "))
+		fmt.Fprintln(w)
+	}
+
+	if flags := trimmedFlagUsages(cmd.InheritedFlags()); flags != "" {
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "INHERITED FLAGS")
+		fmt.Fprint(w, indent(flags, "  "))
+		fmt.Fprintln(w)
+	}
+
+	if example := strings.TrimSpace(cmd.Example); example != "" {
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "EXAMPLES")
+		fmt.Fprintln(w, indent(example, "  "))
+	}
+}
+
+func isRootCmd(cmd *cobra.Command) bool {
+	return cmd != nil && !cmd.HasParent()
+}
+
+func commandSummary(cmd *cobra.Command) string {
+	if cmd.Long != "" {
+		return strings.TrimSpace(cmd.Long)
+	}
+	return strings.TrimSpace(cmd.Short)
+}
+
+func availableCommands(cmd *cobra.Command) []*cobra.Command {
+	var commands []*cobra.Command
+	for _, sub := range cmd.Commands() {
+		if !sub.IsAvailableCommand() || sub.IsAdditionalHelpTopicCommand() {
+			continue
+		}
+		commands = append(commands, sub)
+	}
+	return commands
+}
+
+func trimmedFlagUsages(flags *pflag.FlagSet) string {
+	if flags == nil {
+		return ""
+	}
+	return strings.TrimRight(flags.FlagUsages(), "\n")
+}
+
+func indent(text, prefix string) string {
+	if text == "" {
+		return ""
+	}
+	var buf bytes.Buffer
+	for i, line := range strings.Split(text, "\n") {
+		if i > 0 {
+			buf.WriteByte('\n')
+		}
+		buf.WriteString(prefix)
+		buf.WriteString(line)
+	}
+	return buf.String()
+}
+
+func rpad(text string, padding int) string {
+	if len(text) >= padding {
+		return text + " "
+	}
+	return text + strings.Repeat(" ", padding-len(text))
 }

@@ -30,8 +30,8 @@ func TestResolveMissingAuthGuidesLogin(t *testing.T) {
 	if !errors.As(err, &noAuth) {
 		t.Fatalf("Resolve() error = %T, want NoAuthError", err)
 	}
-	if !strings.Contains(err.Error(), "gshoot auth login") {
-		t.Fatalf("Resolve() error = %q, want login guidance", err.Error())
+	if got, want := noAuth.Error(), "gshoot: list [no auth found]\n"; got != want {
+		t.Fatalf("Resolve() error = %q, want %q", got, want)
 	}
 }
 

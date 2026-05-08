@@ -1,12 +1,15 @@
 [env]
-_.path = ["{{config_root}}/zig-out/bin", '{{config_root}}/bin']
+_.path = ["{{config_root}}/tmp/bin"]
 
 [settings]
 task.output = "quiet"
 
+[shell_alias]
+gshoot = "go run ./cmd/gshoot"
+
 [tools]
-gofumpt = "latest"
 golang = "latest"
+golangci-lint = "latest"
 
 #
 # tasks
@@ -15,41 +18,19 @@ golang = "latest"
 [tasks]
 
 # one-liners
-build = "mkdir -p tmp && go build -o tmp/gshoot ./cmd/gshoot"
-build-smoke = "mkdir -p tmp && go build -o tmp/smoke  ./cmd/smoke"
-lint = "go vet  ./... && mise _banner '✓ lint ✓'"
+build = "mkdir -p tmp/bin && go build -o tmp/bin/gshoot ./cmd/gshoot"
+build-smoke = "mkdir -p tmp/bin && go build -o tmp/bin/smoke ./cmd/smoke"
+check = "mise lint ::: test ::: build && mise _banner -- '✓ check ✓'"
+ci = "mise check"
+format = "golangci-lint fmt && mise _banner '✓ format ✓'"
+lint = "golangci-lint run && mise _banner '✓ lint ✓'"
 test = "go test ./... && mise _banner '✓ test ✓'"
-
-check = """
-mise lint ::: test ::: build
-mise _banner -- "✓ check ✓"
-"""
-
-fmt = """
-gofumpt -w $(find cmd internal -name '*.go')
-if command -v gci >/dev/null 2>&1; then
-  gci write -s standard -s default -s 'prefix(github.com/gurgeous/gshoot)' cmd internal
-else
-  mise _warning -- "skipping gci [not installed]"
-fi
-"""
-
-init = """
-if command -v gci >/dev/null 2>&1; then
-  mise _banner -- "gci already installed"
-else
-  mise _banner -- "installing gci..."
-  go install github.com/daixiang0/gci@latest
-fi
-mise _banner "✓ init ✓"
-"""
 
 smoke = """
 mise build ::: build-smoke
-./tmp/smoke
+./tmp/bin/smoke
 mise _banner "✓ smoke ✓"
 """
-
 
 #
 # banner and friends

@@ -3,6 +3,7 @@
 ## Project
 
 - After any non-Markdown change, run `mise check`
+- If user-facing text changes, ask before reverting it; usually fix tests instead
 - Small Go CLI, not a framework or service
 - Be succinct, especially in Markdown
 - Prefer `mise run` tasks when they exist
@@ -34,7 +35,7 @@
 
 ## Tests
 
-- Use TDD: write or extend the test or `gsmoke` coverage first, then implement
+- Use TDD: write or extend the test or `smoke` coverage first, then implement
 - Keep unit tests deterministic and network-free
 - Put real API coverage in the manual smoke path
 - Write smoke and other temp files under `tmp/`

@@ -28,12 +28,37 @@ func TestRunRootHelp(t *testing.T) {
 	}
 
 	output := stdout.String()
-	for _, want := range []string{"gshoot", "auth", "up", "down", "list"} {
+	for _, want := range []string{"USAGE", "gshoot <command> <subcommand> [flags]", "auth", "up", "down", "list"} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("help output missing %q:\n%s", want, output)
 		}
 	}
+	if strings.Contains(output, "Flags:") {
+		t.Fatalf("help output = %q, want no flags section", output)
+	}
 
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+}
+
+func TestRunVersion(t *testing.T) {
+	t.Parallel()
+
+	origVersion := version
+	version = "1.2.3"
+	defer func() { version = origVersion }()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run([]string{"--version"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0", code)
+	}
+	if got, want := stdout.String(), "gshoot 1.2.3\n"; got != want {
+		t.Fatalf("stdout = %q, want %q", got, want)
+	}
 	if stderr.Len() != 0 {
 		t.Fatalf("stderr = %q, want empty", stderr.String())
 	}
@@ -54,8 +79,32 @@ func TestRunUnknownCommand(t *testing.T) {
 		t.Fatalf("stdout = %q, want empty", stdout.String())
 	}
 
-	if !strings.Contains(stderr.String(), "unknown command") {
-		t.Fatalf("stderr = %q, want unknown command", stderr.String())
+	got := stderr.String()
+	for _, want := range []string{
+		`gshoot: unknown command "wat"`,
+		helpHint,
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("stderr = %q, want %q", got, want)
+		}
+	}
+}
+
+func TestRunDownMissingArgs(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run([]string{"down"}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("Run() code = %d, want 1", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	if got := stderr.String(); got != "gshoot: expected `gshoot down <spreadsheet> [sheet]`\n"+helpHint+"\n" {
+		t.Fatalf("stderr = %q", got)
 	}
 }
 
@@ -65,14 +114,14 @@ func TestRunSubcommandHelp(t *testing.T) {
 	tests := []struct {
 		name string
 		args []string
-		want string
+		want []string
 	}{
-		{name: "auth", args: []string{"auth", "--help"}, want: "Authentication helpers"},
-		{name: "auth status", args: []string{"auth", "status", "--help"}, want: "Show auth status"},
-		{name: "auth logout", args: []string{"auth", "logout", "--help"}, want: "Clear cached OAuth token"},
-		{name: "up", args: []string{"up", "--help"}, want: "Upload CSV data"},
-		{name: "down", args: []string{"down", "--help"}, want: "Download sheet data"},
-		{name: "list", args: []string{"list", "--help"}, want: "List recent spreadsheets"},
+		{name: "auth", args: []string{"auth", "--help"}, want: []string{"Login (or logout) from Google Sheets", "USAGE", "COMMANDS"}},
+		{name: "auth status", args: []string{"auth", "status", "--help"}, want: []string{"Show auth status", "USAGE"}},
+		{name: "auth logout", args: []string{"auth", "logout", "--help"}, want: []string{"Clear cached OAuth token", "USAGE"}},
+		{name: "up", args: []string{"up", "--help"}, want: []string{"Upload a local CSV file to a Google Sheet", "USAGE"}},
+		{name: "down", args: []string{"down", "--help"}, want: []string{"Download a Google Sheet as CSV", "USAGE", "FLAGS", "EXAMPLES"}},
+		{name: "list", args: []string{"list", "--help"}, want: []string{"List your Google Sheets", "USAGE", "EXAMPLES"}},
 	}
 
 	for _, tt := range tests {
@@ -87,8 +136,10 @@ func TestRunSubcommandHelp(t *testing.T) {
 				t.Fatalf("Run() code = %d, want 0", code)
 			}
 
-			if !strings.Contains(stdout.String(), tt.want) {
-				t.Fatalf("stdout = %q, want %q", stdout.String(), tt.want)
+			for _, want := range tt.want {
+				if !strings.Contains(stdout.String(), want) {
+					t.Fatalf("stdout = %q, want %q", stdout.String(), want)
+				}
 			}
 
 			if stderr.Len() != 0 {
@@ -168,8 +219,8 @@ func TestRunListAuthError(t *testing.T) {
 	if stdout.Len() != 0 {
 		t.Fatalf("stdout = %q, want empty", stdout.String())
 	}
-	if !strings.Contains(stderr.String(), "no auth") {
-		t.Fatalf("stderr = %q, want auth error", stderr.String())
+	if got, want := stderr.String(), "gshoot: no auth\n"+helpHint+"\n"; got != want {
+		t.Fatalf("stderr = %q, want %q", got, want)
 	}
 }
 
@@ -296,8 +347,8 @@ func TestRunDownMissingSpreadsheet(t *testing.T) {
 	if stdout.Len() != 0 {
 		t.Fatalf("stdout = %q, want empty", stdout.String())
 	}
-	if !strings.Contains(stderr.String(), "hint: run `gshoot list`") {
-		t.Fatalf("stderr = %q, want list hint", stderr.String())
+	if got, want := stderr.String(), "gshoot: spreadsheet not found: Budget\n"+helpHint+"\n"; got != want {
+		t.Fatalf("stderr = %q, want %q", got, want)
 	}
 }
 
@@ -327,8 +378,8 @@ func TestRunDownNoSheets(t *testing.T) {
 	if code != 1 {
 		t.Fatalf("Run() code = %d, want 1", code)
 	}
-	if !strings.Contains(stderr.String(), "spreadsheet has no sheets") {
-		t.Fatalf("stderr = %q, want no-sheets error", stderr.String())
+	if got, want := stderr.String(), "gshoot: spreadsheet has no sheets: Budget\n"+helpHint+"\n"; got != want {
+		t.Fatalf("stderr = %q, want %q", got, want)
 	}
 }
 

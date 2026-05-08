@@ -60,7 +60,7 @@ func TestRunInfersSiblingBinary(t *testing.T) {
 	var ran []string
 	runCommand = func(name string, args ...string) error {
 		ran = append([]string{name}, args...)
-		return os.WriteFile(filepath.Join(smokeTmpDir(), "gsmoke-down.csv"), []byte(expectedDownCSV), 0o644)
+		return os.WriteFile(filepath.Join(smokeTmpDir(), "smoke-down.csv"), []byte(expectedDownCSV), 0o644)
 	}
 	smokeTmpDir = func() string { return tmpDir }
 
@@ -71,11 +71,11 @@ func TestRunInfersSiblingBinary(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("Run() code = %d, want 0", code)
 	}
-	want := []string{gshootPath, "down", "gsmoke", "down-basic", "--output", filepath.Join(tmpDir, "gsmoke-down.csv")}
+	want := []string{gshootPath, "down", "gshoot-smoke", "down-basic", "--output", filepath.Join(tmpDir, "smoke-down.csv")}
 	if strings.Join(ran, "\x00") != strings.Join(want, "\x00") {
 		t.Fatalf("runCommand() = %#v, want %#v", ran, want)
 	}
-	if !strings.Contains(stdout.String(), "running "+gshootPath+" down gsmoke down-basic") {
+	if !strings.Contains(stdout.String(), "running "+gshootPath+" down gshoot-smoke down-basic") {
 		t.Fatalf("stdout = %q, want inferred command", stdout.String())
 	}
 	if stderr.Len() != 0 {
