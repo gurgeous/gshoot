@@ -36,6 +36,8 @@ fi
 
 init = """
 if command -v gci >/dev/null 2>&1; then
+  mise _banner -- "gci already installed"
+else
   mise _banner -- "installing gci..."
   go install github.com/daixiang0/gci@latest
 fi

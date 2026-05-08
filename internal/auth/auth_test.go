@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -449,6 +450,62 @@ func TestLoadOAuthTokenInvalidJSON(t *testing.T) {
 	_, err := LoadOAuthToken(path)
 	if err == nil {
 		t.Fatal("LoadOAuthToken() error = nil, want error")
+	}
+}
+
+func TestNewTokenSourceExpiredCachedOAuthWithoutClientConfig(t *testing.T) {
+	t.Parallel()
+
+	resolved := Resolved{
+		Scopes:          ScopesForCommand(CommandList),
+		OAuthClientPath: filepath.Join(t.TempDir(), "oauth-client.json"),
+		Source: Source{
+			Kind: SourceKindCachedOAuth,
+			OAuthToken: &OAuthToken{
+				AccessToken:  "expired",
+				RefreshToken: "refresh",
+				TokenType:    "Bearer",
+				Expiry:       time.Now().Add(-time.Hour),
+			},
+		},
+	}
+
+	_, err := NewTokenSource(context.Background(), resolved)
+	if err == nil {
+		t.Fatal("NewTokenSource() error = nil, want error")
+	}
+	if !strings.Contains(err.Error(), "expired") || !strings.Contains(err.Error(), "oauth-client.json") {
+		t.Fatalf("NewTokenSource() error = %q, want actionable error", err.Error())
+	}
+}
+
+func TestNewTokenSourceValidCachedOAuthWithoutClientConfig(t *testing.T) {
+	t.Parallel()
+
+	resolved := Resolved{
+		Scopes:          ScopesForCommand(CommandList),
+		OAuthClientPath: filepath.Join(t.TempDir(), "oauth-client.json"),
+		Source: Source{
+			Kind: SourceKindCachedOAuth,
+			OAuthToken: &OAuthToken{
+				AccessToken: "valid",
+				TokenType:   "Bearer",
+				Expiry:      time.Now().Add(time.Hour),
+			},
+		},
+	}
+
+	src, err := NewTokenSource(context.Background(), resolved)
+	if err != nil {
+		t.Fatalf("NewTokenSource() error = %v", err)
+	}
+
+	token, err := src.Token()
+	if err != nil {
+		t.Fatalf("Token() error = %v", err)
+	}
+	if token.AccessToken != "valid" {
+		t.Fatalf("Token() access token = %q, want valid", token.AccessToken)
 	}
 }
 

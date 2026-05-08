@@ -2,8 +2,15 @@ package cli
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/gurgeous/gshoot/internal/auth"
+	"github.com/gurgeous/gshoot/internal/listing"
+	"golang.org/x/oauth2"
 )
 
 func TestRunRootHelp(t *testing.T) {
@@ -83,4 +90,105 @@ func TestRunSubcommandHelp(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRunList(t *testing.T) {
+	restore := stubListDeps(t)
+	defer restore()
+
+	resolveAuth = func(opts auth.Options) (auth.Resolved, error) {
+		if opts.Command != auth.CommandList {
+			t.Fatalf("Resolve() command = %q, want list", opts.Command)
+		}
+		return auth.Resolved{Scopes: auth.ScopesForCommand(auth.CommandList)}, nil
+	}
+	newTokenSource = func(_ context.Context, _ auth.Resolved) (oauth2.TokenSource, error) {
+		return oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "token"}), nil
+	}
+	newListingClient = func(_ context.Context, _ oauth2.TokenSource) (listing.Client, error) {
+		return &fakeListingClient{
+			items: []listing.DriveSpreadsheet{
+				{ID: "1", Name: "Alpha", ModifiedTime: time.Date(2026, 5, 7, 12, 0, 0, 0, time.UTC)},
+				{ID: "2", Name: "Beta", ModifiedTime: time.Date(2026, 5, 7, 11, 0, 0, 0, time.UTC)},
+			},
+			sheets: map[string][]string{
+				"1": {"One", "Two", "Three", "Four"},
+				"2": {"Only"},
+			},
+		}, nil
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run([]string{"list"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0", code)
+	}
+
+	output := stdout.String()
+	for _, want := range []string{
+		"2026-05-07T12:00:00Z  Alpha",
+		"One, Two, Three, ...",
+		"2026-05-07T11:00:00Z  Beta",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("stdout missing %q:\n%s", want, output)
+		}
+	}
+	if strings.Contains(output, "Only") {
+		t.Fatalf("stdout = %q, want no preview for single-sheet spreadsheet", output)
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+}
+
+func TestRunListAuthError(t *testing.T) {
+	restore := stubListDeps(t)
+	defer restore()
+
+	resolveAuth = func(auth.Options) (auth.Resolved, error) {
+		return auth.Resolved{}, errors.New("no auth")
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run([]string{"list"}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("Run() code = %d, want 1", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "no auth") {
+		t.Fatalf("stderr = %q, want auth error", stderr.String())
+	}
+}
+
+func stubListDeps(t *testing.T) func() {
+	t.Helper()
+
+	origResolve := resolveAuth
+	origToken := newTokenSource
+	origClient := newListingClient
+	return func() {
+		resolveAuth = origResolve
+		newTokenSource = origToken
+		newListingClient = origClient
+	}
+}
+
+type fakeListingClient struct {
+	items  []listing.DriveSpreadsheet
+	sheets map[string][]string
+}
+
+func (f *fakeListingClient) ListSpreadsheets(context.Context, int) ([]listing.DriveSpreadsheet, error) {
+	return f.items, nil
+}
+
+func (f *fakeListingClient) ListSheetNames(_ context.Context, spreadsheetID string) ([]string, error) {
+	return f.sheets[spreadsheetID], nil
 }
