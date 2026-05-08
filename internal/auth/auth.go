@@ -6,16 +6,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
+	"time"
 )
 
 const (
-	configDirEnvName         = "GSHOOT_CONFIG_DIR"
-	tokenEnvName             = "GSHOOT_TOKEN"
-	credentialsFileEnvName   = "GSHOOT_CREDENTIALS_FILE"
-	applicationCredsEnvName  = "GOOGLE_APPLICATION_CREDENTIALS"
-	oauthClientFileName      = "oauth-client.json"
-	oauthTokenFileName       = "oauth-token.json"
+	oauthClientFileName = "oauth-client.json"
+	oauthTokenFileName  = "oauth-token.json"
 )
 
 // Command identifies a gshoot subcommand for scope selection.
@@ -46,8 +42,53 @@ const (
 	CredentialKindServiceAccount CredentialKind = "service_account"
 )
 
-// Env provides environment lookup for auth resolution.
-type Env map[string]string
+// Env houses the environment variables gshoot uses.
+type Env struct {
+	values map[string]string
+}
+
+// NewEnv builds an Env from explicit values.
+func NewEnv(values map[string]string) Env {
+	return Env{values: values}
+}
+
+// Lookup returns an environment value.
+func (e Env) Lookup(key string) string {
+	if e.values != nil {
+		return e.values[key]
+	}
+	return os.Getenv(key)
+}
+
+func (e Env) ConfigDirOverride() string {
+	return e.Lookup("GSHOOT_CONFIG_DIR")
+}
+
+func (e Env) Token() string {
+	return e.Lookup("GSHOOT_TOKEN")
+}
+
+func (e Env) CredentialsFile() string {
+	return e.Lookup("GSHOOT_CREDENTIALS_FILE")
+}
+
+func (e Env) ApplicationCredentials() string {
+	return e.Lookup("GOOGLE_APPLICATION_CREDENTIALS")
+}
+
+func (e Env) XDGConfigHome() string {
+	return e.Lookup("XDG_CONFIG_HOME")
+}
+
+func (e Env) Home() string {
+	if home := e.Lookup("HOME"); home != "" {
+		return home
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		return home
+	}
+	return "."
+}
 
 // Options configures auth resolution.
 type Options struct {
@@ -57,18 +98,20 @@ type Options struct {
 
 // Resolved describes the chosen auth source and supporting paths.
 type Resolved struct {
-	ConfigDir      string
-	Scopes         []string
-	Source         Source
+	ConfigDir       string
+	Scopes          []string
+	Source          Source
 	OAuthClientPath string
 	OAuthTokenPath  string
 }
 
 // Source identifies one auth source.
 type Source struct {
-	Kind  SourceKind
-	Path  string
-	Token string
+	Kind           SourceKind
+	Path           string
+	Token          string
+	CredentialFile *CredentialFile
+	OAuthToken     *OAuthToken
 }
 
 // CredentialFile is a parsed credential file.
@@ -108,10 +151,10 @@ type OAuthClient struct {
 
 // OAuthToken is cached OAuth token state.
 type OAuthToken struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-	TokenType    string `json:"token_type"`
-	Expiry       string `json:"expiry"`
+	AccessToken  string    `json:"access_token"`
+	RefreshToken string    `json:"refresh_token"`
+	TokenType    string    `json:"token_type"`
+	Expiry       time.Time `json:"expiry"`
 }
 
 // ScopesForCommand returns Google API scopes for a CLI command.
@@ -134,13 +177,13 @@ func ScopesForCommand(cmd Command) []string {
 
 // ConfigDir returns the config directory for gshoot.
 func ConfigDir(env Env) string {
-	if dir := envLookup(env, configDirEnvName); dir != "" {
+	if dir := env.ConfigDirOverride(); dir != "" {
 		return dir
 	}
-	if dir := envLookup(env, "XDG_CONFIG_HOME"); dir != "" {
+	if dir := env.XDGConfigHome(); dir != "" {
 		return filepath.Join(dir, "gshoot")
 	}
-	return filepath.Join(homeDir(env), ".config", "gshoot")
+	return filepath.Join(env.Home(), ".config", "gshoot")
 }
 
 // Resolve picks the best auth source for a command.
@@ -149,8 +192,11 @@ func Resolve(opts Options) (Resolved, error) {
 	oauthClientPath := filepath.Join(configDir, oauthClientFileName)
 	oauthTokenPath := filepath.Join(configDir, oauthTokenFileName)
 	scopes := ScopesForCommand(opts.Command)
+	if len(scopes) == 0 {
+		return Resolved{}, fmt.Errorf("unknown command for auth scopes: %q", opts.Command)
+	}
 
-	if token := envLookup(opts.Env, tokenEnvName); token != "" {
+	if token := opts.Env.Token(); token != "" {
 		return Resolved{
 			ConfigDir:       configDir,
 			Scopes:          scopes,
@@ -163,9 +209,10 @@ func Resolve(opts Options) (Resolved, error) {
 		}, nil
 	}
 
-	if path := envLookup(opts.Env, credentialsFileEnvName); path != "" {
-		if _, err := LoadCredentialFile(path); err != nil {
-			return Resolved{}, fmt.Errorf("load %s: %w", credentialsFileEnvName, err)
+	if path := opts.Env.CredentialsFile(); path != "" {
+		cred, err := LoadCredentialFile(path)
+		if err != nil {
+			return Resolved{}, fmt.Errorf("load $GSHOOT_CREDENTIALS_FILE: %w", err)
 		}
 		return Resolved{
 			ConfigDir:       configDir,
@@ -173,15 +220,35 @@ func Resolve(opts Options) (Resolved, error) {
 			OAuthClientPath: oauthClientPath,
 			OAuthTokenPath:  oauthTokenPath,
 			Source: Source{
-				Kind: SourceKindCredentialsFile,
-				Path: path,
+				Kind:           SourceKindCredentialsFile,
+				Path:           path,
+				CredentialFile: &cred,
 			},
 		}, nil
 	}
 
-	if fileExists(oauthTokenPath) {
-		if _, err := LoadOAuthToken(oauthTokenPath); err != nil {
-			return Resolved{}, fmt.Errorf("load cached oauth token: %w", err)
+	token, err := LoadOAuthToken(oauthTokenPath)
+	if err == nil {
+		return Resolved{
+			ConfigDir:       configDir,
+			Scopes:          scopes,
+			OAuthClientPath: oauthClientPath,
+			OAuthTokenPath:  oauthTokenPath,
+			Source: Source{
+				Kind:       SourceKindCachedOAuth,
+				Path:       oauthTokenPath,
+				OAuthToken: &token,
+			},
+		}, nil
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return Resolved{}, fmt.Errorf("load cached oauth token: %w", err)
+	}
+
+	if path := opts.Env.ApplicationCredentials(); path != "" {
+		cred, loadErr := LoadCredentialFile(path)
+		if loadErr != nil {
+			return Resolved{}, fmt.Errorf("load $GOOGLE_APPLICATION_CREDENTIALS: %w", loadErr)
 		}
 		return Resolved{
 			ConfigDir:       configDir,
@@ -189,53 +256,37 @@ func Resolve(opts Options) (Resolved, error) {
 			OAuthClientPath: oauthClientPath,
 			OAuthTokenPath:  oauthTokenPath,
 			Source: Source{
-				Kind: SourceKindCachedOAuth,
-				Path: oauthTokenPath,
+				Kind:           SourceKindApplicationDefaultCredentials,
+				Path:           path,
+				CredentialFile: &cred,
 			},
 		}, nil
 	}
 
-	if path := envLookup(opts.Env, applicationCredsEnvName); path != "" {
-		if _, err := LoadCredentialFile(path); err != nil {
-			return Resolved{}, fmt.Errorf("load %s: %w", applicationCredsEnvName, err)
-		}
+	adcPath := filepath.Join(opts.Env.Home(), ".config", "gcloud", "application_default_credentials.json")
+	cred, err := LoadCredentialFile(adcPath)
+	if err == nil {
 		return Resolved{
 			ConfigDir:       configDir,
 			Scopes:          scopes,
 			OAuthClientPath: oauthClientPath,
 			OAuthTokenPath:  oauthTokenPath,
 			Source: Source{
-				Kind: SourceKindApplicationDefaultCredentials,
-				Path: path,
+				Kind:           SourceKindApplicationDefaultCredentials,
+				Path:           adcPath,
+				CredentialFile: &cred,
 			},
 		}, nil
 	}
-
-	adcPath := filepath.Join(homeDir(opts.Env), ".config", "gcloud", "application_default_credentials.json")
-	if fileExists(adcPath) {
-		if _, err := LoadCredentialFile(adcPath); err != nil {
-			return Resolved{}, fmt.Errorf("load application default credentials: %w", err)
-		}
-		return Resolved{
-			ConfigDir:       configDir,
-			Scopes:          scopes,
-			OAuthClientPath: oauthClientPath,
-			OAuthTokenPath:  oauthTokenPath,
-			Source: Source{
-				Kind: SourceKindApplicationDefaultCredentials,
-				Path: adcPath,
-			},
-		}, nil
+	if !errors.Is(err, os.ErrNotExist) {
+		return Resolved{}, fmt.Errorf("load application default credentials: %w", err)
 	}
 
-	checked := []string{
-		tokenEnvName,
-		credentialsFileEnvName,
+	return Resolved{}, fmt.Errorf(
+		"no auth found; checked env vars $GSHOOT_TOKEN, $GSHOOT_CREDENTIALS_FILE, $GOOGLE_APPLICATION_CREDENTIALS; checked files %s, %s",
 		oauthTokenPath,
-		applicationCredsEnvName,
 		adcPath,
-	}
-	return Resolved{}, fmt.Errorf("no auth found; checked %s", strings.Join(checked, ", "))
+	)
 }
 
 // LoadCredentialFile parses a credentials file.
@@ -246,7 +297,17 @@ func LoadCredentialFile(path string) (CredentialFile, error) {
 	}
 
 	var raw struct {
-		Type      string       `json:"type"`
+		Type string `json:"type"`
+
+		ClientID     string `json:"client_id"`
+		ClientSecret string `json:"client_secret"`
+		RefreshToken string `json:"refresh_token"`
+
+		ClientEmail  string `json:"client_email"`
+		PrivateKey   string `json:"private_key"`
+		PrivateKeyID string `json:"private_key_id"`
+		TokenURI     string `json:"token_uri"`
+
 		Installed *OAuthClient `json:"installed"`
 		Web       *OAuthClient `json:"web"`
 	}
@@ -268,24 +329,27 @@ func LoadCredentialFile(path string) (CredentialFile, error) {
 			OAuthClient: raw.Web,
 		}, nil
 	case raw.Type == "authorized_user":
-		var cred AuthorizedUser
-		if err := json.Unmarshal(data, &cred); err != nil {
-			return CredentialFile{}, err
-		}
 		return CredentialFile{
-			Kind:           CredentialKindAuthorizedUser,
-			Path:           path,
-			AuthorizedUser: &cred,
+			Kind: CredentialKindAuthorizedUser,
+			Path: path,
+			AuthorizedUser: &AuthorizedUser{
+				ClientID:     raw.ClientID,
+				ClientSecret: raw.ClientSecret,
+				RefreshToken: raw.RefreshToken,
+				Type:         raw.Type,
+			},
 		}, nil
 	case raw.Type == "service_account":
-		var cred ServiceAccount
-		if err := json.Unmarshal(data, &cred); err != nil {
-			return CredentialFile{}, err
-		}
 		return CredentialFile{
-			Kind:           CredentialKindServiceAccount,
-			Path:           path,
-			ServiceAccount: &cred,
+			Kind: CredentialKindServiceAccount,
+			Path: path,
+			ServiceAccount: &ServiceAccount{
+				Type:         raw.Type,
+				ClientEmail:  raw.ClientEmail,
+				PrivateKey:   raw.PrivateKey,
+				PrivateKeyID: raw.PrivateKeyID,
+				TokenURI:     raw.TokenURI,
+			},
 		}, nil
 	default:
 		return CredentialFile{}, errors.New("unsupported credential file")
@@ -304,26 +368,4 @@ func LoadOAuthToken(path string) (OAuthToken, error) {
 		return OAuthToken{}, err
 	}
 	return token, nil
-}
-
-func envLookup(env Env, key string) string {
-	if env != nil {
-		return env[key]
-	}
-	return os.Getenv(key)
-}
-
-func homeDir(env Env) string {
-	if home := envLookup(env, "HOME"); home != "" {
-		return home
-	}
-	if home, err := os.UserHomeDir(); err == nil {
-		return home
-	}
-	return "."
-}
-
-func fileExists(path string) bool {
-	info, err := os.Stat(path)
-	return err == nil && !info.IsDir()
 }

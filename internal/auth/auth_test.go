@@ -1,11 +1,13 @@
 package auth
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestScopesForCommand(t *testing.T) {
@@ -53,9 +55,18 @@ func TestScopesForCommand(t *testing.T) {
 	}
 }
 
+func TestScopesForCommandUnknown(t *testing.T) {
+	t.Parallel()
+
+	if got := ScopesForCommand(Command("wat")); got != nil {
+		t.Fatalf("ScopesForCommand() = %#v, want nil", got)
+	}
+}
+
 func TestConfigDir(t *testing.T) {
 	t.Parallel()
 
+	home := t.TempDir()
 	tests := []struct {
 		name string
 		env  Env
@@ -63,26 +74,18 @@ func TestConfigDir(t *testing.T) {
 	}{
 		{
 			name: "override",
-			env: Env{
-				"GSHOOT_CONFIG_DIR": "/tmp/gshoot-config",
-				"HOME":              "/home/amd",
-			},
+			env:  NewEnv(map[string]string{"GSHOOT_CONFIG_DIR": "/tmp/gshoot-config", "HOME": home}),
 			want: "/tmp/gshoot-config",
 		},
 		{
 			name: "xdg",
-			env: Env{
-				"XDG_CONFIG_HOME": "/home/amd/.config-alt",
-				"HOME":            "/home/amd",
-			},
-			want: "/home/amd/.config-alt/gshoot",
+			env:  NewEnv(map[string]string{"XDG_CONFIG_HOME": "/tmp/xdg", "HOME": home}),
+			want: "/tmp/xdg/gshoot",
 		},
 		{
 			name: "home default",
-			env: Env{
-				"HOME": "/home/amd",
-			},
-			want: "/home/amd/.config/gshoot",
+			env:  NewEnv(map[string]string{"HOME": home}),
+			want: filepath.Join(home, ".config", "gshoot"),
 		},
 	}
 
@@ -101,10 +104,10 @@ func TestResolveSourcePrecedence(t *testing.T) {
 	t.Parallel()
 
 	tempDir := t.TempDir()
+	home := filepath.Join(tempDir, "home")
 	explicitCreds := writeFile(t, filepath.Join(tempDir, "explicit.json"), `{"type":"service_account"}`)
-	adcCreds := writeFile(t, filepath.Join(tempDir, "adc.json"), `{"type":"authorized_user"}`)
-	cachedClient := writeFile(t, filepath.Join(tempDir, "oauth-client.json"), `{"installed":{"client_id":"cid","client_secret":"secret","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","redirect_uris":["http://127.0.0.1"]}}`)
-	cachedToken := writeFile(t, filepath.Join(tempDir, "oauth-token.json"), `{"access_token":"cached-token","refresh_token":"refresh-token","token_type":"Bearer"}`)
+	adcCreds := writeFile(t, filepath.Join(tempDir, "adc.json"), `{"type":"authorized_user","client_id":"adc","client_secret":"secret","refresh_token":"refresh"}`)
+	cachedToken := writeFile(t, filepath.Join(tempDir, "oauth-token.json"), `{"access_token":"cached-token","refresh_token":"refresh-token","token_type":"Bearer","expiry":"2026-05-07T22:00:00Z"}`)
 
 	tests := []struct {
 		name string
@@ -114,48 +117,46 @@ func TestResolveSourcePrecedence(t *testing.T) {
 	}{
 		{
 			name: "raw token wins",
-			env: Env{
-				"GSHOOT_TOKEN":            "token-123",
-				"GSHOOT_CREDENTIALS_FILE": explicitCreds,
-				"GSHOOT_CONFIG_DIR":       tempDir,
+			env: NewEnv(map[string]string{
+				"GSHOOT_TOKEN":                   "token-123",
+				"GSHOOT_CREDENTIALS_FILE":        explicitCreds,
+				"GSHOOT_CONFIG_DIR":              tempDir,
 				"GOOGLE_APPLICATION_CREDENTIALS": adcCreds,
-				"HOME":                    "/home/amd",
-			},
+				"HOME":                           home,
+			}),
 			want: SourceKindRawToken,
 		},
 		{
 			name: "credentials file env",
-			env: Env{
-				"GSHOOT_CREDENTIALS_FILE": explicitCreds,
-				"GSHOOT_CONFIG_DIR":       tempDir,
+			env: NewEnv(map[string]string{
+				"GSHOOT_CREDENTIALS_FILE":        explicitCreds,
+				"GSHOOT_CONFIG_DIR":              tempDir,
 				"GOOGLE_APPLICATION_CREDENTIALS": adcCreds,
-				"HOME":                    "/home/amd",
-			},
+				"HOME":                           home,
+			}),
 			want: SourceKindCredentialsFile,
 			path: explicitCreds,
 		},
 		{
 			name: "cached oauth before adc",
-			env: Env{
-				"GSHOOT_CONFIG_DIR":       tempDir,
+			env: NewEnv(map[string]string{
+				"GSHOOT_CONFIG_DIR":              tempDir,
 				"GOOGLE_APPLICATION_CREDENTIALS": adcCreds,
-				"HOME":                    "/home/amd",
-			},
+				"HOME":                           home,
+			}),
 			want: SourceKindCachedOAuth,
 			path: cachedToken,
 		},
 		{
 			name: "adc env",
-			env: Env{
+			env: NewEnv(map[string]string{
 				"GOOGLE_APPLICATION_CREDENTIALS": adcCreds,
-				"HOME":                           "/home/amd",
-			},
+				"HOME":                           home,
+			}),
 			want: SourceKindApplicationDefaultCredentials,
 			path: adcCreds,
 		},
 	}
-
-	_ = cachedClient
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -173,6 +174,18 @@ func TestResolveSourcePrecedence(t *testing.T) {
 			if tt.path != "" && got.Source.Path != tt.path {
 				t.Fatalf("Resolve() path = %q, want %q", got.Source.Path, tt.path)
 			}
+
+			if tt.want == SourceKindRawToken && got.Source.Token != "token-123" {
+				t.Fatalf("Resolve() token = %q, want raw token", got.Source.Token)
+			}
+
+			if got.OAuthClientPath != filepath.Join(ConfigDir(tt.env), oauthClientFileName) {
+				t.Fatalf("Resolve() OAuthClientPath = %q, want derived path", got.OAuthClientPath)
+			}
+
+			if got.OAuthTokenPath != filepath.Join(ConfigDir(tt.env), oauthTokenFileName) {
+				t.Fatalf("Resolve() OAuthTokenPath = %q, want derived path", got.OAuthTokenPath)
+			}
 		})
 	}
 }
@@ -181,10 +194,10 @@ func TestResolveWellKnownADC(t *testing.T) {
 	t.Parallel()
 
 	home := t.TempDir()
-	adcPath := writeFile(t, filepath.Join(home, ".config", "gcloud", "application_default_credentials.json"), `{"type":"authorized_user"}`)
+	adcPath := writeFile(t, filepath.Join(home, ".config", "gcloud", "application_default_credentials.json"), `{"type":"authorized_user","client_id":"adc","client_secret":"secret","refresh_token":"refresh"}`)
 
 	got, err := Resolve(Options{
-		Env:     Env{"HOME": home},
+		Env:     NewEnv(map[string]string{"HOME": home}),
 		Command: CommandList,
 	})
 	if err != nil {
@@ -205,7 +218,7 @@ func TestResolveMissingAuth(t *testing.T) {
 
 	home := t.TempDir()
 	_, err := Resolve(Options{
-		Env:     Env{"HOME": home},
+		Env:     NewEnv(map[string]string{"HOME": home}),
 		Command: CommandDown,
 	})
 	if err == nil {
@@ -214,14 +227,127 @@ func TestResolveMissingAuth(t *testing.T) {
 
 	msg := err.Error()
 	for _, want := range []string{
-		"GSHOOT_TOKEN",
-		"GSHOOT_CREDENTIALS_FILE",
+		"$GSHOOT_TOKEN",
+		"$GSHOOT_CREDENTIALS_FILE",
+		"$GOOGLE_APPLICATION_CREDENTIALS",
 		filepath.Join(home, ".config", "gshoot", oauthTokenFileName),
 		filepath.Join(home, ".config", "gcloud", "application_default_credentials.json"),
 	} {
 		if !strings.Contains(msg, want) {
 			t.Fatalf("error %q missing %q", msg, want)
 		}
+	}
+}
+
+func TestResolveExplicitCredentialFileMissing(t *testing.T) {
+	t.Parallel()
+
+	_, err := Resolve(Options{
+		Env: NewEnv(map[string]string{
+			"GSHOOT_CREDENTIALS_FILE": "/does/not/exist.json",
+			"HOME":                    t.TempDir(),
+		}),
+		Command: CommandDown,
+	})
+	if err == nil {
+		t.Fatal("Resolve() error = nil, want error")
+	}
+
+	if !strings.Contains(err.Error(), "GSHOOT_CREDENTIALS_FILE") || !strings.Contains(err.Error(), "no such file") {
+		t.Fatalf("Resolve() error = %q, want explicit env file failure", err.Error())
+	}
+}
+
+func TestResolveApplicationCredentialsMissing(t *testing.T) {
+	t.Parallel()
+
+	_, err := Resolve(Options{
+		Env: NewEnv(map[string]string{
+			"GOOGLE_APPLICATION_CREDENTIALS": "/does/not/exist.json",
+			"HOME":                           t.TempDir(),
+		}),
+		Command: CommandList,
+	})
+	if err == nil {
+		t.Fatal("Resolve() error = nil, want error")
+	}
+
+	if !strings.Contains(err.Error(), "GOOGLE_APPLICATION_CREDENTIALS") || !strings.Contains(err.Error(), "no such file") {
+		t.Fatalf("Resolve() error = %q, want explicit ADC env failure", err.Error())
+	}
+}
+
+func TestResolveExplicitCredentialFileCorrupt(t *testing.T) {
+	t.Parallel()
+
+	path := writeFile(t, filepath.Join(t.TempDir(), "bad.json"), `{"type":`)
+	_, err := Resolve(Options{
+		Env: NewEnv(map[string]string{
+			"GSHOOT_CREDENTIALS_FILE": path,
+			"HOME":                    t.TempDir(),
+		}),
+		Command: CommandDown,
+	})
+	if err == nil {
+		t.Fatal("Resolve() error = nil, want error")
+	}
+
+	if !strings.Contains(err.Error(), "GSHOOT_CREDENTIALS_FILE") {
+		t.Fatalf("Resolve() error = %q, want explicit env context", err.Error())
+	}
+}
+
+func TestResolveWellKnownADCCorrupt(t *testing.T) {
+	t.Parallel()
+
+	home := t.TempDir()
+	writeFile(t, filepath.Join(home, ".config", "gcloud", "application_default_credentials.json"), `{"type":`)
+
+	_, err := Resolve(Options{
+		Env:     NewEnv(map[string]string{"HOME": home}),
+		Command: CommandList,
+	})
+	if err == nil {
+		t.Fatal("Resolve() error = nil, want error")
+	}
+
+	if !strings.Contains(err.Error(), "application default credentials") {
+		t.Fatalf("Resolve() error = %q, want ADC context", err.Error())
+	}
+}
+
+func TestResolveCachedOAuthInvalid(t *testing.T) {
+	t.Parallel()
+
+	configDir := t.TempDir()
+	writeFile(t, filepath.Join(configDir, oauthTokenFileName), `{"access_token":`)
+
+	_, err := Resolve(Options{
+		Env:     NewEnv(map[string]string{"GSHOOT_CONFIG_DIR": configDir, "HOME": t.TempDir()}),
+		Command: CommandDown,
+	})
+	if err == nil {
+		t.Fatal("Resolve() error = nil, want error")
+	}
+
+	if !strings.Contains(err.Error(), "cached oauth token") {
+		t.Fatalf("Resolve() error = %q, want cached token context", err.Error())
+	}
+}
+
+func TestResolveUnknownCommand(t *testing.T) {
+	t.Parallel()
+
+	_, err := Resolve(Options{
+		Env:     NewEnv(map[string]string{"HOME": t.TempDir()}),
+		Command: Command("wat"),
+	})
+	if err == nil {
+		t.Fatal("Resolve() error = nil, want error")
+	}
+
+	if !strings.Contains(err.Error(), "unknown command") {
+		t.Fatalf("Resolve() error = %q, want unknown command", err.Error())
 	}
 }
 
@@ -250,6 +376,16 @@ func TestLoadCredentialFile(t *testing.T) {
 			body: `{"installed":{"client_id":"cid","client_secret":"secret","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","redirect_uris":["http://127.0.0.1"]}}`,
 			want: CredentialKindOAuthClient,
 		},
+		{
+			name: "oauth client web",
+			body: `{"web":{"client_id":"cid","client_secret":"secret","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","redirect_uris":["http://127.0.0.1"]}}`,
+			want: CredentialKindOAuthClient,
+		},
+		{
+			name: "installed wins over type",
+			body: `{"type":"authorized_user","installed":{"client_id":"cid","client_secret":"secret","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","redirect_uris":["http://127.0.0.1"]}}`,
+			want: CredentialKindOAuthClient,
+		},
 	}
 
 	for _, tt := range tests {
@@ -269,6 +405,26 @@ func TestLoadCredentialFile(t *testing.T) {
 	}
 }
 
+func TestLoadCredentialFileUnsupported(t *testing.T) {
+	t.Parallel()
+
+	tests := []string{
+		`{"type":"external_account"}`,
+		`{}`,
+	}
+
+	for _, body := range tests {
+		path := writeFile(t, filepath.Join(t.TempDir(), "unsupported.json"), body)
+		_, err := LoadCredentialFile(path)
+		if err == nil {
+			t.Fatal("LoadCredentialFile() error = nil, want error")
+		}
+		if !strings.Contains(err.Error(), "unsupported credential file") {
+			t.Fatalf("LoadCredentialFile() error = %q, want unsupported error", err.Error())
+		}
+	}
+}
+
 func TestLoadOAuthToken(t *testing.T) {
 	t.Parallel()
 
@@ -280,6 +436,33 @@ func TestLoadOAuthToken(t *testing.T) {
 
 	if got.AccessToken != "a" || got.RefreshToken != "r" || got.TokenType != "Bearer" {
 		t.Fatalf("LoadOAuthToken() = %#v, want parsed token", got)
+	}
+	if got.Expiry != time.Date(2026, 5, 7, 22, 0, 0, 0, time.UTC) {
+		t.Fatalf("LoadOAuthToken() expiry = %v, want parsed time", got.Expiry)
+	}
+}
+
+func TestLoadOAuthTokenInvalidJSON(t *testing.T) {
+	t.Parallel()
+
+	path := writeFile(t, filepath.Join(t.TempDir(), "oauth-token.json"), `{"access_token":`)
+	_, err := LoadOAuthToken(path)
+	if err == nil {
+		t.Fatal("LoadOAuthToken() error = nil, want error")
+	}
+}
+
+func TestLoadMissingFiles(t *testing.T) {
+	t.Parallel()
+
+	_, err := LoadCredentialFile("/does/not/exist.json")
+	if !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("LoadCredentialFile() error = %v, want os.ErrNotExist", err)
+	}
+
+	_, err = LoadOAuthToken("/does/not/exist.json")
+	if !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("LoadOAuthToken() error = %v, want os.ErrNotExist", err)
 	}
 }
 

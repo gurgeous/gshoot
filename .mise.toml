@@ -11,42 +11,45 @@ golang = "latest"
 #
 # tasks
 #
+# REMIND: CGO_ENABLED? LD_FLAGS?
+#
 
 [tasks]
 
 # one-liners
-build = "go build ./...  && mise _banner '✓ build ✓'"
-lint = "go vet ./...  && mise _banner '✓ lint ✓'"
+build = "mkdir -p tmp && go build -o tmp/gshoot ./cmd/gshoot"
+build-smoke = "mkdir -p tmp && go build -o tmp/smoke  ./cmd/smoke"
+lint = "go vet  ./... && mise _banner '✓ lint ✓'"
 test = "go test ./... && mise _banner '✓ test ✓'"
 
+check = """
+mise lint ::: test ::: build
+mise _banner -- "✓ check ✓"
+"""
+
 fmt = """
-  gofumpt -w $(find cmd internal -name '*.go')
-  if command -v gci >/dev/null 2>&1; then
-    gci write -s standard -s default -s prefix(github.com/gurgeous/gshoot) cmd internal
-  else
-    mise _warning -- "skipping gci [not installed]"
-  fi
+gofumpt -w $(find cmd internal -name '*.go')
+if command -v gci >/dev/null 2>&1; then
+  gci write -s standard -s default -s 'prefix(github.com/gurgeous/gshoot)' cmd internal
+else
+  mise _warning -- "skipping gci [not installed]"
+fi
 """
 
 init = """
-  if command -v gci >/dev/null 2>&1; then
-    mise _banner -- "installing gci..."
-    go install github.com/daixiang0/gci@latest
-  fi
-  mise _banner "✓ init ✓"
+if command -v gci >/dev/null 2>&1; then
+  mise _banner -- "installing gci..."
+  go install github.com/daixiang0/gci@latest
+fi
+mise _banner "✓ init ✓"
 """
 
 smoke = """
-  mkdir -p tmp
-  go build -o tmp/gshoot ./cmd/gshoot
-  go run ./cmd/smoke --gshoot tmp/gshoot
-  mise _banner "✓ smoke ✓"
+mise build ::: build-smoke
+./tmp/smoke
+mise _banner "✓ smoke ✓"
 """
 
-check = """
-  mise lint ::: test ::: build
-  mise _banner -- "✓ check ✓"
-"""
 
 #
 # banner and friends
