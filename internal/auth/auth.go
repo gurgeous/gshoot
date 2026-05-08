@@ -288,7 +288,8 @@ func Resolve(opts Options) (Resolved, error) {
 	}
 
 	return Resolved{}, fmt.Errorf(
-		"no auth found; checked env vars $GSHOOT_TOKEN, $GSHOOT_CREDENTIALS_FILE, $GOOGLE_APPLICATION_CREDENTIALS; checked files %s, %s",
+		"%w\nchecked env vars: $GSHOOT_TOKEN, $GSHOOT_CREDENTIALS_FILE, $GOOGLE_APPLICATION_CREDENTIALS\nchecked files: %s, %s",
+		&NoAuthError{Command: opts.Command, ConfigDir: configDir},
 		oauthTokenPath,
 		adcPath,
 	)
@@ -300,7 +301,10 @@ func LoadCredentialFile(path string) (CredentialFile, error) {
 	if err != nil {
 		return CredentialFile{}, err
 	}
+	return parseCredentialFile(path, data)
+}
 
+func parseCredentialFile(path string, data []byte) (CredentialFile, error) {
 	var raw struct {
 		Type string `json:"type"`
 

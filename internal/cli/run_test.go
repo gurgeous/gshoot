@@ -28,7 +28,7 @@ func TestRunRootHelp(t *testing.T) {
 	}
 
 	output := stdout.String()
-	for _, want := range []string{"gshoot", "up", "down", "list"} {
+	for _, want := range []string{"gshoot", "auth", "up", "down", "list"} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("help output missing %q:\n%s", want, output)
 		}
@@ -67,6 +67,9 @@ func TestRunSubcommandHelp(t *testing.T) {
 		args []string
 		want string
 	}{
+		{name: "auth", args: []string{"auth", "--help"}, want: "Authentication helpers"},
+		{name: "auth status", args: []string{"auth", "status", "--help"}, want: "Show auth status"},
+		{name: "auth logout", args: []string{"auth", "logout", "--help"}, want: "Clear cached OAuth token"},
 		{name: "up", args: []string{"up", "--help"}, want: "Upload CSV data"},
 		{name: "down", args: []string{"down", "--help"}, want: "Download sheet data"},
 		{name: "list", args: []string{"list", "--help"}, want: "List recent spreadsheets"},

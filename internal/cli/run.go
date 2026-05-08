@@ -17,9 +17,13 @@ import (
 )
 
 var (
-	resolveAuth    = auth.Resolve
-	newTokenSource = auth.NewTokenSource
-	newDownClient  = func(ctx context.Context, tokenSource oauth2.TokenSource) (down.Client, error) {
+	resolveAuth     = auth.Resolve
+	newTokenSource  = auth.NewTokenSource
+	loginAuth       = auth.Login
+	logoutAuth      = auth.Logout
+	statusAuth      = auth.InspectStatus
+	printAuthStatus = auth.PrintStatus
+	newDownClient   = func(ctx context.Context, tokenSource oauth2.TokenSource) (down.Client, error) {
 		return down.NewGoogleClient(ctx, tokenSource)
 	}
 	newListingClient = func(ctx context.Context, tokenSource oauth2.TokenSource) (listing.Client, error) {
@@ -51,12 +55,78 @@ func newRootCmd(stdout, stderr io.Writer) *cobra.Command {
 	cmd.SetOut(stdout)
 	cmd.SetErr(stderr)
 	cmd.AddCommand(
+		newAuthCmd(stdout, stderr),
 		newStubCmd("up", "Upload CSV data to Google Sheets"),
 		newDownCmd(stdout, stderr),
 		newListCmd(stdout, stderr),
 	)
 
 	return cmd
+}
+
+func newAuthCmd(stdout, stderr io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "auth",
+		Short: "Authentication helpers",
+	}
+	cmd.AddCommand(
+		newAuthLoginCmd(stdout, stderr),
+		newAuthStatusCmd(stdout, stderr),
+		newAuthLogoutCmd(stdout, stderr),
+	)
+	return cmd
+}
+
+func newAuthLoginCmd(stdout, stderr io.Writer) *cobra.Command {
+	var clientSecretPath string
+
+	cmd := &cobra.Command{
+		Use:   "login",
+		Short: "Run browser OAuth login",
+		Args:  cobra.NoArgs,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return loginAuth(context.Background(), auth.LoginOptions{
+				Env:              auth.NewEnv(nil),
+				ClientSecretPath: clientSecretPath,
+				Stdout:           stdout,
+				Stderr:           stderr,
+			})
+		},
+	}
+	cmd.Flags().StringVar(&clientSecretPath, "client-secret", "", "path to a downloaded Google Desktop app OAuth client JSON")
+	return cmd
+}
+
+func newAuthStatusCmd(stdout, _ io.Writer) *cobra.Command {
+	return &cobra.Command{
+		Use:   "status",
+		Short: "Show auth status",
+		Args:  cobra.NoArgs,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			printAuthStatus(stdout, statusAuth(auth.NewEnv(nil)))
+			return nil
+		},
+	}
+}
+
+func newAuthLogoutCmd(stdout, _ io.Writer) *cobra.Command {
+	return &cobra.Command{
+		Use:   "logout",
+		Short: "Clear cached OAuth token",
+		Args:  cobra.NoArgs,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			removed, err := logoutAuth(auth.NewEnv(nil))
+			if err != nil {
+				return err
+			}
+			if removed {
+				fmt.Fprintln(stdout, "Removed cached OAuth token. OAuth client config was kept.")
+			} else {
+				fmt.Fprintln(stdout, "No cached OAuth token was present.")
+			}
+			return nil
+		},
+	}
 }
 
 func newDownCmd(stdout, stderr io.Writer) *cobra.Command {
