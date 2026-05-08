@@ -2,6 +2,7 @@
 
 ## Project
 
+- After any non-Markdown change, run `mise check`
 - Small Go CLI, not a framework or service
 - Be succinct, especially in Markdown
 - Prefer `mise run` tasks when they exist

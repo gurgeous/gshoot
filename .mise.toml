@@ -11,8 +11,6 @@ golang = "latest"
 #
 # tasks
 #
-# REMIND: CGO_ENABLED? LD_FLAGS?
-#
 
 [tasks]
 
@@ -56,28 +54,13 @@ mise _banner "✓ smoke ✓"
 #
 
 [tasks._banner]
-usage = 'flag "--bg <bg>" default="48;2;64;160;43" ; arg "<message>"'
-run = '''
-printf '\033[1;38;5;231;%sm[%s] %-72s\033[0m\n' "${usage_bg}" "$(date '+%H:%M:%S')" "${usage_message}"
-'''
+usage = 'flag "--bg <bg>" default="48;2;64;160;43" ; arg "<msg>"'
+run = 'printf "\e[1;38;5;231;%sm[%s] %-72s\e[0m\n" "${usage_bg}" $(date +"%H:%M:%S") "${usage_msg}"'
 
 [tasks._warning]
-usage = 'arg "<message>"'
-run = [
-  { task = "_banner", args = [
-    "--bg",
-    "48;2;251;100;11",
-    "{{usage.message}}",
-  ] },
-]
+usage = 'arg "<msg>"'
+run = 'mise _banner --bg "48;2;251;100;11" "$usage_msg"'
 
 [tasks._fatal]
-usage = 'arg "<message>"'
-run = [
-  { task = "_banner", args = [
-    "--bg",
-    "48;2;210;15;57",
-    "{{usage.message}}",
-  ] },
-  "exit 1",
-]
+usage = 'arg "<msg>"'
+run = 'mise _banner --bg "48;2;210;15;57" "$usage_msg" ; exit 1'
