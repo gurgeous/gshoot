@@ -2,20 +2,26 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/gurgeous/gshoot/internal/auth"
+	"github.com/gurgeous/gshoot/internal/down"
 	"github.com/gurgeous/gshoot/internal/listing"
 	"github.com/spf13/cobra"
 	"golang.org/x/oauth2"
 )
 
 var (
-	resolveAuth = auth.Resolve
+	resolveAuth    = auth.Resolve
 	newTokenSource = auth.NewTokenSource
+	newDownClient  = func(ctx context.Context, tokenSource oauth2.TokenSource) (down.Client, error) {
+		return down.NewGoogleClient(ctx, tokenSource)
+	}
 	newListingClient = func(ctx context.Context, tokenSource oauth2.TokenSource) (listing.Client, error) {
 		return listing.NewGoogleClient(ctx, tokenSource)
 	}
@@ -46,10 +52,78 @@ func newRootCmd(stdout, stderr io.Writer) *cobra.Command {
 	cmd.SetErr(stderr)
 	cmd.AddCommand(
 		newStubCmd("up", "Upload CSV data to Google Sheets"),
-		newStubCmd("down", "Download sheet data"),
+		newDownCmd(stdout, stderr),
 		newListCmd(stdout, stderr),
 	)
 
+	return cmd
+}
+
+func newDownCmd(stdout, stderr io.Writer) *cobra.Command {
+	var outputPath string
+
+	cmd := &cobra.Command{
+		Use:   "down <spreadsheet> [sheet]",
+		Short: "Download sheet data",
+		Args:  cobra.RangeArgs(1, 2),
+		RunE: func(_ *cobra.Command, args []string) error {
+			ctx := context.Background()
+			resolved, err := resolveAuth(auth.Options{
+				Env:     auth.NewEnv(nil),
+				Command: auth.CommandDown,
+			})
+			if err != nil {
+				return err
+			}
+
+			tokenSource, err := newTokenSource(ctx, resolved)
+			if err != nil {
+				return err
+			}
+
+			client, err := newDownClient(ctx, tokenSource)
+			if err != nil {
+				return err
+			}
+
+			sheetName := ""
+			if len(args) == 2 {
+				sheetName = args[1]
+			}
+
+			result, err := down.NewService(client).Download(ctx, args[0], sheetName)
+			if err != nil {
+				var spreadsheetErr *down.SpreadsheetNotFoundError
+				if errors.As(err, &spreadsheetErr) {
+					return spreadsheetNotFoundError(spreadsheetErr.Name)
+				}
+
+				var sheetErr *down.SheetNotFoundError
+				if errors.As(err, &sheetErr) {
+					return sheetNotFoundError(sheetErr.Spreadsheet, sheetErr.Sheet)
+				}
+
+				var noSheetsErr *down.NoSheetsError
+				if errors.As(err, &noSheetsErr) {
+					return noSheetsError(noSheetsErr.Spreadsheet)
+				}
+				return err
+			}
+
+			writer := stdout
+			if outputPath != "" {
+				file, err := os.Create(outputPath)
+				if err != nil {
+					return fmt.Errorf("create output file: %w", err)
+				}
+				defer file.Close()
+				writer = file
+			}
+
+			return down.WriteCSV(writer, result.Values)
+		},
+	}
+	cmd.Flags().StringVarP(&outputPath, "output", "o", "", "where to write the CSV")
 	return cmd
 }
 

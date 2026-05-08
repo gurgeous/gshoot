@@ -22,3 +22,12 @@ func TestSheetNotFoundError(t *testing.T) {
 		t.Fatalf("error = %q, want list hint", err.Error())
 	}
 }
+
+func TestNoSheetsError(t *testing.T) {
+	t.Parallel()
+
+	err := noSheetsError("Budget")
+	if !strings.Contains(err.Error(), "hint: run `gshoot list`") {
+		t.Fatalf("error = %q, want list hint", err.Error())
+	}
+}
