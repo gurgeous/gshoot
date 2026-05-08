@@ -96,7 +96,7 @@ func newAuthLoginCmd(stdout, stderr io.Writer) *cobra.Command {
 			"gshoot auth login",
 			"  gshoot auth login --client-secret ~/Downloads/client_secret.json",
 		}, "\n"),
-		Args:  noArgs("gshoot auth login"),
+		Args: noArgs("gshoot auth login"),
 		RunE: func(_ *cobra.Command, _ []string) error {
 			return loginAuth(context.Background(), auth.LoginOptions{
 				Env:              auth.NewEnv(nil),
@@ -154,7 +154,7 @@ func newDownCmd(stdout, stderr io.Writer) *cobra.Command {
 			"gshoot down Budget",
 			"  gshoot down Budget Q1 --output q1.csv",
 		}, "\n"),
-		Args:  downArgs,
+		Args: downArgs,
 		RunE: func(_ *cobra.Command, args []string) error {
 			ctx := context.Background()
 			resolved, err := resolveAuth(auth.Options{
@@ -243,10 +243,10 @@ func downArgs(_ *cobra.Command, args []string) error {
 
 func newListCmd(stdout, stderr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List your Google Sheets",
+		Use:     "list",
+		Short:   "List your Google Sheets",
 		Example: "  gshoot list",
-		Args:  noArgs("gshoot list"),
+		Args:    noArgs("gshoot list"),
 		RunE: func(*cobra.Command, []string) error {
 			ctx := context.Background()
 			resolved, err := resolveAuth(auth.Options{
