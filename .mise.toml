@@ -22,7 +22,7 @@ build = "mkdir -p tmp/bin && go build -o tmp/bin/gshoot ./cmd/gshoot"
 build-smoke = "mkdir -p tmp/bin && go build -o tmp/bin/smoke ./cmd/smoke"
 check = "mise lint ::: test ::: build && mise _banner -- '✓ check ✓'"
 ci = "mise check"
-format = "golangci-lint run --fix && mise _banner '✓ format ✓'"
+format = "golangci-lint fmt && mise _banner '✓ format ✓'"
 lint = "golangci-lint run && mise _banner '✓ lint ✓'"
 test = "go test ./... && mise _banner '✓ test ✓'"
 
