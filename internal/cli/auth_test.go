@@ -55,7 +55,7 @@ func TestRunListNoAuthShowsFriendlyHint(t *testing.T) {
 	if code != 1 {
 		t.Fatalf("Run() code = %d, want 1", code)
 	}
-	if got, want := stderr.String(), "gshoot: list [no auth found]\n\n"; got != want {
+	if got, want := stderr.String(), "gshoot: list [no auth found]\n"+helpHint+"\n"; got != want {
 		t.Fatalf("stderr = %q, want %q", got, want)
 	}
 }
@@ -75,8 +75,8 @@ func TestRunAuthLoginError(t *testing.T) {
 	if code != 1 {
 		t.Fatalf("Run() code = %d, want 1", code)
 	}
-	if !strings.Contains(stderr.String(), "bad login") {
-		t.Fatalf("stderr = %q, want login error", stderr.String())
+	if got, want := stderr.String(), "gshoot: bad login\n"+helpHint+"\n"; got != want {
+		t.Fatalf("stderr = %q, want %q", got, want)
 	}
 }
 
