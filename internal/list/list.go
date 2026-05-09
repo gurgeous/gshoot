@@ -21,8 +21,8 @@ var (
 	resolveAuth    = auth.Resolve
 )
 
-// NewCommand creates the list command.
-func NewCommand() *cobra.Command {
+// NewListCommand creates the list command.
+func NewListCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "list",
 		Short:         "List your Google Sheets",
