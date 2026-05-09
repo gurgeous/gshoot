@@ -1,10 +1,8 @@
 package cli
 
 import (
-	"context"
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/gurgeous/gshoot/internal/auth"
 	"github.com/gurgeous/gshoot/internal/down"
@@ -14,13 +12,9 @@ import (
 )
 
 var (
-	version         = "dev"
-	resolveAuth     = auth.Resolve
-	newTokenSource  = auth.NewTokenSource
-	loginAuth       = auth.Login
-	logoutAuth      = auth.Logout
-	statusAuth      = auth.InspectStatus
-	printAuthStatus = auth.PrintStatus
+	version        = "dev"
+	resolveAuth    = auth.Resolve
+	newTokenSource = auth.NewTokenSource
 )
 
 // Run executes the gshoot CLI.
@@ -70,86 +64,12 @@ func newRootCmd() *cobra.Command {
 		writeHelp(command.OutOrStdout(), command)
 	})
 	cmd.AddCommand(
-		newAuthCmd(),
+		auth.NewCommand(),
 		newStubCmd("up", "Upload a local CSV file to a Google Sheet"),
 		down.NewCommand(),
 		list.NewCommand(),
 	)
 
-	return cmd
-}
-
-//
-// commands
-//
-
-func newAuthCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "auth",
-		Short: "Login (or logout) from Google Sheets",
-	}
-	cmd.AddCommand(
-		newAuthLoginCmd(),
-		newAuthStatusCmd(),
-		newAuthLogoutCmd(),
-	)
-	return cmd
-}
-
-func newAuthLoginCmd() *cobra.Command {
-	var clientSecretPath string
-
-	cmd := &cobra.Command{
-		Use:   "login",
-		Short: "Run browser OAuth login",
-		Example: strings.Join([]string{
-			"gshoot auth login",
-			"  gshoot auth login --client-secret ~/Downloads/client_secret.json",
-		}, "\n"),
-		Args: noArgs("gshoot auth login"),
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			return loginAuth(context.Background(), auth.LoginOptions{
-				ClientSecretPath: clientSecretPath,
-				Stdout:           cmd.OutOrStdout(),
-				Stderr:           cmd.ErrOrStderr(),
-			})
-		},
-	}
-	cmd.Flags().StringVar(&clientSecretPath, "client-secret", "", "path to a downloaded Google Desktop app OAuth client JSON")
-	return cmd
-}
-
-func newAuthStatusCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "status",
-		Short: "Show auth status",
-		Args:  noArgs("gshoot auth status"),
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			printAuthStatus(cmd.OutOrStdout(), statusAuth())
-			return nil
-		},
-	}
-	return cmd
-}
-
-func newAuthLogoutCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "logout",
-		Short: "Clear cached OAuth token",
-		Args:  noArgs("gshoot auth logout"),
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			removed, err := logoutAuth()
-			if err != nil {
-				return err
-			}
-			if removed {
-				fmt.Fprintln(cmd.OutOrStdout(), "Removed cached OAuth token. OAuth client config was kept.")
-			} else {
-				fmt.Fprintln(cmd.OutOrStdout(), "No cached OAuth token was present.")
-			}
-			return nil
-		},
-	}
 	return cmd
 }
 

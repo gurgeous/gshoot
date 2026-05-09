@@ -3,20 +3,19 @@ package list
 import (
 	"context"
 	"fmt"
-	"io"
-	"time"
 
 	"github.com/gurgeous/gshoot/internal/auth"
 	"github.com/gurgeous/gshoot/internal/google"
 	"github.com/gurgeous/gshoot/internal/ux"
 	"github.com/spf13/cobra"
+	"google.golang.org/api/drive/v3"
 )
 
 var (
-	resolveAuth    = auth.Resolve
-	newTokenSource = auth.NewTokenSource
+	listRecent     = recent
 	newGoogle      = google.New
-	listRecent     = Recent
+	newTokenSource = auth.NewTokenSource
+	resolveAuth    = auth.Resolve
 )
 
 // NewCommand creates the list command.
@@ -24,7 +23,6 @@ func NewCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "list",
 		Short:         "List your Google Sheets",
-		Example:       "  gshoot list",
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		Args: func(_ *cobra.Command, args []string) error {
@@ -33,52 +31,57 @@ func NewCommand() *cobra.Command {
 			}
 			return fmt.Errorf("expected `gshoot list`")
 		},
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			ctx := context.Background()
-			stderr := cmd.ErrOrStderr()
-			totalStart := time.Now()
-
-			debugf(stderr, "resolving auth...")
-			authStart := time.Now()
-			resolved, err := resolveAuth(auth.Options{Command: auth.CommandList})
-			if err != nil {
-				return err
-			}
-			debugf(stderr, "auth ready in %s", time.Since(authStart).Round(time.Millisecond))
-
-			debugf(stderr, "creating google client...")
-			clientStart := time.Now()
-			tokenSource, err := newTokenSource(ctx, resolved)
-			if err != nil {
-				return err
-			}
-			client, err := newGoogle(ctx, tokenSource)
-			if err != nil {
-				return err
-			}
-			debugf(stderr, "client ready in %s", time.Since(clientStart).Round(time.Millisecond))
-
-			debugf(stderr, "listing recent spreadsheets...")
-			stopDots := ux.StartDots(stderr, "listing spreadsheets...")
-			files, driveDuration, err := listRecent(ctx, client, 10)
-			if err != nil {
-				stopDots("list failed")
-				return err
-			}
-			stopDots(fmt.Sprintf("listed %d spreadsheets in %s", len(files), driveDuration.Round(time.Millisecond)))
-			debugf(stderr, "drive returned %d spreadsheets in %s", len(files), driveDuration.Round(time.Millisecond))
-
-			stdout := cmd.OutOrStdout()
-			for _, file := range files {
-				fmt.Fprintf(stdout, "%s  %s\n", file.ModifiedTime, file.Name)
-			}
-			debugf(stderr, "done in %s (%d spreadsheets)", time.Since(totalStart).Round(time.Millisecond), len(files))
-			return nil
-		},
+		RunE: run,
 	}
 	return cmd
 }
 
-func debugf(w io.Writer, format string, args ...any) {
-	fmt.Fprintf(w, "gshoot: "+format+"\n", args...)
+func run(cmd *cobra.Command, args []string) error {
+	ctx := context.Background()
+
+	// auth
+	resolved, err := resolveAuth(auth.Options{Command: auth.CommandList})
+	if err != nil {
+		return err
+	}
+	tokenSource, err := newTokenSource(ctx, resolved)
+	if err != nil {
+		return err
+	}
+
+	// create client
+	client, err := newGoogle(ctx, tokenSource)
+	if err != nil {
+		return err
+	}
+
+	// list
+	stopDots := ux.StartDots(cmd.ErrOrStderr(), "listing spreadsheets...")
+	files, err := listRecent(ctx, client, 10)
+	if err != nil {
+		stopDots("list failed")
+		return err
+	}
+	stopDots(fmt.Sprintf("listed %d spreadsheets", len(files)))
+
+	// print
+	for _, file := range files {
+		fmt.Fprintf(cmd.OutOrStdout(), "%s  %s\n", file.ModifiedTime, file.Name)
+	}
+	return nil
+}
+
+// Recent returns recent spreadsheets ordered by modified time.
+func recent(ctx context.Context, client *google.Client, limit int) ([]*drive.File, error) {
+	res, err := client.Drive.Files.List().
+		Context(ctx).
+		Q("mimeType='application/vnd.google-apps.spreadsheet' and trashed=false").
+		OrderBy("modifiedTime desc,name").
+		PageSize(int64(limit)).
+		Fields("files(id,name,modifiedTime)").
+		Do()
+	if err != nil {
+		return nil, fmt.Errorf("list spreadsheets: %w", err)
+	}
+	return res.Files, nil
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/gurgeous/gshoot/internal/auth"
 	"github.com/gurgeous/gshoot/internal/google"
 	"github.com/spf13/cobra"
+	"google.golang.org/api/drive/v3"
 )
 
 var (
@@ -79,4 +80,19 @@ func args(_ *cobra.Command, args []string) error {
 		return nil
 	}
 	return fmt.Errorf("expected `gshoot down <spreadsheet> [sheet]`")
+}
+
+// Recent returns recent spreadsheets ordered by modified time.
+func Recent(ctx context.Context, client *google.Client, limit int) ([]*drive.File, error) {
+	res, err := client.Drive.Files.List().
+		Context(ctx).
+		Q("mimeType='application/vnd.google-apps.spreadsheet' and trashed=false").
+		OrderBy("modifiedTime desc,name").
+		PageSize(int64(limit)).
+		Fields("files(id,name,modifiedTime)").
+		Do()
+	if err != nil {
+		return nil, fmt.Errorf("list spreadsheets: %w", err)
+	}
+	return res.Files, nil
 }

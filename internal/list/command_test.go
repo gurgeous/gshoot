@@ -6,7 +6,6 @@ import (
 	"errors"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/gurgeous/gshoot/internal/auth"
 	"github.com/gurgeous/gshoot/internal/google"
@@ -30,11 +29,11 @@ func TestNewCommand(t *testing.T) {
 	newGoogle = func(context.Context, oauth2.TokenSource) (*google.Client, error) {
 		return &google.Client{}, nil
 	}
-	listRecent = func(context.Context, *google.Client, int) ([]*drive.File, time.Duration, error) {
+	listRecent = func(context.Context, *google.Client, int) ([]*drive.File, error) {
 		return []*drive.File{
 			{Name: "Alpha", ModifiedTime: "2026-05-07T12:00:00Z"},
 			{Name: "Beta", ModifiedTime: "2026-05-07T11:00:00Z"},
-		}, 12 * time.Millisecond, nil
+		}, nil
 	}
 
 	var stdout bytes.Buffer
@@ -55,18 +54,8 @@ func TestNewCommand(t *testing.T) {
 			t.Fatalf("stdout missing %q:\n%s", want, stdout.String())
 		}
 	}
-	for _, want := range []string{
-		"resolving auth...",
-		"auth ready in",
-		"creating google client...",
-		"client ready in",
-		"listing recent spreadsheets...",
-		"drive returned 2 spreadsheets in",
-		"done in",
-	} {
-		if !strings.Contains(stderr.String(), want) {
-			t.Fatalf("stderr missing %q:\n%s", want, stderr.String())
-		}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
 	}
 }
 
