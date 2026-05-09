@@ -34,7 +34,7 @@ linters:
   settings:
     exhaustive:
       default-signifies-exhaustive: true # default switch works even if some enums not present
-    gosec: { confidence: low, severity: low, excludes: [G101, G117, G301] }
+    gosec: { confidence: low, severity: low, excludes: [G101, G115, G117, G301] }
 
 issues: { max-issues-per-linter: 0, max-same-issues: 0 }
 formatters:

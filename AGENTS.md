@@ -1,5 +1,10 @@
 # AGENTS
 
+## Important
+
+- Avoid overly specific tests; assert only the meaningful behavior
+- Overly specific tests waste time, money, and tokens
+
 ## Project
 
 - After any non-Markdown change, run `mise check`
@@ -50,3 +55,4 @@
 - Prefer direct implementations over speculative extensibility
 - Preserve user-visible behavior before redesigning it
 - Prefer `CGO_ENABLED=0` and `-trimpath` for normal builds unless a real dependency forces otherwise
+- Help goes to stdout; progress and errors go to stderr; only animate progress on TTY stderr

@@ -3,9 +3,11 @@ package list
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/gurgeous/gshoot/internal/auth"
 	"github.com/gurgeous/gshoot/internal/google"
+	"github.com/gurgeous/gshoot/internal/util"
 	"github.com/gurgeous/gshoot/internal/ux"
 	"github.com/spf13/cobra"
 	"google.golang.org/api/drive/v3"
@@ -19,8 +21,8 @@ var (
 	resolveAuth    = auth.Resolve
 )
 
-// NewCommand creates the list command.
-func NewCommand() *cobra.Command {
+// NewListCommand creates the list command.
+func NewListCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "list",
 		Short:         "List your Google Sheets",
@@ -38,9 +40,11 @@ func NewCommand() *cobra.Command {
 }
 
 func run(cmd *cobra.Command, _ []string) error {
+	dots := ux.StartDots(cmd.ErrOrStderr(), "gshoot: opening Google Sheets...")
 	ctx := context.Background()
 
 	// auth
+	dots.SetDescription("gshoot: authenticating...")
 	resolved, err := resolveAuth(auth.Options{Command: auth.CommandList})
 	if err != nil {
 		return err
@@ -57,17 +61,30 @@ func run(cmd *cobra.Command, _ []string) error {
 	}
 
 	// list
-	stopDots := ux.StartDots(cmd.ErrOrStderr(), "listing spreadsheets...")
+	dots.SetDescription("gshoot: listing spreadsheets...")
 	files, err := listRecent(ctx, client, 10)
 	if err != nil {
-		stopDots("list failed")
+		dots.SetDescription("list failed")
+		dots.Stop()
 		return err
 	}
 
 	// done
-	stopDots(fmt.Sprintf("%d recent spreadsheets", len(files)))
-	for _, file := range files {
-		fmt.Fprintf(cmd.OutOrStdout(), "%s  %s\n", file.ModifiedTime, file.Name)
+	dots.SetDescription(fmt.Sprintf("%d recent spreadsheets", len(files)))
+	dots.Stop()
+	out := cmd.OutOrStdout()
+	for i, file := range files {
+		const width = 30
+		num := ux.Dim.Render(fmt.Sprintf("%2d.", i+1))
+		name := fmt.Sprintf("%-"+strconv.Itoa(width)+"s", util.Truncate(file.Name, width))
+		date := ux.Dim.Render(util.DateAndTimeStr(file.ModifiedTime))
+		fmt.Fprintf(
+			out,
+			" %s %s   %s\n",
+			num,
+			util.Hyperlink(out, util.SpreadsheetURL(file.Id), name),
+			date,
+		)
 	}
 	return nil
 }

@@ -9,12 +9,17 @@ import (
 
 var (
 	Brand   lipgloss.Style
+	Dim     lipgloss.Style
 	Info    lipgloss.Style
 	Success lipgloss.Style
 	Warn    lipgloss.Style
 	Error   lipgloss.Style
 	Subtle  lipgloss.Style
 )
+
+//
+// init/Init
+//
 
 // Default to dark. Later, we can look at the terminal to get a better answer
 func init() {
@@ -30,13 +35,18 @@ func Init() {
 	setStyles(lipgloss.LightDark(env.GSHOOT_THEME != "light"))
 }
 
-func setStyles(ld lipgloss.LightDarkFunc) {
-	Brand = lipgloss.NewStyle().Foreground(ld(lipgloss.Color(Tailwind.Blue.c600), lipgloss.Color(Tailwind.Blue.c400))).Bold(true)
-	Info = lipgloss.NewStyle().Foreground(ld(lipgloss.Color(Tailwind.Blue.c600), lipgloss.Color(Tailwind.Blue.c400))).Bold(true)
-	Success = lipgloss.NewStyle().Foreground(ld(lipgloss.Color(Tailwind.Green.c700), lipgloss.Color(Tailwind.Green.c400))).Bold(true)
-	Warn = lipgloss.NewStyle().Foreground(ld(lipgloss.Color(Tailwind.Amber.c700), lipgloss.Color(Tailwind.Amber.c400))).Bold(true)
-	Error = lipgloss.NewStyle().Foreground(ld(lipgloss.Color(Tailwind.Red.c700), lipgloss.Color(Tailwind.Red.c400))).Bold(true)
-	Subtle = lipgloss.NewStyle().Foreground(ld(lipgloss.Color(Tailwind.Slate.c600), lipgloss.Color(Tailwind.Slate.c400)))
+func setStyles(fn lipgloss.LightDarkFunc) {
+	fg := func(light, dark string) lipgloss.Style {
+		return lipgloss.NewStyle().Foreground(fn(lipgloss.Color(light), lipgloss.Color(dark)))
+	}
+
+	Brand = fg(Tailwind.Blue.c600, Tailwind.Blue.c400).Bold(true)
+	Dim = fg(Tailwind.Gray.c400, Tailwind.Gray.c600)
+	Info = fg(Tailwind.Blue.c600, Tailwind.Blue.c400).Bold(true)
+	Success = fg(Tailwind.Green.c700, Tailwind.Green.c400).Bold(true)
+	Warn = fg(Tailwind.Amber.c700, Tailwind.Amber.c400).Bold(true)
+	Error = fg(Tailwind.Red.c700, Tailwind.Red.c400).Bold(true)
+	Subtle = fg(Tailwind.Slate.c600, Tailwind.Slate.c400)
 }
 
 //

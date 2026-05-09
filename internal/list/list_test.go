@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gurgeous/gshoot/internal/auth"
 	"github.com/gurgeous/gshoot/internal/google"
@@ -13,9 +14,11 @@ import (
 	"google.golang.org/api/drive/v3"
 )
 
-func TestNewCommand(t *testing.T) {
-	restore := stubDeps()
-	defer restore()
+func TestListCommand(t *testing.T) {
+	origLocal := time.Local
+	time.Local = time.FixedZone("PDT", -7*60*60)
+	defer func() { time.Local = origLocal }()
+	defer stubDeps()
 
 	resolveAuth = func(opts auth.Options) (auth.Resolved, error) {
 		if opts.Command != auth.CommandList {
@@ -38,7 +41,7 @@ func TestNewCommand(t *testing.T) {
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	cmd := NewCommand()
+	cmd := NewListCommand()
 	cmd.SetOut(&stdout)
 	cmd.SetErr(&stderr)
 	cmd.SetArgs([]string{})
@@ -46,20 +49,31 @@ func TestNewCommand(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
+
+	out := stdout.String()
 	for _, want := range []string{
-		"2026-05-07T12:00:00Z  Alpha",
-		"2026-05-07T11:00:00Z  Beta",
+		"Alpha",
+		"Beta",
+		"PDT",
 	} {
-		if !strings.Contains(stdout.String(), want) {
-			t.Fatalf("stdout missing %q:\n%s", want, stdout.String())
+		if !strings.Contains(out, want) {
+			t.Fatalf("stdout missing %q:\n%s", want, out)
 		}
 	}
-	if stderr.Len() != 0 {
-		t.Fatalf("stderr = %q, want empty", stderr.String())
+	if strings.Count(out, "\n") != 2 {
+		t.Fatalf("stdout = %q, want 2 rows", out)
+	}
+	for _, want := range []string{
+		"listing spreadsheets...",
+		"2 recent spreadsheets",
+	} {
+		if !strings.Contains(stderr.String(), want) {
+			t.Fatalf("stderr missing %q:\n%s", want, stderr.String())
+		}
 	}
 }
 
-func TestNewCommandAuthError(t *testing.T) {
+func TestListCommandAuthError(t *testing.T) {
 	restore := stubDeps()
 	defer restore()
 
@@ -69,7 +83,7 @@ func TestNewCommandAuthError(t *testing.T) {
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	cmd := NewCommand()
+	cmd := NewListCommand()
 	cmd.SetOut(&stdout)
 	cmd.SetErr(&stderr)
 	cmd.SetArgs([]string{})
@@ -87,14 +101,14 @@ func TestNewCommandAuthError(t *testing.T) {
 }
 
 func stubDeps() func() {
-	origResolve := resolveAuth
-	origToken := newTokenSource
 	origGoogle := newGoogle
 	origListRecent := listRecent
+	origResolve := resolveAuth
+	origToken := newTokenSource
 	return func() {
-		resolveAuth = origResolve
-		newTokenSource = origToken
-		newGoogle = origGoogle
 		listRecent = origListRecent
+		newGoogle = origGoogle
+		newTokenSource = origToken
+		resolveAuth = origResolve
 	}
 }
