@@ -23,6 +23,4 @@ var (
 		home, _ := os.UserHomeDir()
 		return home
 	}()
-	// XDG_CONFIG_HOME overrides the XDG config base directory.
-	XDG_CONFIG_HOME = os.Getenv("XDG_CONFIG_HOME")
 )

@@ -4,6 +4,7 @@ go 1.26.0
 
 require (
 	charm.land/lipgloss/v2 v2.0.3
+	github.com/adrg/xdg v0.5.3
 	github.com/spf13/cobra v1.10.1
 	github.com/spf13/pflag v1.0.9
 	golang.org/x/oauth2 v0.36.0

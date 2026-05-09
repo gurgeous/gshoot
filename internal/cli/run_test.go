@@ -31,13 +31,13 @@ func TestRunRootHelp(t *testing.T) {
 	for _, want := range []string{
 		"Usage: gshoot <command> [flags]",
 		"Flags:",
-		"-h, --help",
-		"-v, --version",
+		"  -h, --help     help for gshoot",
+		"  -v, --version  print version number",
 		"Commands:",
-		"auth",
-		"up",
-		"down",
-		"list",
+		"  auth           Login (or logout) from Google Sheets",
+		"  up             Upload a local CSV file to a Google Sheet",
+		"  down           Download a Google Sheet as CSV",
+		"  list           List your Google Sheets",
 		`Run "gshoot <command> --help" for more information on a command.`,
 	} {
 		if !strings.Contains(output, want) {

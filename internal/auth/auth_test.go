@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/adrg/xdg"
 )
 
 func TestScopesForCommand(t *testing.T) {
@@ -72,7 +74,7 @@ func TestConfigDir(t *testing.T) {
 		},
 		{
 			name: "xdg",
-			env:  map[string]string{"XDG_CONFIG_HOME": "/tmp/xdg", "HOME": home},
+			env:  map[string]string{"HOME": home},
 			want: "/tmp/xdg/gshoot",
 		},
 		{
@@ -85,6 +87,18 @@ func TestConfigDir(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			withTestEnv(t, tt.env)
+			if tt.name == "xdg" {
+				if err := os.Setenv("XDG_CONFIG_HOME", "/tmp/xdg"); err != nil {
+					t.Fatalf("Setenv(XDG_CONFIG_HOME): %v", err)
+				}
+				xdg.Reload()
+				t.Cleanup(func() {
+					if err := os.Unsetenv("XDG_CONFIG_HOME"); err != nil {
+						t.Fatalf("Unsetenv(XDG_CONFIG_HOME): %v", err)
+					}
+					xdg.Reload()
+				})
+			}
 			if got := ConfigDir(); got != tt.want {
 				t.Fatalf("ConfigDir() = %q, want %q", got, tt.want)
 			}

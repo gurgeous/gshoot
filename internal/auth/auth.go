@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/adrg/xdg"
 	"github.com/gurgeous/gshoot/internal/env"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -137,10 +138,8 @@ func ConfigDir() string {
 	if dir := env.GSHOOT_CONFIG_DIR; dir != "" {
 		return dir
 	}
-	if dir := env.XDG_CONFIG_HOME; dir != "" {
-		return filepath.Join(dir, "gshoot")
-	}
-	return filepath.Join(env.HOME, ".config", "gshoot")
+	xdg.Reload()
+	return filepath.Join(xdg.ConfigHome, "gshoot")
 }
 
 // Resolve picks the best auth source for a command.
@@ -220,7 +219,8 @@ func Resolve(opts Options) (Resolved, error) {
 		}, nil
 	}
 
-	adcPath := filepath.Join(env.HOME, ".config", "gcloud", "application_default_credentials.json")
+	xdg.Reload()
+	adcPath := filepath.Join(xdg.Home, ".config", "gcloud", "application_default_credentials.json")
 	cred, err := LoadCredentialFile(adcPath)
 	if err == nil {
 		return Resolved{
