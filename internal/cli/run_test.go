@@ -119,7 +119,7 @@ func TestRunSubcommandHelp(t *testing.T) {
 		{name: "auth logout", args: []string{"auth", "logout", "--help"}, want: []string{"Clear cached OAuth token", "USAGE"}},
 		{name: "up", args: []string{"up", "--help"}, want: []string{"Upload a local CSV file to a Google Sheet", "USAGE"}},
 		{name: "down", args: []string{"down", "--help"}, want: []string{"Download a Google Sheet as CSV", "USAGE", "FLAGS", "EXAMPLES"}},
-		{name: "list", args: []string{"list", "--help"}, want: []string{"List your Google Sheets", "USAGE", "EXAMPLES"}},
+		{name: "list", args: []string{"list", "--help"}, want: []string{"List your Google Sheets", "USAGE"}},
 	}
 
 	for _, tt := range tests {

@@ -36,7 +36,7 @@ func NewCommand() *cobra.Command {
 	return cmd
 }
 
-func run(cmd *cobra.Command, args []string) error {
+func run(cmd *cobra.Command, _ []string) error {
 	ctx := context.Background()
 
 	// auth
