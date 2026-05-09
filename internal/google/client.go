@@ -19,19 +19,14 @@ type Client struct {
 // New creates a shared Google API client.
 func New(ctx context.Context, tokenSource oauth2.TokenSource) (*Client, error) {
 	httpClient := oauth2.NewClient(ctx, tokenSource)
-
-	driveService, err := drive.NewService(ctx, option.WithHTTPClient(httpClient))
+	drive, err := drive.NewService(ctx, option.WithHTTPClient(httpClient))
 	if err != nil {
 		return nil, fmt.Errorf("create drive service: %w", err)
 	}
-
-	sheetsService, err := sheets.NewService(ctx, option.WithHTTPClient(httpClient))
+	sheets, err := sheets.NewService(ctx, option.WithHTTPClient(httpClient))
 	if err != nil {
 		return nil, fmt.Errorf("create sheets service: %w", err)
 	}
 
-	return &Client{
-		Drive:  driveService,
-		Sheets: sheetsService,
-	}, nil
+	return &Client{Drive: drive, Sheets: sheets}, nil
 }

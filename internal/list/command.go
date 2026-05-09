@@ -12,6 +12,7 @@ import (
 )
 
 var (
+	// grrr, dep injection
 	listRecent     = recent
 	newGoogle      = google.New
 	newTokenSource = auth.NewTokenSource
@@ -26,10 +27,10 @@ func NewCommand() *cobra.Command {
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		Args: func(_ *cobra.Command, args []string) error {
-			if len(args) == 0 {
-				return nil
+			if len(args) > 0 {
+				return fmt.Errorf("expected `gshoot list`")
 			}
-			return fmt.Errorf("expected `gshoot list`")
+			return nil
 		},
 		RunE: run,
 	}
@@ -62,9 +63,9 @@ func run(cmd *cobra.Command, _ []string) error {
 		stopDots("list failed")
 		return err
 	}
-	stopDots(fmt.Sprintf("listed %d spreadsheets", len(files)))
 
-	// print
+	// done
+	stopDots(fmt.Sprintf("%d recent spreadsheets", len(files)))
 	for _, file := range files {
 		fmt.Fprintf(cmd.OutOrStdout(), "%s  %s\n", file.ModifiedTime, file.Name)
 	}
