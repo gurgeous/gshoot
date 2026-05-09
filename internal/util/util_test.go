@@ -1,6 +1,9 @@
 package util
 
-import "testing"
+import (
+	"bytes"
+	"testing"
+)
 
 func TestIndentBlock(t *testing.T) {
 	t.Parallel()
@@ -59,5 +62,23 @@ func TestTruncate(t *testing.T) {
 				t.Fatalf("Truncate() = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestHyperlink(t *testing.T) {
+	t.Parallel()
+
+	var out bytes.Buffer
+	if got := Hyperlink(&out, "https://example.com", "Alpha"); got != "Alpha" {
+		t.Fatalf("Hyperlink() = %q, want plain label", got)
+	}
+}
+
+func TestIsTTY(t *testing.T) {
+	t.Parallel()
+
+	var out bytes.Buffer
+	if IsTty(&out) {
+		t.Fatal("IsTTY() = true, want false")
 	}
 }

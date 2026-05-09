@@ -1,10 +1,46 @@
 package util
 
 import (
+	"fmt"
+	"io"
+	"os"
 	"strings"
 
-	lipgloss "charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
+	"golang.org/x/term"
 )
+
+const (
+	ESC = "\x1b"
+	BEL = "\a"
+	CSI = ESC + "["
+	OSC = ESC + "]"
+	ST  = ESC + "\\"
+)
+
+//
+// terminal
+//
+
+// func Hyperlink(link, name string) string {
+
+// Hyperlink returns an OSC 8 hyperlink on TTY output, else plain text.
+func Hyperlink(w io.Writer, link, name string) string {
+	if !IsTty(w) {
+		return name
+	}
+	return OSC + "8;;" + link + ST + name + OSC + "8;;" + ST
+}
+
+// IsTty reports whether a writer is backed by a terminal.
+func IsTty(w io.Writer) bool {
+	file, ok := w.(*os.File)
+	return ok && term.IsTerminal(int(file.Fd()))
+}
+
+//
+// strings
+//
 
 // IndentBlock prefixes each line with two spaces.
 func IndentBlock(text string) string {
@@ -23,30 +59,12 @@ func IndentBlock(text string) string {
 }
 
 // RPad right-pads text up to the requested width.
-func RPad(text string, padding int) string {
-	spaces := max(padding-len(text), 1)
-	return text + strings.Repeat(" ", spaces)
+func RPad(s string, padding int) string {
+	template := fmt.Sprintf("%%-%ds ", padding)
+	return fmt.Sprintf(template, s)
 }
 
 // Truncate shortens text to fit width and appends an ellipsis when needed.
-func Truncate(text string, width int) string {
-	if width <= 0 {
-		return ""
-	}
-	if lipgloss.Width(text) <= width {
-		return text
-	}
-	if width == 1 {
-		return "…"
-	}
-
-	var buf strings.Builder
-	for _, r := range text {
-		next := buf.String() + string(r)
-		if lipgloss.Width(next) > width-1 {
-			break
-		}
-		buf.WriteRune(r)
-	}
-	return buf.String() + "…"
+func Truncate(s string, length int) string {
+	return ansi.Truncate(s, length, "…")
 }

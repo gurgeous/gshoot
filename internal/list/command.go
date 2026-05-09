@@ -68,13 +68,15 @@ func run(cmd *cobra.Command, _ []string) error {
 
 	// done
 	stopDots(fmt.Sprintf("%d recent spreadsheets", len(files)))
+	out := cmd.OutOrStdout()
 	for i, file := range files {
 		const width = 30
+		name := fmt.Sprintf("%-30s", util.Truncate(file.Name, width))
 		fmt.Fprintf(
-			cmd.OutOrStdout(),
-			"  %2d %-30s %s\n",
+			out,
+			"  %2d %s %s\n",
 			i+1,
-			util.Truncate(file.Name, width),
+			util.Hyperlink(out, spreadsheetURL(file.Id), name),
 			formatModifiedTime(file.ModifiedTime),
 		)
 	}
@@ -102,4 +104,8 @@ func formatModifiedTime(raw string) string {
 		return raw
 	}
 	return t.Local().Format("Mon Jan 2 2006 15:04 MST")
+}
+
+func spreadsheetURL(id string) string {
+	return "https://docs.google.com/spreadsheets/d/" + id + "/edit"
 }

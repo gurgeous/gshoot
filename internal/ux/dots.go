@@ -6,8 +6,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/gurgeous/gshoot/internal/util"
 	"github.com/schollz/progressbar/v3"
-	"golang.org/x/term"
 )
 
 const interval = 50 * time.Millisecond
@@ -16,11 +16,7 @@ const interval = 50 * time.Millisecond
 func Start(w io.Writer, label string) func(string) {
 	// check to see if we can actually show progress
 	file, ok := w.(*os.File)
-	fd := uintptr(0)
-	if ok {
-		fd = file.Fd()
-	}
-	if ok && (fd > uintptr(^uint(0)>>1) || !term.IsTerminal(int(fd))) {
+	if ok && !util.IsTty(w) {
 		ok = false
 	}
 	if !ok {
