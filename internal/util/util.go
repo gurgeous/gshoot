@@ -54,10 +54,8 @@ func Indent(s string, indent string) string {
 }
 
 func PadRight(s string, length int) string {
-	if padWidth := length - DisplayWidth(s); padWidth > 0 {
-		s += strings.Repeat(" ", padWidth)
-	}
-	return s
+	spaces := max(length-len(s), 1)
+	return s + strings.Repeat(" ", spaces)
 }
 
 func Truncate(s string, length int) string {

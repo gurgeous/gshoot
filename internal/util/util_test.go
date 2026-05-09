@@ -15,7 +15,7 @@ func TestIndent(t *testing.T) {
 	}
 }
 
-func TestRPad(t *testing.T) {
+func TestPadRight(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -33,7 +33,7 @@ func TestRPad(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			if got := PadRight(tt.text, tt.padding); got != tt.want {
-				t.Fatalf("RPad() = %q, want %q", got, tt.want)
+				t.Fatalf("PadRight() = %q, want %q", got, tt.want)
 			}
 		})
 	}
