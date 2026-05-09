@@ -5,13 +5,13 @@ import (
 	"testing"
 )
 
-func TestIndentBlock(t *testing.T) {
+func TestIndent(t *testing.T) {
 	t.Parallel()
 
-	got := IndentBlock("a\nb")
+	got := Indent("a\nb", "  ")
 	want := "  a\n  b"
 	if got != want {
-		t.Fatalf("IndentBlock() = %q, want %q", got, want)
+		t.Fatalf("Indent() = %q, want %q", got, want)
 	}
 }
 
@@ -32,7 +32,7 @@ func TestRPad(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if got := RPad(tt.text, tt.padding); got != tt.want {
+			if got := PadRight(tt.text, tt.padding); got != tt.want {
 				t.Fatalf("RPad() = %q, want %q", got, tt.want)
 			}
 		})

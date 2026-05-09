@@ -1,30 +1,29 @@
 package util
 
 import (
-	"fmt"
 	"io"
 	"os"
+	"regexp"
 	"strings"
 
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	"golang.org/x/term"
 )
 
 const (
-	ESC = "\x1b"
-	BEL = "\a"
-	CSI = ESC + "["
-	OSC = ESC + "]"
-	ST  = ESC + "\\"
+	ESC      = "\x1b"
+	BEL      = "\a"
+	CSI      = ESC + "["
+	OSC      = ESC + "]"
+	ST       = ESC + "\\"
+	ellipsis = "…"
 )
 
 //
 // terminal
 //
 
-// func Hyperlink(link, name string) string {
-
-// Hyperlink returns an OSC 8 hyperlink on TTY output, else plain text.
 func Hyperlink(w io.Writer, link, name string) string {
 	if !IsTty(w) {
 		return name
@@ -32,7 +31,6 @@ func Hyperlink(w io.Writer, link, name string) string {
 	return OSC + "8;;" + link + ST + name + OSC + "8;;" + ST
 }
 
-// IsTty reports whether a writer is backed by a terminal.
 func IsTty(w io.Writer) bool {
 	file, ok := w.(*os.File)
 	return ok && term.IsTerminal(int(file.Fd()))
@@ -42,29 +40,26 @@ func IsTty(w io.Writer) bool {
 // strings
 //
 
-// IndentBlock prefixes each line with two spaces.
-func IndentBlock(text string) string {
-	if text == "" {
-		return ""
-	}
-	var buf strings.Builder
-	for i, line := range strings.Split(text, "\n") {
-		if i > 0 {
-			buf.WriteByte('\n')
-		}
-		buf.WriteString("  ")
-		buf.WriteString(line)
-	}
-	return buf.String()
+var indentRE = regexp.MustCompile(`(?m)^`)
+
+func DisplayWidth(s string) int {
+	return lipgloss.Width(s)
 }
 
-// RPad right-pads text up to the requested width.
-func RPad(s string, padding int) string {
-	template := fmt.Sprintf("%%-%ds ", padding)
-	return fmt.Sprintf(template, s)
+func Indent(s string, indent string) string {
+	if len(s) == 0 {
+		return s
+	}
+	return indentRE.ReplaceAllLiteralString(s, indent)
 }
 
-// Truncate shortens text to fit width and appends an ellipsis when needed.
+func PadRight(s string, length int) string {
+	if padWidth := length - DisplayWidth(s); padWidth > 0 {
+		s += strings.Repeat(" ", padWidth)
+	}
+	return s
+}
+
 func Truncate(s string, length int) string {
-	return ansi.Truncate(s, length, "…")
+	return ansi.Truncate(s, length, ellipsis)
 }

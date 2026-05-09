@@ -43,7 +43,7 @@ func writeRootHelp(w io.Writer, cmd *cobra.Command) {
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Commands:")
 	for _, sub := range commands {
-		fmt.Fprintf(w, "  %s%s\n", util.RPad(sub.Name(), padding+2), sub.Short)
+		fmt.Fprintf(w, "  %s%s\n", util.PadRight(sub.Name(), padding+2), sub.Short)
 	}
 
 	fmt.Fprintln(w)
@@ -61,7 +61,7 @@ func writeCommandHelp(w io.Writer, cmd *cobra.Command) {
 		fmt.Fprintln(w)
 		fmt.Fprintln(w, "COMMANDS")
 		for _, sub := range commands {
-			fmt.Fprintf(w, "  %s%s\n", util.RPad(sub.Name(), cmd.NamePadding()), sub.Short)
+			fmt.Fprintf(w, "  %s%s\n", util.PadRight(sub.Name(), cmd.NamePadding()), sub.Short)
 		}
 	}
 
@@ -80,7 +80,7 @@ func writeCommandHelp(w io.Writer, cmd *cobra.Command) {
 	if example := strings.TrimSpace(cmd.Example); example != "" {
 		fmt.Fprintln(w)
 		fmt.Fprintln(w, "EXAMPLES")
-		fmt.Fprintln(w, util.IndentBlock(example))
+		fmt.Fprintln(w, util.Indent(example, "  "))
 	}
 }
 
@@ -145,6 +145,6 @@ func writeFlags(w io.Writer, flags []helpFlag, minPadding int) {
 		padding = max(len(flag.name), padding)
 	}
 	for _, flag := range flags {
-		fmt.Fprintf(w, "  %s%s\n", util.RPad(flag.name, padding+2), flag.help)
+		fmt.Fprintf(w, "  %s%s\n", util.PadRight(flag.name, padding+2), flag.help)
 	}
 }
