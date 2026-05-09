@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/adrg/xdg"
+	"github.com/gurgeous/gshoot/internal/env"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"golang.org/x/oauth2/jwt"
@@ -47,57 +49,8 @@ const (
 	CredentialKindServiceAccount CredentialKind = "service_account"
 )
 
-// Env houses the environment variables gshoot uses.
-type Env struct {
-	values map[string]string
-}
-
-// NewEnv builds an Env from explicit values.
-func NewEnv(values map[string]string) Env {
-	return Env{values: values}
-}
-
-// Lookup returns an environment value.
-func (e Env) Lookup(key string) string {
-	if e.values != nil {
-		return e.values[key]
-	}
-	return os.Getenv(key)
-}
-
-func (e Env) ConfigDirOverride() string {
-	return e.Lookup("GSHOOT_CONFIG_DIR")
-}
-
-func (e Env) Token() string {
-	return e.Lookup("GSHOOT_TOKEN")
-}
-
-func (e Env) CredentialsFile() string {
-	return e.Lookup("GSHOOT_CREDENTIALS_FILE")
-}
-
-func (e Env) ApplicationCredentials() string {
-	return e.Lookup("GOOGLE_APPLICATION_CREDENTIALS")
-}
-
-func (e Env) XDGConfigHome() string {
-	return e.Lookup("XDG_CONFIG_HOME")
-}
-
-func (e Env) Home() string {
-	if home := e.Lookup("HOME"); home != "" {
-		return home
-	}
-	if home, err := os.UserHomeDir(); err == nil {
-		return home
-	}
-	return "."
-}
-
 // Options configures auth resolution.
 type Options struct {
-	Env     Env
 	Command Command
 }
 
@@ -181,19 +134,17 @@ func ScopesForCommand(cmd Command) []string {
 }
 
 // ConfigDir returns the config directory for gshoot.
-func ConfigDir(env Env) string {
-	if dir := env.ConfigDirOverride(); dir != "" {
+func ConfigDir() string {
+	if dir := env.GSHOOT_CONFIG_DIR; dir != "" {
 		return dir
 	}
-	if dir := env.XDGConfigHome(); dir != "" {
-		return filepath.Join(dir, "gshoot")
-	}
-	return filepath.Join(env.Home(), ".config", "gshoot")
+	xdg.Reload()
+	return filepath.Join(xdg.ConfigHome, "gshoot")
 }
 
 // Resolve picks the best auth source for a command.
 func Resolve(opts Options) (Resolved, error) {
-	configDir := ConfigDir(opts.Env)
+	configDir := ConfigDir()
 	oauthClientPath := filepath.Join(configDir, oauthClientFileName)
 	oauthTokenPath := filepath.Join(configDir, oauthTokenFileName)
 	scopes := ScopesForCommand(opts.Command)
@@ -201,7 +152,7 @@ func Resolve(opts Options) (Resolved, error) {
 		return Resolved{}, fmt.Errorf("unknown command for auth scopes: %q", opts.Command)
 	}
 
-	if token := opts.Env.Token(); token != "" {
+	if token := env.GSHOOT_TOKEN; token != "" {
 		return Resolved{
 			ConfigDir:       configDir,
 			Scopes:          scopes,
@@ -214,7 +165,7 @@ func Resolve(opts Options) (Resolved, error) {
 		}, nil
 	}
 
-	if path := opts.Env.CredentialsFile(); path != "" {
+	if path := env.GSHOOT_CREDENTIALS_FILE; path != "" {
 		cred, err := LoadCredentialFile(path)
 		if err != nil {
 			return Resolved{}, fmt.Errorf("load $GSHOOT_CREDENTIALS_FILE: %w", err)
@@ -250,7 +201,7 @@ func Resolve(opts Options) (Resolved, error) {
 		return Resolved{}, fmt.Errorf("load cached oauth token: %w", err)
 	}
 
-	if path := opts.Env.ApplicationCredentials(); path != "" {
+	if path := env.GOOGLE_APPLICATION_CREDENTIALS; path != "" {
 		cred, loadErr := LoadCredentialFile(path)
 		if loadErr != nil {
 			return Resolved{}, fmt.Errorf("load $GOOGLE_APPLICATION_CREDENTIALS: %w", loadErr)
@@ -268,7 +219,8 @@ func Resolve(opts Options) (Resolved, error) {
 		}, nil
 	}
 
-	adcPath := filepath.Join(opts.Env.Home(), ".config", "gcloud", "application_default_credentials.json")
+	xdg.Reload()
+	adcPath := filepath.Join(xdg.Home, ".config", "gcloud", "application_default_credentials.json")
 	cred, err := LoadCredentialFile(adcPath)
 	if err == nil {
 		return Resolved{

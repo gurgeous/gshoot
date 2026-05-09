@@ -18,7 +18,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gurgeous/gshoot/internal/output"
+	"github.com/gurgeous/gshoot/internal/ux"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
@@ -39,7 +39,6 @@ func (e *NoAuthError) Error() string {
 
 // LoginOptions configures interactive browser login.
 type LoginOptions struct {
-	Env              Env
 	ClientSecretPath string
 	Stdout           io.Writer
 	Stderr           io.Writer
@@ -48,10 +47,9 @@ type LoginOptions struct {
 
 // Login runs an interactive OAuth login and persists the token.
 func Login(ctx context.Context, opts LoginOptions) error {
-	configDir := ConfigDir(opts.Env)
+	configDir := ConfigDir()
 	clientPath := filepath.Join(configDir, oauthClientFileName)
 	tokenPath := filepath.Join(configDir, oauthTokenFileName)
-	ui := output.New(opts.Stdout, opts.Stderr)
 
 	if err := os.MkdirAll(configDir, 0o700); err != nil {
 		return fmt.Errorf("create config dir: %w", err)
@@ -61,7 +59,7 @@ func Login(ctx context.Context, opts LoginOptions) error {
 		if err := importOAuthClient(opts.ClientSecretPath, clientPath); err != nil {
 			return err
 		}
-		ui.Success("Saved OAuth client config to " + clientPath)
+		fmt.Fprintln(opts.Stdout, ux.Success.Render("Saved OAuth client config to "+clientPath))
 	}
 
 	cred, err := LoadCredentialFile(clientPath)
@@ -94,7 +92,7 @@ func Login(ctx context.Context, opts LoginOptions) error {
 		return err
 	}
 
-	ui.Success("Login complete. Token saved to " + tokenPath)
+	fmt.Fprintln(opts.Stdout, ux.Success.Render("Login complete. Token saved to "+tokenPath))
 	return nil
 }
 
@@ -204,7 +202,6 @@ func friendlyLoginError(err error) error {
 }
 
 func browserLoginFlow(ctx context.Context, config *oauth2.Config, stdout, stderr io.Writer) (*oauth2.Token, error) {
-	ui := output.New(stdout, stderr)
 	state, err := randomState()
 	if err != nil {
 		return nil, fmt.Errorf("generate oauth state: %w", err)
@@ -218,12 +215,12 @@ func browserLoginFlow(ctx context.Context, config *oauth2.Config, stdout, stderr
 	config.RedirectURL = redirectURL
 
 	authURL := config.AuthCodeURL(state, oauth2.AccessTypeOffline, oauth2.SetAuthURLParam("prompt", "consent"))
-	ui.Info("Open this URL if the browser does not open:")
-	ui.Subtle(authURL)
+	fmt.Fprintln(stdout, ux.Info.Render("Open this URL if the browser does not open:"))
+	fmt.Fprintln(stdout, ux.Subtle.Render(authURL))
 	if err := openBrowser(authURL); err != nil {
-		ui.Warn("Could not open browser automatically: " + err.Error())
+		fmt.Fprintln(stderr, ux.Warn.Render("Could not open browser automatically: "+err.Error()))
 	}
-	ui.Info("Waiting for Google login at " + callbackURL + " ...")
+	fmt.Fprintln(stdout, ux.Info.Render("Waiting for Google login at "+callbackURL+" ..."))
 
 	code, err := receive(ctx)
 	if err != nil {

@@ -28,13 +28,21 @@ func TestRunRootHelp(t *testing.T) {
 	}
 
 	output := stdout.String()
-	for _, want := range []string{"USAGE", "gshoot <command> <subcommand> [flags]", "auth", "up", "down", "list"} {
+	for _, want := range []string{
+		"Usage: gshoot <command> [flags]",
+		"Flags:",
+		"  -h, --help     help for gshoot",
+		"  -v, --version  print version number",
+		"Commands:",
+		"  auth           Login (or logout) from Google Sheets",
+		"  up             Upload a local CSV file to a Google Sheet",
+		"  down           Download a Google Sheet as CSV",
+		"  list           List your Google Sheets",
+		`Run "gshoot <command> --help" for more information on a command.`,
+	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("help output missing %q:\n%s", want, output)
 		}
-	}
-	if strings.Contains(output, "Flags:") {
-		t.Fatalf("help output = %q, want no flags section", output)
 	}
 
 	if stderr.Len() != 0 {

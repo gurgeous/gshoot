@@ -12,8 +12,7 @@ import (
 const helpHint = "gshoot: try 'gshoot --help' for more information"
 
 func writeError(w io.Writer, err error) {
-	var noAuth *auth.NoAuthError
-	if errors.As(err, &noAuth) {
+	if noAuth, ok := errors.AsType[*auth.NoAuthError](err); ok {
 		auth.WriteNoAuthError(w, noAuth)
 		return
 	}
