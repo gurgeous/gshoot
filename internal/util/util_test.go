@@ -35,3 +35,29 @@ func TestRPad(t *testing.T) {
 		})
 	}
 }
+
+func TestTruncate(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		text  string
+		width int
+		want  string
+	}{
+		{name: "keeps shorter", text: "abc", width: 5, want: "abc"},
+		{name: "truncates ascii", text: "abcdef", width: 5, want: "abcd…"},
+		{name: "single cell", text: "abcdef", width: 1, want: "…"},
+		{name: "zero width", text: "abcdef", width: 0, want: ""},
+		{name: "wide rune", text: "猫猫猫", width: 3, want: "猫…"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := Truncate(tt.text, tt.width); got != tt.want {
+				t.Fatalf("Truncate() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}

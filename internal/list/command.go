@@ -3,9 +3,11 @@ package list
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/gurgeous/gshoot/internal/auth"
 	"github.com/gurgeous/gshoot/internal/google"
+	"github.com/gurgeous/gshoot/internal/util"
 	"github.com/gurgeous/gshoot/internal/ux"
 	"github.com/spf13/cobra"
 	"google.golang.org/api/drive/v3"
@@ -66,8 +68,15 @@ func run(cmd *cobra.Command, _ []string) error {
 
 	// done
 	stopDots(fmt.Sprintf("%d recent spreadsheets", len(files)))
-	for _, file := range files {
-		fmt.Fprintf(cmd.OutOrStdout(), "%s  %s\n", file.ModifiedTime, file.Name)
+	for i, file := range files {
+		const width = 30
+		fmt.Fprintf(
+			cmd.OutOrStdout(),
+			"  %2d %-30s %s\n",
+			i+1,
+			util.Truncate(file.Name, width),
+			formatModifiedTime(file.ModifiedTime),
+		)
 	}
 	return nil
 }
@@ -85,4 +94,12 @@ func recent(ctx context.Context, client *google.Client, limit int) ([]*drive.Fil
 		return nil, fmt.Errorf("list spreadsheets: %w", err)
 	}
 	return res.Files, nil
+}
+
+func formatModifiedTime(raw string) string {
+	t, err := time.Parse(time.RFC3339, raw)
+	if err != nil {
+		return raw
+	}
+	return t.Local().Format("Mon Jan 2 2006 15:04 MST")
 }

@@ -1,5 +1,10 @@
 # AGENTS
 
+## Important
+
+- Avoid overly specific tests; assert only the meaningful behavior
+- Overly specific tests waste time, money, and tokens
+
 ## Project
 
 - After any non-Markdown change, run `mise check`

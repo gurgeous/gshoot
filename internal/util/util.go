@@ -1,6 +1,10 @@
 package util
 
-import "strings"
+import (
+	"strings"
+
+	lipgloss "charm.land/lipgloss/v2"
+)
 
 // IndentBlock prefixes each line with two spaces.
 func IndentBlock(text string) string {
@@ -22,4 +26,27 @@ func IndentBlock(text string) string {
 func RPad(text string, padding int) string {
 	spaces := max(padding-len(text), 1)
 	return text + strings.Repeat(" ", spaces)
+}
+
+// Truncate shortens text to fit width and appends an ellipsis when needed.
+func Truncate(text string, width int) string {
+	if width <= 0 {
+		return ""
+	}
+	if lipgloss.Width(text) <= width {
+		return text
+	}
+	if width == 1 {
+		return "…"
+	}
+
+	var buf strings.Builder
+	for _, r := range text {
+		next := buf.String() + string(r)
+		if lipgloss.Width(next) > width-1 {
+			break
+		}
+		buf.WriteRune(r)
+	}
+	return buf.String() + "…"
 }

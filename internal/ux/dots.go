@@ -33,7 +33,18 @@ func Start(w io.Writer, label string) func(string) {
 		progressbar.OptionEnableColorCodes(true),
 		progressbar.OptionSetDescription(Brand.Render(label)),
 		progressbar.OptionSetWriter(file),
-		progressbar.OptionSpinnerType(14), // dots
+		progressbar.OptionSpinnerCustom([]string{
+			Brand.Render("⠋"),
+			Brand.Render("⠙"),
+			Brand.Render("⠹"),
+			Brand.Render("⠸"),
+			Brand.Render("⠼"),
+			Brand.Render("⠴"),
+			Brand.Render("⠦"),
+			Brand.Render("⠧"),
+			Brand.Render("⠇"),
+			Brand.Render("⠏"),
+		}),
 		progressbar.OptionThrottle(interval),
 	)
 
