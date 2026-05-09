@@ -14,13 +14,11 @@ import (
 	"google.golang.org/api/drive/v3"
 )
 
-func TestNewCommand(t *testing.T) {
+func TestListCommand(t *testing.T) {
 	origLocal := time.Local
 	time.Local = time.FixedZone("PDT", -7*60*60)
 	defer func() { time.Local = origLocal }()
-
-	restore := stubDeps()
-	defer restore()
+	defer stubDeps()
 
 	resolveAuth = func(opts auth.Options) (auth.Resolved, error) {
 		if opts.Command != auth.CommandList {
@@ -43,7 +41,7 @@ func TestNewCommand(t *testing.T) {
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	cmd := NewCommand()
+	cmd := ListCommand()
 	cmd.SetOut(&stdout)
 	cmd.SetErr(&stderr)
 	cmd.SetArgs([]string{})
@@ -75,7 +73,7 @@ func TestNewCommand(t *testing.T) {
 	}
 }
 
-func TestNewCommandAuthError(t *testing.T) {
+func TestListCommandAuthError(t *testing.T) {
 	restore := stubDeps()
 	defer restore()
 
@@ -85,7 +83,7 @@ func TestNewCommandAuthError(t *testing.T) {
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	cmd := NewCommand()
+	cmd := ListCommand()
 	cmd.SetOut(&stdout)
 	cmd.SetErr(&stderr)
 	cmd.SetArgs([]string{})
@@ -103,14 +101,14 @@ func TestNewCommandAuthError(t *testing.T) {
 }
 
 func stubDeps() func() {
-	origResolve := resolveAuth
-	origToken := newTokenSource
 	origGoogle := newGoogle
 	origListRecent := listRecent
+	origResolve := resolveAuth
+	origToken := newTokenSource
 	return func() {
-		resolveAuth = origResolve
-		newTokenSource = origToken
-		newGoogle = origGoogle
 		listRecent = origListRecent
+		newGoogle = origGoogle
+		newTokenSource = origToken
+		resolveAuth = origResolve
 	}
 }

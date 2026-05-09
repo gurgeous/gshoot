@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"time"
 
 	"github.com/gurgeous/gshoot/internal/auth"
 	"github.com/gurgeous/gshoot/internal/google"
@@ -22,8 +21,8 @@ var (
 	resolveAuth    = auth.Resolve
 )
 
-// NewCommand creates the list command.
-func NewCommand() *cobra.Command {
+// ListCommand creates the list command.
+func ListCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "list",
 		Short:         "List your Google Sheets",
@@ -74,12 +73,12 @@ func run(cmd *cobra.Command, _ []string) error {
 		const width = 30
 		num := ux.Dim.Render(fmt.Sprintf("%2d.", i+1))
 		name := fmt.Sprintf("%-"+strconv.Itoa(width)+"s", util.Truncate(file.Name, width))
-		date := ux.Dim.Render(dateAndTimeStr(file.ModifiedTime))
+		date := ux.Dim.Render(util.DateAndTimeStr(file.ModifiedTime))
 		fmt.Fprintf(
 			out,
 			" %s %s   %s\n",
 			num,
-			util.Hyperlink(out, spreadsheetURL(file.Id), name),
+			util.Hyperlink(out, util.SpreadsheetURL(file.Id), name),
 			date,
 		)
 	}
@@ -99,16 +98,4 @@ func recent(ctx context.Context, client *google.Client, limit int) ([]*drive.Fil
 		return nil, fmt.Errorf("list spreadsheets: %w", err)
 	}
 	return res.Files, nil
-}
-
-func dateAndTimeStr(s string) string {
-	t, err := time.Parse(time.RFC3339, s)
-	if err != nil {
-		return s
-	}
-	return t.Local().Format("Mon Jan 2 2006 15:04 MST")
-}
-
-func spreadsheetURL(id string) string {
-	return "https://docs.google.com/spreadsheets/d/" + id + "/edit"
 }

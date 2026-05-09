@@ -31,14 +31,22 @@ func Init() {
 	setStyles(lipgloss.LightDark(env.GSHOOT_THEME != "light"))
 }
 
-func setStyles(ld lipgloss.LightDarkFunc) {
-	Brand = lipgloss.NewStyle().Foreground(ld(lipgloss.Color(Tailwind.Blue.c600), lipgloss.Color(Tailwind.Blue.c400))).Bold(true)
-	Dim = lipgloss.NewStyle().Foreground(lipgloss.Color(Tailwind.Gray.c500))
-	Info = lipgloss.NewStyle().Foreground(ld(lipgloss.Color(Tailwind.Blue.c600), lipgloss.Color(Tailwind.Blue.c400))).Bold(true)
-	Success = lipgloss.NewStyle().Foreground(ld(lipgloss.Color(Tailwind.Green.c700), lipgloss.Color(Tailwind.Green.c400))).Bold(true)
-	Warn = lipgloss.NewStyle().Foreground(ld(lipgloss.Color(Tailwind.Amber.c700), lipgloss.Color(Tailwind.Amber.c400))).Bold(true)
-	Error = lipgloss.NewStyle().Foreground(ld(lipgloss.Color(Tailwind.Red.c700), lipgloss.Color(Tailwind.Red.c400))).Bold(true)
-	Subtle = lipgloss.NewStyle().Foreground(ld(lipgloss.Color(Tailwind.Slate.c600), lipgloss.Color(Tailwind.Slate.c400)))
+func setStyles(fn lipgloss.LightDarkFunc) {
+	plain := func(light, dark string) lipgloss.Style {
+		return lipgloss.NewStyle().Foreground(fn(lipgloss.Color(light), lipgloss.Color(dark)))
+	}
+
+	bold := func(light, dark string) lipgloss.Style {
+		return plain(light, dark).Bold(true)
+	}
+
+	Brand = bold(Tailwind.Blue.c600, Tailwind.Blue.c400)
+	Dim = plain(Tailwind.Gray.c500, Tailwind.Gray.c500)
+	Info = bold(Tailwind.Blue.c600, Tailwind.Blue.c400)
+	Success = bold(Tailwind.Green.c700, Tailwind.Green.c400)
+	Warn = bold(Tailwind.Amber.c700, Tailwind.Amber.c400)
+	Error = bold(Tailwind.Red.c700, Tailwind.Red.c400)
+	Subtle = plain(Tailwind.Slate.c600, Tailwind.Slate.c400)
 }
 
 //

@@ -5,6 +5,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"time"
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -42,6 +43,14 @@ func IsTty(w io.Writer) bool {
 
 var indentRE = regexp.MustCompile(`(?m)^`)
 
+func DateAndTimeStr(s string) string {
+	t, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		return s
+	}
+	return t.Local().Format("Mon Jan 2 2006 15:04 MST")
+}
+
 func DisplayWidth(s string) int {
 	return lipgloss.Width(s)
 }
@@ -56,6 +65,10 @@ func Indent(s string, indent string) string {
 func PadRight(s string, length int) string {
 	spaces := max(length-len(s), 1)
 	return s + strings.Repeat(" ", spaces)
+}
+
+func SpreadsheetURL(id string) string {
+	return "https://docs.google.com/spreadsheets/d/" + id
 }
 
 func Truncate(s string, length int) string {
