@@ -80,7 +80,7 @@ func TestLoginImportsClientAndSavesToken(t *testing.T) {
 		t.Fatalf("Login() error = %v", err)
 	}
 
-	configDir := filepath.Join(home, ".config", "gshoot")
+	configDir := ConfigDir()
 	clientData, err := os.ReadFile(filepath.Join(configDir, oauthClientFileName))
 	if err != nil {
 		t.Fatalf("ReadFile(client) error = %v", err)
@@ -106,9 +106,8 @@ func TestLoginImportsClientAndSavesToken(t *testing.T) {
 
 func TestLoginFlowErrorAddsGoogleGuidance(t *testing.T) {
 	home := t.TempDir()
-	writeFile(t, filepath.Join(home, ".config", "gshoot", oauthClientFileName), `{"installed":{"client_id":"cid","client_secret":"secret","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","redirect_uris":["http://127.0.0.1"]}}`)
-
 	withTestEnv(t, map[string]string{"HOME": home})
+	writeFile(t, filepath.Join(ConfigDir(), oauthClientFileName), `{"installed":{"client_id":"cid","client_secret":"secret","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","redirect_uris":["http://127.0.0.1"]}}`)
 	err := Login(context.Background(), LoginOptions{
 		Stdout: new(bytes.Buffer),
 		Stderr: new(bytes.Buffer),
@@ -183,9 +182,8 @@ func TestFriendlyLoginErrorInvalidClient(t *testing.T) {
 
 func TestInspectStatusReadyForLogin(t *testing.T) {
 	home := t.TempDir()
-	writeFile(t, filepath.Join(home, ".config", "gshoot", oauthClientFileName), `{"installed":{"client_id":"cid","client_secret":"secret","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","redirect_uris":["http://127.0.0.1"]}}`)
-
 	withTestEnv(t, map[string]string{"HOME": home})
+	writeFile(t, filepath.Join(ConfigDir(), oauthClientFileName), `{"installed":{"client_id":"cid","client_secret":"secret","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","redirect_uris":["http://127.0.0.1"]}}`)
 	status := InspectStatus()
 	if !status.HasOAuthClient || status.LoggedIn {
 		t.Fatalf("InspectStatus() = %#v, want ready-for-login state", status)
@@ -194,10 +192,9 @@ func TestInspectStatusReadyForLogin(t *testing.T) {
 
 func TestInspectStatusAuthenticatedFromCachedToken(t *testing.T) {
 	home := t.TempDir()
-	writeFile(t, filepath.Join(home, ".config", "gshoot", oauthClientFileName), `{"installed":{"client_id":"cid","client_secret":"secret","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","redirect_uris":["http://127.0.0.1"]}}`)
-	writeFile(t, filepath.Join(home, ".config", "gshoot", oauthTokenFileName), `{"access_token":"a","refresh_token":"r","token_type":"Bearer","expiry":"3026-05-07T22:00:00Z"}`)
-
 	withTestEnv(t, map[string]string{"HOME": home})
+	writeFile(t, filepath.Join(ConfigDir(), oauthClientFileName), `{"installed":{"client_id":"cid","client_secret":"secret","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","redirect_uris":["http://127.0.0.1"]}}`)
+	writeFile(t, filepath.Join(ConfigDir(), oauthTokenFileName), `{"access_token":"a","refresh_token":"r","token_type":"Bearer","expiry":"3026-05-07T22:00:00Z"}`)
 	status := InspectStatus()
 	if !status.LoggedIn || status.ResolvedSource != SourceKindCachedOAuth {
 		t.Fatalf("InspectStatus() = %#v, want cached-oauth logged-in state", status)
@@ -214,9 +211,8 @@ func TestPrintStatusNoAuth(t *testing.T) {
 
 func TestLogout(t *testing.T) {
 	home := t.TempDir()
-	writeFile(t, filepath.Join(home, ".config", "gshoot", oauthTokenFileName), `{"access_token":"a","token_type":"Bearer","expiry":"3026-05-07T22:00:00Z"}`)
-
 	withTestEnv(t, map[string]string{"HOME": home})
+	writeFile(t, filepath.Join(ConfigDir(), oauthTokenFileName), `{"access_token":"a","token_type":"Bearer","expiry":"3026-05-07T22:00:00Z"}`)
 	removed, err := Logout()
 	if err != nil {
 		t.Fatalf("Logout() error = %v", err)
@@ -224,7 +220,7 @@ func TestLogout(t *testing.T) {
 	if !removed {
 		t.Fatal("Logout() removed = false, want true")
 	}
-	if fileExists(filepath.Join(home, ".config", "gshoot", oauthTokenFileName)) {
+	if fileExists(filepath.Join(ConfigDir(), oauthTokenFileName)) {
 		t.Fatal("Logout() should remove the cached token")
 	}
 }

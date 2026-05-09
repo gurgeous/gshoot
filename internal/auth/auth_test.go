@@ -80,7 +80,7 @@ func TestConfigDir(t *testing.T) {
 		{
 			name: "home default",
 			env:  map[string]string{"HOME": home},
-			want: filepath.Join(home, ".config", "gshoot"),
+			want: "",
 		},
 	}
 
@@ -99,8 +99,12 @@ func TestConfigDir(t *testing.T) {
 					xdg.Reload()
 				})
 			}
-			if got := ConfigDir(); got != tt.want {
-				t.Fatalf("ConfigDir() = %q, want %q", got, tt.want)
+			want := tt.want
+			if tt.name == "home default" {
+				want = filepath.Join(xdg.ConfigHome, "gshoot")
+			}
+			if got := ConfigDir(); got != want {
+				t.Fatalf("ConfigDir() = %q, want %q", got, want)
 			}
 		})
 	}
@@ -225,7 +229,7 @@ func TestResolveMissingAuth(t *testing.T) {
 		"$GSHOOT_TOKEN",
 		"$GSHOOT_CREDENTIALS_FILE",
 		"$GOOGLE_APPLICATION_CREDENTIALS",
-		filepath.Join(home, ".config", "gshoot", oauthTokenFileName),
+		filepath.Join(ConfigDir(), oauthTokenFileName),
 		filepath.Join(home, ".config", "gcloud", "application_default_credentials.json"),
 	} {
 		if !strings.Contains(msg, want) {
