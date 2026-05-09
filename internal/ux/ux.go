@@ -9,6 +9,7 @@ import (
 
 var (
 	Brand   lipgloss.Style
+	Dim     lipgloss.Style
 	Info    lipgloss.Style
 	Success lipgloss.Style
 	Warn    lipgloss.Style
@@ -32,6 +33,7 @@ func Init() {
 
 func setStyles(ld lipgloss.LightDarkFunc) {
 	Brand = lipgloss.NewStyle().Foreground(ld(lipgloss.Color(Tailwind.Blue.c600), lipgloss.Color(Tailwind.Blue.c400))).Bold(true)
+	Dim = lipgloss.NewStyle().Foreground(lipgloss.Color(Tailwind.Gray.c500))
 	Info = lipgloss.NewStyle().Foreground(ld(lipgloss.Color(Tailwind.Blue.c600), lipgloss.Color(Tailwind.Blue.c400))).Bold(true)
 	Success = lipgloss.NewStyle().Foreground(ld(lipgloss.Color(Tailwind.Green.c700), lipgloss.Color(Tailwind.Green.c400))).Bold(true)
 	Warn = lipgloss.NewStyle().Foreground(ld(lipgloss.Color(Tailwind.Amber.c700), lipgloss.Color(Tailwind.Amber.c400))).Bold(true)

@@ -3,6 +3,7 @@ package list
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/gurgeous/gshoot/internal/auth"
@@ -71,13 +72,15 @@ func run(cmd *cobra.Command, _ []string) error {
 	out := cmd.OutOrStdout()
 	for i, file := range files {
 		const width = 30
-		name := fmt.Sprintf("%-30s", util.Truncate(file.Name, width))
+		num := ux.Dim.Render(fmt.Sprintf("%2d.", i+1))
+		name := fmt.Sprintf("%-"+strconv.Itoa(width)+"s", util.Truncate(file.Name, width))
+		date := ux.Dim.Render(dateAndTimeStr(file.ModifiedTime))
 		fmt.Fprintf(
 			out,
-			"  %2d %s %s\n",
-			i+1,
+			" %s %s   %s\n",
+			num,
 			util.Hyperlink(out, spreadsheetURL(file.Id), name),
-			formatModifiedTime(file.ModifiedTime),
+			date,
 		)
 	}
 	return nil
@@ -98,10 +101,10 @@ func recent(ctx context.Context, client *google.Client, limit int) ([]*drive.Fil
 	return res.Files, nil
 }
 
-func formatModifiedTime(raw string) string {
-	t, err := time.Parse(time.RFC3339, raw)
+func dateAndTimeStr(s string) string {
+	t, err := time.Parse(time.RFC3339, s)
 	if err != nil {
-		return raw
+		return s
 	}
 	return t.Local().Format("Mon Jan 2 2006 15:04 MST")
 }
