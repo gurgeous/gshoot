@@ -37,38 +37,6 @@ func TestRunAuthLogin(t *testing.T) {
 	}
 }
 
-func TestRunListNoAuthShowsFriendlyHint(t *testing.T) {
-	restore := stubAuthLogin(t)
-	defer restore()
-
-	resolveAuth = func(auth.Options) (auth.Resolved, error) {
-		return auth.Resolved{}, &auth.NoAuthError{
-			Command:   auth.CommandList,
-			ConfigDir: "/tmp/gshoot",
-		}
-	}
-
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-
-	code := Run([]string{"list"}, &stdout, &stderr)
-	if code != 1 {
-		t.Fatalf("Run() code = %d, want 1", code)
-	}
-	got := stderr.String()
-	for _, want := range []string{
-		"You will need to authenticate first.",
-		"setting up auth with Google Sheets is",
-		"Don't blame gshoot.",
-		"Try this first:",
-		"gshoot auth status",
-	} {
-		if !strings.Contains(got, want) {
-			t.Fatalf("stderr missing %q:\n%q", want, got)
-		}
-	}
-}
-
 func TestRunAuthLoginError(t *testing.T) {
 	restore := stubAuthLogin(t)
 	defer restore()

@@ -16,7 +16,8 @@ var (
 
 // StartDots starts a simple spinner and returns a function that stops it.
 func StartDots(w io.Writer, label string) func(string) {
-	if !term.IsTerminal(int(os.Stdout.Fd())) {
+	fd := os.Stdout.Fd()
+	if fd > uintptr(^uint(0)>>1) || !term.IsTerminal(int(fd)) {
 		// nop
 		return func(string) {}
 	}

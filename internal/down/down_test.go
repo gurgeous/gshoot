@@ -5,42 +5,47 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
+
+	"github.com/gurgeous/gshoot/internal/google"
+	"google.golang.org/api/drive/v3"
+	"google.golang.org/api/sheets/v4"
 )
 
-func TestServiceDownloadDefaultSheet(t *testing.T) {
+func TestDownloadDefaultSheet(t *testing.T) {
 	t.Parallel()
 
-	client := &fakeClient{
-		spreadsheets: []DriveSpreadsheet{
-			{ID: "new", Name: "budget", ModifiedTime: time.Date(2026, 5, 7, 8, 0, 0, 0, time.UTC)},
-			{ID: "old", Name: "Budget", ModifiedTime: time.Date(2026, 5, 6, 8, 0, 0, 0, time.UTC)},
-		},
-		sheets: map[string][]Sheet{
-			"new": {
-				{ID: 10, Title: "Sheet1"},
-				{ID: 20, Title: "Other"},
-			},
-		},
-		values: map[string][][]string{
-			"new/Sheet1": {
-				{"name", "count"},
-				{"alpha"},
-				{"beta", "2", "extra"},
-			},
-		},
+	restore := stubDownloadDeps()
+	defer restore()
+
+	listSpreadsheets = func(context.Context, *google.Client) ([]*drive.File, error) {
+		return []*drive.File{
+			{Id: "new", Name: "budget", ModifiedTime: "2026-05-07T08:00:00Z"},
+			{Id: "old", Name: "Budget", ModifiedTime: "2026-05-06T08:00:00Z"},
+		}, nil
+	}
+	listSheets = func(_ context.Context, _ *google.Client, spreadsheetID string) ([]*sheets.Sheet, error) {
+		if spreadsheetID != "new" {
+			t.Fatalf("ListSheets() spreadsheet = %q, want new", spreadsheetID)
+		}
+		return []*sheets.Sheet{
+			{Properties: &sheets.SheetProperties{SheetId: 10, Title: "Sheet1"}},
+			{Properties: &sheets.SheetProperties{SheetId: 20, Title: "Other"}},
+		}, nil
+	}
+	getValues = func(_ context.Context, _ *google.Client, spreadsheetID, sheetTitle string) ([][]string, error) {
+		if spreadsheetID != "new" || sheetTitle != "Sheet1" {
+			t.Fatalf("GetValues() args = (%q, %q)", spreadsheetID, sheetTitle)
+		}
+		return [][]string{
+			{"name", "count"},
+			{"alpha"},
+			{"beta", "2", "extra"},
+		}, nil
 	}
 
-	result, err := NewService(client).Download(context.Background(), "Budget", "")
+	values, err := Download(context.Background(), &google.Client{}, "Budget", "")
 	if err != nil {
 		t.Fatalf("Download() error = %v", err)
-	}
-
-	if result.Spreadsheet.ID != "new" {
-		t.Fatalf("Download() spreadsheet id = %q, want newest match", result.Spreadsheet.ID)
-	}
-	if result.Sheet.Title != "Sheet1" {
-		t.Fatalf("Download() sheet title = %q, want first sheet", result.Sheet.Title)
 	}
 
 	want := [][]string{
@@ -48,46 +53,53 @@ func TestServiceDownloadDefaultSheet(t *testing.T) {
 		{"alpha", "", ""},
 		{"beta", "2", "extra"},
 	}
-	if !equalRows(result.Values, want) {
-		t.Fatalf("Download() values = %#v, want %#v", result.Values, want)
+	if !equalRows(values, want) {
+		t.Fatalf("Download() values = %#v, want %#v", values, want)
 	}
 }
 
-func TestServiceDownloadNamedSheet(t *testing.T) {
+func TestDownloadNamedSheet(t *testing.T) {
 	t.Parallel()
 
-	client := &fakeClient{
-		spreadsheets: []DriveSpreadsheet{
-			{ID: "1", Name: "Budget", ModifiedTime: time.Date(2026, 5, 7, 8, 0, 0, 0, time.UTC)},
-		},
-		sheets: map[string][]Sheet{
-			"1": {
-				{ID: 10, Title: "Sheet1"},
-				{ID: 20, Title: "Summary"},
-			},
-		},
-		values: map[string][][]string{
-			"1/Summary": {
-				{"month", "total"},
-				{"May", "10"},
-			},
-		},
+	restore := stubDownloadDeps()
+	defer restore()
+
+	listSpreadsheets = func(context.Context, *google.Client) ([]*drive.File, error) {
+		return []*drive.File{{Id: "1", Name: "Budget", ModifiedTime: "2026-05-07T08:00:00Z"}}, nil
+	}
+	listSheets = func(context.Context, *google.Client, string) ([]*sheets.Sheet, error) {
+		return []*sheets.Sheet{
+			{Properties: &sheets.SheetProperties{SheetId: 10, Title: "Sheet1"}},
+			{Properties: &sheets.SheetProperties{SheetId: 20, Title: "Summary"}},
+		}, nil
+	}
+	getValues = func(_ context.Context, _ *google.Client, spreadsheetID, sheetTitle string) ([][]string, error) {
+		if spreadsheetID != "1" || sheetTitle != "Summary" {
+			t.Fatalf("GetValues() args = (%q, %q)", spreadsheetID, sheetTitle)
+		}
+		return [][]string{{"month", "total"}, {"May", "10"}}, nil
 	}
 
-	result, err := NewService(client).Download(context.Background(), "Budget", "summary")
+	values, err := Download(context.Background(), &google.Client{}, "Budget", "summary")
 	if err != nil {
 		t.Fatalf("Download() error = %v", err)
 	}
-
-	if result.Sheet.Title != "Summary" {
-		t.Fatalf("Download() sheet title = %q, want Summary", result.Sheet.Title)
+	if !equalRows(values, [][]string{{"month", "total"}, {"May", "10"}}) {
+		t.Fatalf("Download() values = %#v", values)
 	}
 }
 
-func TestServiceDownloadSpreadsheetNotFound(t *testing.T) {
+func TestDownloadSpreadsheetNotFound(t *testing.T) {
 	t.Parallel()
 
-	_, err := NewService(&fakeClient{}).Download(context.Background(), "Budget", "")
+	restore := stubDownloadDeps()
+	defer restore()
+
+	listSpreadsheets = func(context.Context, *google.Client) ([]*drive.File, error) {
+		return nil, nil
+	}
+
+	_, err := Download(context.Background(), &google.Client{}, "Budget", "")
 	if err == nil {
 		t.Fatal("Download() error = nil, want error")
 	}
@@ -98,21 +110,22 @@ func TestServiceDownloadSpreadsheetNotFound(t *testing.T) {
 	}
 }
 
-func TestServiceDownloadSheetNotFound(t *testing.T) {
+func TestDownloadSheetNotFound(t *testing.T) {
 	t.Parallel()
 
-	client := &fakeClient{
-		spreadsheets: []DriveSpreadsheet{
-			{ID: "1", Name: "Budget", ModifiedTime: time.Date(2026, 5, 7, 8, 0, 0, 0, time.UTC)},
-		},
-		sheets: map[string][]Sheet{
-			"1": {
-				{ID: 10, Title: "Sheet1"},
-			},
-		},
+	restore := stubDownloadDeps()
+	defer restore()
+
+	listSpreadsheets = func(context.Context, *google.Client) ([]*drive.File, error) {
+		return []*drive.File{{Id: "1", Name: "Budget", ModifiedTime: "2026-05-07T08:00:00Z"}}, nil
+	}
+	listSheets = func(context.Context, *google.Client, string) ([]*sheets.Sheet, error) {
+		return []*sheets.Sheet{
+			{Properties: &sheets.SheetProperties{SheetId: 10, Title: "Sheet1"}},
+		}, nil
 	}
 
-	_, err := NewService(client).Download(context.Background(), "Budget", "Summary")
+	_, err := Download(context.Background(), &google.Client{}, "Budget", "Summary")
 	if err == nil {
 		t.Fatal("Download() error = nil, want error")
 	}
@@ -123,6 +136,30 @@ func TestServiceDownloadSheetNotFound(t *testing.T) {
 	}
 	if notFound.Spreadsheet != "Budget" {
 		t.Fatalf("SheetNotFoundError spreadsheet = %q, want Budget", notFound.Spreadsheet)
+	}
+}
+
+func TestDownloadNoSheets(t *testing.T) {
+	t.Parallel()
+
+	restore := stubDownloadDeps()
+	defer restore()
+
+	listSpreadsheets = func(context.Context, *google.Client) ([]*drive.File, error) {
+		return []*drive.File{{Id: "1", Name: "Budget", ModifiedTime: "2026-05-07T08:00:00Z"}}, nil
+	}
+	listSheets = func(context.Context, *google.Client, string) ([]*sheets.Sheet, error) {
+		return nil, nil
+	}
+
+	_, err := Download(context.Background(), &google.Client{}, "Budget", "")
+	if err == nil {
+		t.Fatal("Download() error = nil, want error")
+	}
+
+	var noSheets *NoSheetsError
+	if !errors.As(err, &noSheets) {
+		t.Fatalf("Download() error = %T, want NoSheetsError", err)
 	}
 }
 
@@ -146,24 +183,6 @@ func TestWriteCSV(t *testing.T) {
 	}
 }
 
-type fakeClient struct {
-	spreadsheets []DriveSpreadsheet
-	sheets       map[string][]Sheet
-	values       map[string][][]string
-}
-
-func (f *fakeClient) ListSpreadsheets(context.Context) ([]DriveSpreadsheet, error) {
-	return f.spreadsheets, nil
-}
-
-func (f *fakeClient) ListSheets(_ context.Context, spreadsheetID string) ([]Sheet, error) {
-	return f.sheets[spreadsheetID], nil
-}
-
-func (f *fakeClient) GetValues(_ context.Context, spreadsheetID, sheetTitle string) ([][]string, error) {
-	return f.values[spreadsheetID+"/"+sheetTitle], nil
-}
-
 func equalRows(lhs, rhs [][]string) bool {
 	if len(lhs) != len(rhs) {
 		return false
@@ -179,4 +198,15 @@ func equalRows(lhs, rhs [][]string) bool {
 		}
 	}
 	return true
+}
+
+func stubDownloadDeps() func() {
+	origListSpreadsheets := listSpreadsheets
+	origListSheets := listSheets
+	origGetValues := getValues
+	return func() {
+		listSpreadsheets = origListSpreadsheets
+		listSheets = origListSheets
+		getValues = origGetValues
+	}
 }

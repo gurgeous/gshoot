@@ -2,19 +2,15 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
-	"os"
 	"strings"
-	"time"
 
 	"github.com/gurgeous/gshoot/internal/auth"
 	"github.com/gurgeous/gshoot/internal/down"
 	"github.com/gurgeous/gshoot/internal/list"
 	"github.com/gurgeous/gshoot/internal/ux"
 	"github.com/spf13/cobra"
-	"golang.org/x/oauth2"
 )
 
 var (
@@ -25,12 +21,6 @@ var (
 	logoutAuth      = auth.Logout
 	statusAuth      = auth.InspectStatus
 	printAuthStatus = auth.PrintStatus
-	newDownClient   = func(ctx context.Context, tokenSource oauth2.TokenSource) (down.Client, error) {
-		return down.NewGoogleClient(ctx, tokenSource)
-	}
-	newListClient = func(ctx context.Context, tokenSource oauth2.TokenSource) (list.Client, error) {
-		return list.NewGoogleClient(ctx, tokenSource)
-	}
 )
 
 // Run executes the gshoot CLI.
@@ -82,8 +72,8 @@ func newRootCmd() *cobra.Command {
 	cmd.AddCommand(
 		newAuthCmd(),
 		newStubCmd("up", "Upload a local CSV file to a Google Sheet"),
-		newDownCmd(),
-		newListCmd(),
+		down.NewCommand(),
+		list.NewCommand(),
 	)
 
 	return cmd
@@ -163,77 +153,6 @@ func newAuthLogoutCmd() *cobra.Command {
 	return cmd
 }
 
-func newDownCmd() *cobra.Command {
-	var outputPath string
-
-	cmd := &cobra.Command{
-		Use:   "down <spreadsheet> [sheet]",
-		Short: "Download a Google Sheet as CSV",
-		Example: strings.Join([]string{
-			"gshoot down Budget",
-			"  gshoot down Budget Q1 --output q1.csv",
-		}, "\n"),
-		Args: downArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			ctx := context.Background()
-			resolved, err := resolveAuth(auth.Options{
-				Command: auth.CommandDown,
-			})
-			if err != nil {
-				return err
-			}
-
-			tokenSource, err := newTokenSource(ctx, resolved)
-			if err != nil {
-				return err
-			}
-
-			client, err := newDownClient(ctx, tokenSource)
-			if err != nil {
-				return err
-			}
-
-			sheetName := ""
-			if len(args) == 2 {
-				sheetName = args[1]
-			}
-
-			result, err := down.NewService(client).Download(ctx, args[0], sheetName)
-			if err != nil {
-				var spreadsheetErr *down.SpreadsheetNotFoundError
-				if errors.As(err, &spreadsheetErr) {
-					return spreadsheetNotFoundError(spreadsheetErr.Name)
-				}
-
-				var sheetErr *down.SheetNotFoundError
-				if errors.As(err, &sheetErr) {
-					return sheetNotFoundError(sheetErr.Spreadsheet, sheetErr.Sheet)
-				}
-
-				var noSheetsErr *down.NoSheetsError
-				if errors.As(err, &noSheetsErr) {
-					return noSheetsError(noSheetsErr.Spreadsheet)
-				}
-				return err
-			}
-
-			writer := cmd.OutOrStdout()
-			if outputPath != "" {
-				file, err := os.Create(outputPath)
-				if err != nil {
-					return fmt.Errorf("create output file: %w", err)
-				}
-				defer file.Close()
-				writer = file
-			}
-
-			return down.WriteCSV(writer, result.Values)
-		},
-	}
-	cmd.Flags().StringVarP(&outputPath, "output", "o", "", "where to write the CSV")
-	return cmd
-}
-
 func newStubCmd(use, short string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   use,
@@ -250,59 +169,6 @@ func noArgs(usage string) cobra.PositionalArgs {
 		}
 		return fmt.Errorf("expected `%s`", usage)
 	}
-}
-
-func downArgs(_ *cobra.Command, args []string) error {
-	if len(args) >= 1 && len(args) <= 2 {
-		return nil
-	}
-	return fmt.Errorf("expected `gshoot down <spreadsheet> [sheet]`")
-}
-
-func newListCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "list",
-		Short:   "List your Google Sheets",
-		Example: "  gshoot list",
-		Args:    noArgs("gshoot list"),
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			ctx := context.Background()
-			stderr := cmd.ErrOrStderr()
-
-			resolved, err := resolveAuth(auth.Options{
-				Command: auth.CommandList,
-			})
-			if err != nil {
-				return err
-			}
-
-			tokenSource, err := newTokenSource(ctx, resolved)
-			if err != nil {
-				return err
-			}
-
-			client, err := newListClient(ctx, tokenSource)
-			if err != nil {
-				return err
-			}
-
-			stopDots := ux.StartDots(stderr, "gshoot: listing spreadsheets...")
-			items, err := list.NewService(client).ListRecent(ctx, 10)
-			if err != nil {
-				stopDots("list failed")
-				return err
-			}
-			stopDots(fmt.Sprintf("gshoot: got %d spreadsheets", len(items)))
-
-			stdout := cmd.OutOrStdout()
-			for _, item := range items {
-				fmt.Fprintf(stdout, "%s %s\n", item.Name, item.ModifiedTime.UTC().Format(time.RFC3339))
-			}
-
-			return nil
-		},
-	}
-	return cmd
 }
 
 func isRootCmd(cmd *cobra.Command) bool {
