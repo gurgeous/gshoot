@@ -41,7 +41,7 @@ func TestListCommand(t *testing.T) {
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	cmd := ListCommand()
+	cmd := NewCommand()
 	cmd.SetOut(&stdout)
 	cmd.SetErr(&stderr)
 	cmd.SetArgs([]string{})
@@ -83,7 +83,7 @@ func TestListCommandAuthError(t *testing.T) {
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	cmd := ListCommand()
+	cmd := NewCommand()
 	cmd.SetOut(&stdout)
 	cmd.SetErr(&stderr)
 	cmd.SetArgs([]string{})

@@ -21,8 +21,8 @@ var (
 	resolveAuth    = auth.Resolve
 )
 
-// ListCommand creates the list command.
-func ListCommand() *cobra.Command {
+// NewCommand creates the list command.
+func NewCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "list",
 		Short:         "List your Google Sheets",
@@ -40,9 +40,11 @@ func ListCommand() *cobra.Command {
 }
 
 func run(cmd *cobra.Command, _ []string) error {
+	dots := ux.StartDots(cmd.ErrOrStderr(), "gshoot: opening Google Sheets...")
 	ctx := context.Background()
 
 	// auth
+	dots.SetDescription("gshoot: authenticating...")
 	resolved, err := resolveAuth(auth.Options{Command: auth.CommandList})
 	if err != nil {
 		return err
@@ -59,15 +61,17 @@ func run(cmd *cobra.Command, _ []string) error {
 	}
 
 	// list
-	stopDots := ux.Start(cmd.ErrOrStderr(), "listing spreadsheets...")
+	dots.SetDescription("gshoot: listing spreadsheets...")
 	files, err := listRecent(ctx, client, 10)
 	if err != nil {
-		stopDots("list failed")
+		dots.SetDescription("list failed")
+		dots.Stop()
 		return err
 	}
 
 	// done
-	stopDots(fmt.Sprintf("%d recent spreadsheets", len(files)))
+	dots.SetDescription(fmt.Sprintf("%d recent spreadsheets", len(files)))
+	dots.Stop()
 	out := cmd.OutOrStdout()
 	for i, file := range files {
 		const width = 30

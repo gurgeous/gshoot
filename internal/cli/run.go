@@ -67,7 +67,7 @@ func newRootCmd() *cobra.Command {
 		auth.NewCommand(),
 		newStubCmd("up", "Upload a local CSV file to a Google Sheet"),
 		down.NewCommand(),
-		list.ListCommand(),
+		list.NewCommand(),
 	)
 
 	return cmd
