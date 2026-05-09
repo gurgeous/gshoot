@@ -17,6 +17,10 @@ var (
 	Subtle  lipgloss.Style
 )
 
+//
+// init/Init
+//
+
 // Default to dark. Later, we can look at the terminal to get a better answer
 func init() {
 	setStyles(lipgloss.LightDark(true))
@@ -32,21 +36,17 @@ func Init() {
 }
 
 func setStyles(fn lipgloss.LightDarkFunc) {
-	plain := func(light, dark string) lipgloss.Style {
+	fg := func(light, dark string) lipgloss.Style {
 		return lipgloss.NewStyle().Foreground(fn(lipgloss.Color(light), lipgloss.Color(dark)))
 	}
 
-	bold := func(light, dark string) lipgloss.Style {
-		return plain(light, dark).Bold(true)
-	}
-
-	Brand = bold(Tailwind.Blue.c600, Tailwind.Blue.c400)
-	Dim = plain(Tailwind.Gray.c500, Tailwind.Gray.c500)
-	Info = bold(Tailwind.Blue.c600, Tailwind.Blue.c400)
-	Success = bold(Tailwind.Green.c700, Tailwind.Green.c400)
-	Warn = bold(Tailwind.Amber.c700, Tailwind.Amber.c400)
-	Error = bold(Tailwind.Red.c700, Tailwind.Red.c400)
-	Subtle = plain(Tailwind.Slate.c600, Tailwind.Slate.c400)
+	Brand = fg(Tailwind.Blue.c600, Tailwind.Blue.c400).Bold(true)
+	Dim = fg(Tailwind.Gray.c400, Tailwind.Gray.c600)
+	Info = fg(Tailwind.Blue.c600, Tailwind.Blue.c400).Bold(true)
+	Success = fg(Tailwind.Green.c700, Tailwind.Green.c400).Bold(true)
+	Warn = fg(Tailwind.Amber.c700, Tailwind.Amber.c400).Bold(true)
+	Error = fg(Tailwind.Red.c700, Tailwind.Red.c400).Bold(true)
+	Subtle = fg(Tailwind.Slate.c600, Tailwind.Slate.c400)
 }
 
 //
