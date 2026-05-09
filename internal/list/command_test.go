@@ -54,8 +54,13 @@ func TestNewCommand(t *testing.T) {
 			t.Fatalf("stdout missing %q:\n%s", want, stdout.String())
 		}
 	}
-	if stderr.Len() != 0 {
-		t.Fatalf("stderr = %q, want empty", stderr.String())
+	for _, want := range []string{
+		"listing spreadsheets...",
+		"2 recent spreadsheets",
+	} {
+		if !strings.Contains(stderr.String(), want) {
+			t.Fatalf("stderr missing %q:\n%s", want, stderr.String())
+		}
 	}
 }
 
