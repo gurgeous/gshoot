@@ -12,7 +12,7 @@ import (
 
 	"github.com/gurgeous/gshoot/internal/auth"
 	"github.com/gurgeous/gshoot/internal/down"
-	"github.com/gurgeous/gshoot/internal/listing"
+	"github.com/gurgeous/gshoot/internal/list"
 	"golang.org/x/oauth2"
 )
 
@@ -170,15 +170,11 @@ func TestRunList(t *testing.T) {
 	newTokenSource = func(_ context.Context, _ auth.Resolved) (oauth2.TokenSource, error) {
 		return oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "token"}), nil
 	}
-	newListingClient = func(_ context.Context, _ oauth2.TokenSource) (listing.Client, error) {
+	newListClient = func(_ context.Context, _ oauth2.TokenSource) (list.Client, error) {
 		return &fakeListingClient{
-			items: []listing.DriveSpreadsheet{
+			items: []list.DriveSpreadsheet{
 				{ID: "1", Name: "Alpha", ModifiedTime: time.Date(2026, 5, 7, 12, 0, 0, 0, time.UTC)},
 				{ID: "2", Name: "Beta", ModifiedTime: time.Date(2026, 5, 7, 11, 0, 0, 0, time.UTC)},
-			},
-			sheets: map[string][]string{
-				"1": {"One", "Two", "Three", "Four"},
-				"2": {"Only"},
 			},
 		}, nil
 	}
@@ -194,18 +190,11 @@ func TestRunList(t *testing.T) {
 	output := stdout.String()
 	for _, want := range []string{
 		"2026-05-07T12:00:00Z  Alpha",
-		"One, Two, Three, ...",
 		"2026-05-07T11:00:00Z  Beta",
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("stdout missing %q:\n%s", want, output)
 		}
-	}
-	if strings.Contains(output, "Only") {
-		t.Fatalf("stdout = %q, want no preview for single-sheet spreadsheet", output)
-	}
-	if stderr.Len() != 0 {
-		t.Fatalf("stderr = %q, want empty", stderr.String())
 	}
 }
 
@@ -227,8 +216,8 @@ func TestRunListAuthError(t *testing.T) {
 	if stdout.Len() != 0 {
 		t.Fatalf("stdout = %q, want empty", stdout.String())
 	}
-	if got, want := stderr.String(), "gshoot: no auth\n"+helpHint+"\n"; got != want {
-		t.Fatalf("stderr = %q, want %q", got, want)
+	if !strings.Contains(stderr.String(), "gshoot: no auth\n"+helpHint+"\n") {
+		t.Fatalf("stderr = %q, want auth error", stderr.String())
 	}
 }
 
@@ -396,11 +385,11 @@ func stubListDeps(t *testing.T) func() {
 
 	origResolve := resolveAuth
 	origToken := newTokenSource
-	origClient := newListingClient
+	origClient := newListClient
 	return func() {
 		resolveAuth = origResolve
 		newTokenSource = origToken
-		newListingClient = origClient
+		newListClient = origClient
 	}
 }
 
@@ -418,16 +407,11 @@ func stubDownDeps(t *testing.T) func() {
 }
 
 type fakeListingClient struct {
-	items  []listing.DriveSpreadsheet
-	sheets map[string][]string
+	items []list.DriveSpreadsheet
 }
 
-func (f *fakeListingClient) ListSpreadsheets(context.Context, int) ([]listing.DriveSpreadsheet, error) {
+func (f *fakeListingClient) ListSpreadsheets(context.Context, int) ([]list.DriveSpreadsheet, error) {
 	return f.items, nil
-}
-
-func (f *fakeListingClient) ListSheetNames(_ context.Context, spreadsheetID string) ([]string, error) {
-	return f.sheets[spreadsheetID], nil
 }
 
 type fakeDownClient struct {

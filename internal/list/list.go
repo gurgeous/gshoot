@@ -1,4 +1,4 @@
-package listing
+package list
 
 import (
 	"context"
@@ -10,7 +10,6 @@ type Spreadsheet struct {
 	ID           string
 	Name         string
 	ModifiedTime time.Time
-	SheetNames   []string
 }
 
 // DriveSpreadsheet is the minimal Drive-side spreadsheet metadata.
@@ -20,13 +19,12 @@ type DriveSpreadsheet struct {
 	ModifiedTime time.Time
 }
 
-// Client provides list operations for spreadsheets and sheets.
+// Client provides list operations for spreadsheets.
 type Client interface {
 	ListSpreadsheets(ctx context.Context, limit int) ([]DriveSpreadsheet, error)
-	ListSheetNames(ctx context.Context, spreadsheetID string) ([]string, error)
 }
 
-// Service lists recent spreadsheets and their sheet names.
+// Service lists recent spreadsheets.
 type Service struct {
 	client Client
 }
@@ -36,7 +34,7 @@ func NewService(client Client) Service {
 	return Service{client: client}
 }
 
-// ListRecent returns recent spreadsheets with sheet names attached.
+// ListRecent returns recent spreadsheets.
 func (s Service) ListRecent(ctx context.Context, limit int) ([]Spreadsheet, error) {
 	driveItems, err := s.client.ListSpreadsheets(ctx, limit)
 	if err != nil {
@@ -45,16 +43,10 @@ func (s Service) ListRecent(ctx context.Context, limit int) ([]Spreadsheet, erro
 
 	items := make([]Spreadsheet, 0, len(driveItems))
 	for _, item := range driveItems {
-		sheetNames, err := s.client.ListSheetNames(ctx, item.ID)
-		if err != nil {
-			return nil, err
-		}
-
 		items = append(items, Spreadsheet{
 			ID:           item.ID,
 			Name:         item.Name,
 			ModifiedTime: item.ModifiedTime,
-			SheetNames:   sheetNames,
 		})
 	}
 

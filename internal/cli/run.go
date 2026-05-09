@@ -11,7 +11,7 @@ import (
 
 	"github.com/gurgeous/gshoot/internal/auth"
 	"github.com/gurgeous/gshoot/internal/down"
-	"github.com/gurgeous/gshoot/internal/listing"
+	"github.com/gurgeous/gshoot/internal/list"
 	"github.com/gurgeous/gshoot/internal/ux"
 	"github.com/spf13/cobra"
 	"golang.org/x/oauth2"
@@ -28,8 +28,8 @@ var (
 	newDownClient   = func(ctx context.Context, tokenSource oauth2.TokenSource) (down.Client, error) {
 		return down.NewGoogleClient(ctx, tokenSource)
 	}
-	newListingClient = func(ctx context.Context, tokenSource oauth2.TokenSource) (listing.Client, error) {
-		return listing.NewGoogleClient(ctx, tokenSource)
+	newListClient = func(ctx context.Context, tokenSource oauth2.TokenSource) (list.Client, error) {
+		return list.NewGoogleClient(ctx, tokenSource)
 	}
 )
 
@@ -267,6 +267,8 @@ func newListCmd() *cobra.Command {
 		Args:    noArgs("gshoot list"),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := context.Background()
+			stderr := cmd.ErrOrStderr()
+
 			resolved, err := resolveAuth(auth.Options{
 				Command: auth.CommandList,
 			})
@@ -279,28 +281,22 @@ func newListCmd() *cobra.Command {
 				return err
 			}
 
-			client, err := newListingClient(ctx, tokenSource)
+			client, err := newListClient(ctx, tokenSource)
 			if err != nil {
 				return err
 			}
 
-			items, err := listing.NewService(client).ListRecent(ctx, 10)
+			stopDots := ux.StartDots(stderr, "gshoot: listing spreadsheets...")
+			items, err := list.NewService(client).ListRecent(ctx, 10)
 			if err != nil {
+				stopDots("list failed")
 				return err
 			}
+			stopDots(fmt.Sprintf("gshoot: got %d spreadsheets", len(items)))
 
 			stdout := cmd.OutOrStdout()
 			for _, item := range items {
-				fmt.Fprintf(stdout, "%s  %s\n", item.ModifiedTime.UTC().Format(time.RFC3339), item.Name)
-				if len(item.SheetNames) > 1 {
-					preview := item.SheetNames
-					suffix := ""
-					if len(preview) > 3 {
-						preview = preview[:3]
-						suffix = ", ..."
-					}
-					fmt.Fprintf(stdout, "  %s%s\n", strings.Join(preview, ", "), suffix)
-				}
+				fmt.Fprintf(stdout, "%s %s\n", item.Name, item.ModifiedTime.UTC().Format(time.RFC3339))
 			}
 
 			return nil
