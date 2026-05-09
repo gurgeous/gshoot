@@ -5,6 +5,7 @@
 - After any non-Markdown change, run `mise check`
 - Use `mise run format` instead of `gofmt` directly
 - If user-facing text changes, ask before reverting it; usually fix tests instead
+- Use `mv` for file moves/renames; use patches for content edits
 - Small Go CLI, not a framework or service
 - Be succinct, especially in Markdown
 - Prefer `mise run` tasks when they exist

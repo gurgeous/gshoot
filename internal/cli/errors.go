@@ -42,15 +42,3 @@ func cobraUnknownCommand(msg string) (string, bool) {
 	}
 	return name, true
 }
-
-func spreadsheetNotFoundError(name string) error {
-	return fmt.Errorf("spreadsheet not found: %s", name)
-}
-
-func sheetNotFoundError(spreadsheet, sheet string) error {
-	return fmt.Errorf("sheet not found in %s: %s", spreadsheet, sheet)
-}
-
-func noSheetsError(spreadsheet string) error {
-	return fmt.Errorf("spreadsheet has no sheets: %s", spreadsheet)
-}

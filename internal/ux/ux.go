@@ -14,8 +14,6 @@ var (
 	Warn    lipgloss.Style
 	Error   lipgloss.Style
 	Subtle  lipgloss.Style
-	// DotsFrames is a compact spinner sequence suitable for inline progress.
-	DotsFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 )
 
 // Default to dark. Later, we can look at the terminal to get a better answer
@@ -42,7 +40,7 @@ func setStyles(ld lipgloss.LightDarkFunc) {
 }
 
 //
-//tailwind colors
+// tailwind colors
 //
 
 var Tailwind = &tailwind{
