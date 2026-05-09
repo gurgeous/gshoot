@@ -220,7 +220,7 @@ func Resolve(opts Options) (Resolved, error) {
 	}
 
 	xdg.Reload()
-	adcPath := filepath.Join(xdg.Home, ".config", "gcloud", "application_default_credentials.json")
+	adcPath := filepath.Join(xdg.ConfigHome, "gcloud", "application_default_credentials.json")
 	cred, err := LoadCredentialFile(adcPath)
 	if err == nil {
 		return Resolved{

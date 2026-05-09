@@ -199,9 +199,8 @@ func TestResolveSourcePrecedence(t *testing.T) {
 
 func TestResolveWellKnownADC(t *testing.T) {
 	home := t.TempDir()
-	adcPath := writeFile(t, filepath.Join(home, ".config", "gcloud", "application_default_credentials.json"), `{"type":"authorized_user","client_id":"adc","client_secret":"secret","refresh_token":"refresh"}`)
-
 	withTestEnv(t, map[string]string{"HOME": home})
+	adcPath := writeFile(t, filepath.Join(xdg.ConfigHome, "gcloud", "application_default_credentials.json"), `{"type":"authorized_user","client_id":"adc","client_secret":"secret","refresh_token":"refresh"}`)
 	got, err := Resolve(Options{Command: CommandList})
 	if err != nil {
 		t.Fatalf("Resolve() error = %v", err)
@@ -230,7 +229,7 @@ func TestResolveMissingAuth(t *testing.T) {
 		"$GSHOOT_CREDENTIALS_FILE",
 		"$GOOGLE_APPLICATION_CREDENTIALS",
 		filepath.Join(ConfigDir(), oauthTokenFileName),
-		filepath.Join(home, ".config", "gcloud", "application_default_credentials.json"),
+		filepath.Join(xdg.ConfigHome, "gcloud", "application_default_credentials.json"),
 	} {
 		if !strings.Contains(msg, want) {
 			t.Fatalf("error %q missing %q", msg, want)
@@ -277,9 +276,8 @@ func TestResolveExplicitCredentialFileCorrupt(t *testing.T) {
 
 func TestResolveWellKnownADCCorrupt(t *testing.T) {
 	home := t.TempDir()
-	writeFile(t, filepath.Join(home, ".config", "gcloud", "application_default_credentials.json"), `{"type":`)
-
 	withTestEnv(t, map[string]string{"HOME": home})
+	writeFile(t, filepath.Join(xdg.ConfigHome, "gcloud", "application_default_credentials.json"), `{"type":`)
 	_, err := Resolve(Options{Command: CommandList})
 	if err == nil {
 		t.Fatal("Resolve() error = nil, want error")
