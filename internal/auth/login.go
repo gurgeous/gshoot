@@ -42,7 +42,6 @@ type LoginOptions struct {
 	ClientSecretPath string
 	Stdout           io.Writer
 	Stderr           io.Writer
-	RunFlow          func(context.Context, *oauth2.Config, io.Writer, io.Writer) (*oauth2.Token, error)
 }
 
 // Login runs an interactive OAuth login and persists the token.
@@ -78,12 +77,7 @@ func Login(ctx context.Context, opts LoginOptions) error {
 		return err
 	}
 
-	runFlow := opts.RunFlow
-	if runFlow == nil {
-		runFlow = browserLoginFlow
-	}
-
-	token, err := runFlow(ctx, config, opts.Stdout, opts.Stderr)
+	token, err := browserLoginFlow(ctx, config, opts.Stdout, opts.Stderr)
 	if err != nil {
 		return friendlyLoginError(err)
 	}
@@ -102,10 +96,18 @@ func oauthConfigForLogin(client *OAuthClient) (*oauth2.Config, error) {
 		return nil, err
 	}
 
+	endpoint := google.Endpoint
+	if client.AuthURI != "" {
+		endpoint.AuthURL = client.AuthURI
+	}
+	if client.TokenURI != "" {
+		endpoint.TokenURL = client.TokenURI
+	}
+
 	return &oauth2.Config{
 		ClientID:     client.ClientID,
 		ClientSecret: client.ClientSecret,
-		Endpoint:     google.Endpoint,
+		Endpoint:     endpoint,
 		RedirectURL:  redirect.String(),
 		Scopes: []string{
 			"https://www.googleapis.com/auth/drive",
@@ -287,7 +289,11 @@ func startLoopbackReceiver(redirectRaw, state string) (string, string, func(cont
 	server := &http.Server{ReadHeaderTimeout: oauthReadHeaderTimeout}
 	mux := http.NewServeMux()
 	mux.HandleFunc(redirectURL.Path, func(w http.ResponseWriter, r *http.Request) {
-		defer server.Shutdown(context.Background())
+		defer func() {
+			go func() {
+				_ = server.Shutdown(context.Background())
+			}()
+		}()
 		q := r.URL.Query()
 		if got := q.Get("state"); got != state {
 			http.Error(w, "state mismatch", http.StatusBadRequest)
