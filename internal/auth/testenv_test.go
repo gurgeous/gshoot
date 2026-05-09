@@ -18,7 +18,6 @@ func withTestEnv(t *testing.T, overrides map[string]string) {
 		"GSHOOT_CREDENTIALS_FILE":        &env.GSHOOT_CREDENTIALS_FILE,
 		"GSHOOT_THEME":                   &env.GSHOOT_THEME,
 		"GSHOOT_TOKEN":                   &env.GSHOOT_TOKEN,
-		"HOME":                           &env.HOME,
 	}
 
 	old := make(map[string]string, len(vars))
@@ -29,11 +28,9 @@ func withTestEnv(t *testing.T, overrides map[string]string) {
 	}
 
 	for name, value := range overrides {
-		ptr, ok := vars[name]
-		if !ok {
-			t.Fatalf("unknown test env var %q", name)
+		if ptr, ok := vars[name]; ok {
+			reflect.ValueOf(ptr).Elem().SetString(value)
 		}
-		reflect.ValueOf(ptr).Elem().SetString(value)
 		if err := os.Setenv(name, value); err != nil {
 			t.Fatalf("setenv %s: %v", name, err)
 		}

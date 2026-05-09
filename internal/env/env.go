@@ -4,7 +4,8 @@ package env
 import "os"
 
 //
-// all env vars used by gshoot
+// env vars used by gshoot. note that charm adds support for NO_COLOR and
+// friends
 //
 
 var (
@@ -18,9 +19,4 @@ var (
 	GSHOOT_THEME = os.Getenv("GSHOOT_THEME")
 	// GSHOOT_TOKEN provides a raw OAuth access token.
 	GSHOOT_TOKEN = os.Getenv("GSHOOT_TOKEN")
-	// HOME is the user home directory fallback.
-	HOME = func() string {
-		home, _ := os.UserHomeDir()
-		return home
-	}()
 )
