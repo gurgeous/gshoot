@@ -1,9 +1,8 @@
-# AGENTS
-
 ## Important
 
-- Avoid overly specific tests; assert only the meaningful behavior
-- Overly specific tests waste time, money, and tokens
+- Avoid overly specific tests; assert only meaningful behavior
+- Over-testing wastes time/money
+- In `httptest` flows, only assert important behavior (not every detail)
 
 ## Project
 

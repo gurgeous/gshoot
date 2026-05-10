@@ -30,7 +30,10 @@ func TestRecent(t *testing.T) {
 
 	// run
 	client := testutil.NewDriveTestClient(t, server.URL)
-	files, _ := recent(context.Background(), client, 10)
+	files, err := recent(context.Background(), client, 10)
+	if err != nil {
+		t.Fatalf("recent() error = %v", err)
+	}
 	if files[0].Name != "Alpha" || files[1].Name != "Beta" {
 		t.Fatalf("recent() = %#v, want Alpha/Beta", files)
 	}
