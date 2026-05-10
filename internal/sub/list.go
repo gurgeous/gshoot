@@ -1,4 +1,4 @@
-package list
+package sub
 
 import (
 	"context"
@@ -6,7 +6,6 @@ import (
 	"io"
 	"strconv"
 
-	"github.com/gurgeous/gshoot/internal/cmdutil"
 	"github.com/gurgeous/gshoot/internal/google"
 	"github.com/gurgeous/gshoot/internal/util"
 	"github.com/gurgeous/gshoot/internal/ux"
@@ -14,14 +13,15 @@ import (
 	"google.golang.org/api/drive/v3"
 )
 
-// NewListCommand creates the list command.
-func NewListCommand() *cobra.Command {
+func init() { rootCmd.AddCommand(newListCommand()) }
+
+func newListCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "list",
 		Short:         "List your Google Sheets",
 		SilenceErrors: true,
 		SilenceUsage:  true,
-		Args:          cmdutil.NoArgs("gshoot list"),
+		Args:          noArgs("gshoot list"),
 		RunE:          run,
 	}
 	return cmd

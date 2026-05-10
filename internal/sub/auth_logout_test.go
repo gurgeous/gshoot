@@ -1,4 +1,4 @@
-package logout
+package sub
 
 import (
 	"bytes"
@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestNewCommand(t *testing.T) {
+func TestNewLogoutCommand(t *testing.T) {
 	orig := runLogout
 	runLogout = func() (bool, error) { return true, nil }
 	t.Cleanup(func() {
@@ -15,7 +15,7 @@ func TestNewCommand(t *testing.T) {
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	cmd := NewLogoutCommand()
+	cmd := newLogoutCommand()
 	cmd.SetOut(&stdout)
 	cmd.SetErr(&stderr)
 

@@ -1,21 +1,21 @@
-package logout
+package sub
 
 import (
 	"fmt"
 
 	"github.com/gurgeous/gshoot/internal/auth"
-	"github.com/gurgeous/gshoot/internal/cmdutil"
 	"github.com/spf13/cobra"
 )
 
 var runLogout = auth.Logout
 
-// NewLogoutCommand creates the auth logout command.
-func NewLogoutCommand() *cobra.Command {
+func init() { authCmd.AddCommand(newLogoutCommand()) }
+
+func newLogoutCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "logout",
 		Short: "Clear cached OAuth token",
-		Args:  cmdutil.NoArgs("gshoot auth logout"),
+		Args:  noArgs("gshoot auth logout"),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			removed, err := runLogout()
 			if err != nil {

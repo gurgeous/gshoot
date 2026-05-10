@@ -1,4 +1,4 @@
-package down
+package sub
 
 import (
 	"context"
@@ -6,14 +6,16 @@ import (
 	"os"
 	"strings"
 
+	"github.com/gurgeous/gshoot/internal/down"
 	"github.com/gurgeous/gshoot/internal/google"
 	"github.com/spf13/cobra"
 )
 
-var downloadSheet = Download
+var downloadSheet = down.Download
 
-// NewDownCommand creates the down command.
-func NewDownCommand() *cobra.Command {
+func init() { rootCmd.AddCommand(newDownCommand()) }
+
+func newDownCommand() *cobra.Command {
 	var outputPath string
 
 	cmd := &cobra.Command{
@@ -51,7 +53,7 @@ func NewDownCommand() *cobra.Command {
 				writer = file
 			}
 
-			return WriteCSV(writer, values)
+			return down.WriteCSV(writer, values)
 		},
 	}
 	cmd.Flags().StringVarP(&outputPath, "output", "o", "", "where to write the CSV")

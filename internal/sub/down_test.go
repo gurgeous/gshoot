@@ -1,4 +1,4 @@
-package down
+package sub
 
 import (
 	"bytes"
@@ -24,7 +24,7 @@ func TestNewCommandStdout(t *testing.T) {
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	cmd := NewDownCommand()
+	cmd := newDownCommand()
 	cmd.SetOut(&stdout)
 	cmd.SetErr(&stderr)
 	cmd.SetArgs([]string{"Budget"})
@@ -50,7 +50,7 @@ func TestNewCommandOutputFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "out.csv")
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	cmd := NewDownCommand()
+	cmd := newDownCommand()
 	cmd.SetOut(&stdout)
 	cmd.SetErr(&stderr)
 	cmd.SetArgs([]string{"Budget", "--output", path})

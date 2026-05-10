@@ -1,4 +1,4 @@
-package status
+package sub
 
 import (
 	"fmt"
@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 
 	"github.com/gurgeous/gshoot/internal/auth"
-	"github.com/gurgeous/gshoot/internal/cmdutil"
 	"github.com/gurgeous/gshoot/internal/util"
 	"github.com/gurgeous/gshoot/internal/ux"
 	"github.com/spf13/cobra"
@@ -14,12 +13,13 @@ import (
 
 var resolveAuth = auth.Resolve
 
-// NewStatusCommand creates the auth status command.
-func NewStatusCommand() *cobra.Command {
+func init() { authCmd.AddCommand(newStatusCommand()) }
+
+func newStatusCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "status",
 		Short: "Show auth status",
-		Args:  cmdutil.NoArgs("gshoot auth status"),
+		Args:  noArgs("gshoot auth status"),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			writeStatus(cmd.OutOrStdout())
 			return nil

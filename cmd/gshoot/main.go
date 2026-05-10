@@ -3,9 +3,9 @@ package main
 import (
 	"os"
 
-	"github.com/gurgeous/gshoot/internal/cli"
+	"github.com/gurgeous/gshoot/internal/sub"
 )
 
 func main() {
-	os.Exit(cli.Run(os.Args[1:], os.Stdout, os.Stderr))
+	os.Exit(sub.Run(os.Args[1:], os.Stdout, os.Stderr))
 }

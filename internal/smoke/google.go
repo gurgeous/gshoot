@@ -160,9 +160,9 @@ func (c *GoogleClient) clearSheet(ctx context.Context, spreadsheetID, sheetName 
 }
 
 func (c *GoogleClient) writeValues(ctx context.Context, spreadsheetID, sheetName string, values [][]string) error {
-	rows := make([][]interface{}, 0, len(values))
+	rows := make([][]any, 0, len(values))
 	for _, row := range values {
-		cells := make([]interface{}, 0, len(row))
+		cells := make([]any, 0, len(row))
 		for _, cell := range row {
 			cells = append(cells, cell)
 		}

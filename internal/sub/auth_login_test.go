@@ -1,4 +1,4 @@
-package login
+package sub
 
 import (
 	"bytes"
@@ -8,7 +8,7 @@ import (
 	"github.com/gurgeous/gshoot/internal/auth"
 )
 
-func TestNewCommand(t *testing.T) {
+func TestNewLoginCommand(t *testing.T) {
 	orig := runLogin
 	runLogin = func(_ context.Context, opts auth.LoginOptions) error {
 		if opts.ClientSecretPath != "/tmp/client.json" {
@@ -25,7 +25,7 @@ func TestNewCommand(t *testing.T) {
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	cmd := NewLoginCommand()
+	cmd := newLoginCommand()
 	cmd.SetOut(&stdout)
 	cmd.SetErr(&stderr)
 	cmd.SetArgs([]string{"--client-secret", "/tmp/client.json"})

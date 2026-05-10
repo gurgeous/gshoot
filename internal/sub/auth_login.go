@@ -1,18 +1,18 @@
-package login
+package sub
 
 import (
 	"context"
 	"strings"
 
 	"github.com/gurgeous/gshoot/internal/auth"
-	"github.com/gurgeous/gshoot/internal/cmdutil"
 	"github.com/spf13/cobra"
 )
 
 var runLogin = auth.Login
 
-// NewLoginCommand creates the auth login command.
-func NewLoginCommand() *cobra.Command {
+func init() { authCmd.AddCommand(newLoginCommand()) }
+
+func newLoginCommand() *cobra.Command {
 	var clientSecretPath string
 
 	cmd := &cobra.Command{
@@ -22,7 +22,7 @@ func NewLoginCommand() *cobra.Command {
 			"gshoot auth login",
 			"  gshoot auth login --client-secret ~/Downloads/client_secret.json",
 		}, "\n"),
-		Args: cmdutil.NoArgs("gshoot auth login"),
+		Args: noArgs("gshoot auth login"),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runLogin(context.Background(), auth.LoginOptions{
 				ClientSecretPath: clientSecretPath,

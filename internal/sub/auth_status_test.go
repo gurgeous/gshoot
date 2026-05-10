@@ -1,4 +1,4 @@
-package status
+package sub
 
 import (
 	"bytes"
@@ -29,7 +29,7 @@ func TestNewStatusCommand(t *testing.T) {
 	}
 
 	var stdout bytes.Buffer
-	cmd := NewStatusCommand()
+	cmd := newStatusCommand()
 	cmd.SetOut(&stdout)
 	cmd.SetArgs(nil)
 

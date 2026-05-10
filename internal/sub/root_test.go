@@ -1,4 +1,4 @@
-package cli
+package sub
 
 import (
 	"bytes"
@@ -7,8 +7,6 @@ import (
 )
 
 func TestRunRootHelp(t *testing.T) {
-	t.Parallel()
-
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
@@ -41,8 +39,6 @@ func TestRunRootHelp(t *testing.T) {
 }
 
 func TestRunVersion(t *testing.T) {
-	t.Parallel()
-
 	origVersion := version
 	version = "1.2.3"
 	defer func() { version = origVersion }()
@@ -63,8 +59,6 @@ func TestRunVersion(t *testing.T) {
 }
 
 func TestRunUnknownCommand(t *testing.T) {
-	t.Parallel()
-
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
@@ -89,8 +83,6 @@ func TestRunUnknownCommand(t *testing.T) {
 }
 
 func TestRunDownMissingArgs(t *testing.T) {
-	t.Parallel()
-
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
@@ -107,8 +99,6 @@ func TestRunDownMissingArgs(t *testing.T) {
 }
 
 func TestRunSubcommandHelp(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name string
 		args []string
@@ -124,8 +114,6 @@ func TestRunSubcommandHelp(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			var stdout bytes.Buffer
 			var stderr bytes.Buffer
 
