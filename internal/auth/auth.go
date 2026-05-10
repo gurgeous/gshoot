@@ -86,6 +86,7 @@ type AuthorizedUser struct {
 	ClientID     string `json:"client_id"`
 	ClientSecret string `json:"client_secret"`
 	RefreshToken string `json:"refresh_token"`
+	TokenURI     string `json:"token_uri"`
 	Type         string `json:"type"`
 }
 
@@ -297,6 +298,7 @@ func parseCredentialFile(path string, data []byte) (CredentialFile, error) {
 				ClientID:     raw.ClientID,
 				ClientSecret: raw.ClientSecret,
 				RefreshToken: raw.RefreshToken,
+				TokenURI:     raw.TokenURI,
 				Type:         raw.Type,
 			},
 		}, nil
@@ -373,7 +375,7 @@ func NewTokenSource(ctx context.Context, resolved Resolved) (oauth2.TokenSource,
 		config := &oauth2.Config{
 			ClientID:     client.OAuthClient.ClientID,
 			ClientSecret: client.OAuthClient.ClientSecret,
-			Endpoint:     google.Endpoint,
+			Endpoint:     oauthEndpoint(client.OAuthClient.AuthURI, client.OAuthClient.TokenURI),
 			Scopes:       resolved.Scopes,
 			RedirectURL:  firstRedirectURI(client.OAuthClient.RedirectURIs),
 		}
@@ -392,7 +394,7 @@ func tokenSourceFromCredentialFile(ctx context.Context, cred *CredentialFile, sc
 		config := &oauth2.Config{
 			ClientID:     cred.AuthorizedUser.ClientID,
 			ClientSecret: cred.AuthorizedUser.ClientSecret,
-			Endpoint:     google.Endpoint,
+			Endpoint:     oauthEndpoint("", cred.AuthorizedUser.TokenURI),
 			Scopes:       scopes,
 		}
 		token := &oauth2.Token{
@@ -418,6 +420,17 @@ func tokenSourceFromCredentialFile(ctx context.Context, cred *CredentialFile, sc
 	default:
 		return nil, fmt.Errorf("unsupported credential kind: %q", cred.Kind)
 	}
+}
+
+func oauthEndpoint(authURL, tokenURL string) oauth2.Endpoint {
+	endpoint := google.Endpoint
+	if authURL != "" {
+		endpoint.AuthURL = authURL
+	}
+	if tokenURL != "" {
+		endpoint.TokenURL = tokenURL
+	}
+	return endpoint
 }
 
 func firstRedirectURI(redirectURIs []string) string {

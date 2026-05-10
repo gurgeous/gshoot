@@ -20,7 +20,6 @@ import (
 
 	"github.com/gurgeous/gshoot/internal/ux"
 	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
 )
 
 var openBrowser = openBrowserURL
@@ -96,18 +95,10 @@ func oauthConfigForLogin(client *OAuthClient) (*oauth2.Config, error) {
 		return nil, err
 	}
 
-	endpoint := google.Endpoint
-	if client.AuthURI != "" {
-		endpoint.AuthURL = client.AuthURI
-	}
-	if client.TokenURI != "" {
-		endpoint.TokenURL = client.TokenURI
-	}
-
 	return &oauth2.Config{
 		ClientID:     client.ClientID,
 		ClientSecret: client.ClientSecret,
-		Endpoint:     endpoint,
+		Endpoint:     oauthEndpoint(client.AuthURI, client.TokenURI),
 		RedirectURL:  redirect.String(),
 		Scopes: []string{
 			"https://www.googleapis.com/auth/drive",

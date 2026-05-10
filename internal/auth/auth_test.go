@@ -3,6 +3,8 @@ package auth
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -455,6 +457,162 @@ func TestNewTokenSourceValidCachedOAuthWithoutClientConfig(t *testing.T) {
 	}
 	if token.AccessToken != "valid" {
 		t.Fatalf("Token() access token = %q, want valid", token.AccessToken)
+	}
+}
+
+func TestNewTokenSourceRefreshesCachedOAuth(t *testing.T) {
+	var tokenEndpointHit bool
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tokenEndpointHit = true
+		if err := r.ParseForm(); err != nil {
+			t.Fatalf("ParseForm() error = %v", err)
+		}
+		if got, want := r.Form.Get("grant_type"), "refresh_token"; got != want {
+			t.Fatalf("grant_type = %q, want %q", got, want)
+		}
+		if got, want := r.Form.Get("refresh_token"), "refresh-token"; got != want {
+			t.Fatalf("refresh_token = %q, want %q", got, want)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"access_token":"refreshed","token_type":"Bearer","expires_in":3600}`))
+	}))
+	defer tokenServer.Close()
+
+	configDir := t.TempDir()
+	writeFile(t, filepath.Join(configDir, oauthClientFileName), `{"installed":{"client_id":"cid","client_secret":"secret","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"`+tokenServer.URL+`","redirect_uris":["http://127.0.0.1/oauth2/callback"]}}`)
+	resolved := Resolved{
+		Scopes:          ScopesForCommand(CommandList),
+		OAuthClientPath: filepath.Join(configDir, oauthClientFileName),
+		Source: Source{
+			Kind: SourceKindCachedOAuth,
+			OAuthToken: &OAuthToken{
+				AccessToken:  "expired",
+				RefreshToken: "refresh-token",
+				TokenType:    "Bearer",
+				Expiry:       time.Now().Add(-time.Hour),
+			},
+		},
+	}
+
+	src, err := NewTokenSource(context.Background(), resolved)
+	if err != nil {
+		t.Fatalf("NewTokenSource() error = %v", err)
+	}
+
+	token, err := src.Token()
+	if err != nil {
+		t.Fatalf("Token() error = %v", err)
+	}
+	if !tokenEndpointHit {
+		t.Fatal("token endpoint was not called")
+	}
+	if got, want := token.AccessToken, "refreshed"; got != want {
+		t.Fatalf("Token() access token = %q, want %q", got, want)
+	}
+}
+
+func TestNewTokenSourceCachedOAuthRefreshFailure(t *testing.T) {
+	var tokenEndpointHit bool
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tokenEndpointHit = true
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"error":"invalid_grant","error_description":"Token has been expired or revoked."}`))
+	}))
+	defer tokenServer.Close()
+
+	configDir := t.TempDir()
+	writeFile(t, filepath.Join(configDir, oauthClientFileName), `{"installed":{"client_id":"cid","client_secret":"secret","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"`+tokenServer.URL+`","redirect_uris":["http://127.0.0.1/oauth2/callback"]}}`)
+	resolved := Resolved{
+		Scopes:          ScopesForCommand(CommandList),
+		OAuthClientPath: filepath.Join(configDir, oauthClientFileName),
+		Source: Source{
+			Kind: SourceKindCachedOAuth,
+			OAuthToken: &OAuthToken{
+				AccessToken:  "expired",
+				RefreshToken: "refresh-token",
+				TokenType:    "Bearer",
+				Expiry:       time.Now().Add(-time.Hour),
+			},
+		},
+	}
+
+	src, err := NewTokenSource(context.Background(), resolved)
+	if err != nil {
+		t.Fatalf("NewTokenSource() error = %v", err)
+	}
+
+	_, err = src.Token()
+	if err == nil {
+		t.Fatal("Token() error = nil, want error")
+	}
+	if !tokenEndpointHit {
+		t.Fatal("token endpoint was not called")
+	}
+	msg := err.Error()
+	for _, want := range []string{"invalid_grant", "expired or revoked"} {
+		if !strings.Contains(msg, want) {
+			t.Fatalf("Token() error = %q, want %q", msg, want)
+		}
+	}
+}
+
+func TestNewTokenSourceRefreshesAuthorizedUser(t *testing.T) {
+	var tokenEndpointHit bool
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tokenEndpointHit = true
+		if err := r.ParseForm(); err != nil {
+			t.Fatalf("ParseForm() error = %v", err)
+		}
+		if got, want := r.Form.Get("grant_type"), "refresh_token"; got != want {
+			t.Fatalf("grant_type = %q, want %q", got, want)
+		}
+		if got, want := r.Form.Get("refresh_token"), "refresh"; got != want {
+			t.Fatalf("refresh_token = %q, want %q", got, want)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"access_token":"authorized-user-access","token_type":"Bearer","expires_in":3600}`))
+	}))
+	defer tokenServer.Close()
+
+	src, err := NewTokenSource(context.Background(), Resolved{
+		Scopes: ScopesForCommand(CommandList),
+		Source: Source{
+			Kind: SourceKindCredentialsFile,
+			CredentialFile: &CredentialFile{
+				Kind: CredentialKindAuthorizedUser,
+				AuthorizedUser: &AuthorizedUser{
+					ClientID:     "cid",
+					ClientSecret: "secret",
+					RefreshToken: "refresh",
+					TokenURI:     tokenServer.URL,
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("NewTokenSource() error = %v", err)
+	}
+
+	token, err := src.Token()
+	if err != nil {
+		t.Fatalf("Token() error = %v", err)
+	}
+	if !tokenEndpointHit {
+		t.Fatal("token endpoint was not called")
+	}
+	if got, want := token.AccessToken, "authorized-user-access"; got != want {
+		t.Fatalf("Token() access token = %q, want %q", got, want)
+	}
+}
+
+func TestOAuthEndpointAuthorizedUserFallsBackToGoogle(t *testing.T) {
+	endpoint := oauthEndpoint("", (&AuthorizedUser{}).TokenURI)
+	if got, want := endpoint.AuthURL, "https://accounts.google.com/o/oauth2/auth"; got != want {
+		t.Fatalf("endpoint.AuthURL = %q, want %q", got, want)
+	}
+	if got, want := endpoint.TokenURL, "https://oauth2.googleapis.com/token"; got != want {
+		t.Fatalf("endpoint.TokenURL = %q, want %q", got, want)
 	}
 }
 
