@@ -4,18 +4,14 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/gurgeous/gshoot/internal/auth"
+	"github.com/gurgeous/gshoot/internal/authcmd"
 	"github.com/gurgeous/gshoot/internal/down"
 	"github.com/gurgeous/gshoot/internal/list"
 	"github.com/gurgeous/gshoot/internal/ux"
 	"github.com/spf13/cobra"
 )
 
-var (
-	version        = "dev"
-	resolveAuth    = auth.Resolve
-	newTokenSource = auth.NewTokenSource
-)
+var version = "dev"
 
 // Run executes the gshoot CLI.
 func Run(args []string, stdout, stderr io.Writer) int {
@@ -64,7 +60,7 @@ func newRootCmd() *cobra.Command {
 		writeHelp(command.OutOrStdout(), command)
 	})
 	cmd.AddCommand(
-		auth.NewCommand(),
+		authcmd.NewCommand(),
 		newStubCmd("up", "Upload a local CSV file to a Google Sheet"),
 		down.NewCommand(),
 		list.NewListCommand(),

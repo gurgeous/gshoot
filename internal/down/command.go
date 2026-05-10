@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/gurgeous/gshoot/internal/auth"
 	"github.com/gurgeous/gshoot/internal/google"
 	"github.com/spf13/cobra"
 )
@@ -27,7 +26,7 @@ func NewCommand() *cobra.Command {
 		Args: args,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
-			client, err := google.NewClient(ctx, auth.CommandDown)
+			client, err := google.NewClient(ctx, google.ReadOnlyScopes())
 			if err != nil {
 				return err
 			}

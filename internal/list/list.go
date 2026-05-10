@@ -6,7 +6,6 @@ import (
 	"io"
 	"strconv"
 
-	"github.com/gurgeous/gshoot/internal/auth"
 	"github.com/gurgeous/gshoot/internal/google"
 	"github.com/gurgeous/gshoot/internal/util"
 	"github.com/gurgeous/gshoot/internal/ux"
@@ -38,15 +37,16 @@ func NewListCommand() *cobra.Command {
 
 func run(cmd *cobra.Command, _ []string) error {
 	dots := ux.StartDots(cmd.ErrOrStderr(), "gshoot: opening Google Sheets...")
+	ctx := context.Background()
 
 	// auth
-	client, err := google.NewClient(context.Background(), auth.CommandList)
+	client, err := google.NewClient(ctx, google.ReadOnlyScopes())
 	if err != nil {
 		return err
 	}
 
 	// list
-	files, err := recent(client, 10)
+	files, err := recent(ctx, client, 10)
 	if err != nil {
 		dots.SetDescription("list failed")
 		dots.Stop()
@@ -62,9 +62,9 @@ func run(cmd *cobra.Command, _ []string) error {
 }
 
 // Recent returns recent spreadsheets ordered by modified time.
-func recent(client *google.Client, limit int) ([]*drive.File, error) {
+func recent(ctx context.Context, client *google.Client, limit int) ([]*drive.File, error) {
 	res, err := client.Drive.Files.List().
-		Context(client.Ctx).
+		Context(ctx).
 		Q("mimeType='application/vnd.google-apps.spreadsheet' and trashed=false").
 		OrderBy("modifiedTime desc,name").
 		PageSize(int64(limit)).

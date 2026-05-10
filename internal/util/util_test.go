@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"regexp"
 	"testing"
 )
 
@@ -42,6 +43,69 @@ func TestFileExists(t *testing.T) {
 	}
 	if FileExists(filepath.Join(dir, "missing.txt")) {
 		t.Fatal("FileExists(missing) = true, want false")
+	}
+}
+
+func TestWritePrivateFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "nested", "secret.txt")
+	if err := WritePrivateFile(path, []byte("top secret\n")); err != nil {
+		t.Fatalf("WritePrivateFile() error = %v", err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	if got, want := string(data), "top secret\n"; got != want {
+		t.Fatalf("file contents = %q, want %q", got, want)
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("Stat() error = %v", err)
+	}
+	if got, want := info.Mode().Perm(), os.FileMode(0o600); got != want {
+		t.Fatalf("file mode = %#o, want %#o", got, want)
+	}
+}
+
+func TestRandomHex(t *testing.T) {
+	got, err := RandomHex(16)
+	if err != nil {
+		t.Fatalf("RandomHex() error = %v", err)
+	}
+	if len(got) != 32 {
+		t.Fatalf("len(RandomHex()) = %d, want 32", len(got))
+	}
+	if !regexp.MustCompile(`^[0-9a-f]+$`).MatchString(got) {
+		t.Fatalf("RandomHex() = %q, want lowercase hex", got)
+	}
+}
+
+func TestBrowserCommandArgs(t *testing.T) {
+	tests := []struct {
+		goos     string
+		wantName string
+		wantArgs []string
+	}{
+		{goos: "darwin", wantName: "open", wantArgs: []string{"https://example.com"}},
+		{goos: "windows", wantName: "rundll32", wantArgs: []string{"url.dll,FileProtocolHandler", "https://example.com"}},
+		{goos: "linux", wantName: "xdg-open", wantArgs: []string{"https://example.com"}},
+	}
+
+	for _, tt := range tests {
+		gotName, gotArgs := browserCommandArgs(tt.goos, "https://example.com")
+		if gotName != tt.wantName {
+			t.Fatalf("browserCommandArgs(%q) name = %q, want %q", tt.goos, gotName, tt.wantName)
+		}
+		if len(gotArgs) != len(tt.wantArgs) {
+			t.Fatalf("browserCommandArgs(%q) args = %#v, want %#v", tt.goos, gotArgs, tt.wantArgs)
+		}
+		for i := range gotArgs {
+			if gotArgs[i] != tt.wantArgs[i] {
+				t.Fatalf("browserCommandArgs(%q) args = %#v, want %#v", tt.goos, gotArgs, tt.wantArgs)
+			}
+		}
 	}
 }
 

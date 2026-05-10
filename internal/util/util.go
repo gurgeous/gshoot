@@ -1,9 +1,14 @@
 package util
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"io"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"time"
 
@@ -29,6 +34,47 @@ const (
 func FileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+// WritePrivateFile atomically writes data to path with 0600 permissions.
+func WritePrivateFile(path string, data []byte) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".tmp-*")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmp.Name()
+	defer os.Remove(tmpPath)
+
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Chmod(0o600); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmpPath, path)
+}
+
+// RandomHex returns n random bytes encoded as lowercase hex.
+func RandomHex(n int) (string, error) {
+	buf := make([]byte, n)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(buf), nil
+}
+
+// OpenBrowserURL opens rawURL in the default browser for the current OS.
+func OpenBrowserURL(rawURL string) error {
+	name, args := browserCommandArgs(runtime.GOOS, rawURL)
+	return exec.Command(name, args...).Start()
 }
 
 // Hyperlink returns an OSC8 hyperlink when the writer is a TTY.
@@ -87,4 +133,15 @@ func SpreadsheetURL(id string) string {
 // Truncate trims s to the requested display width with an ellipsis.
 func Truncate(s string, length int) string {
 	return ansi.Truncate(s, length, ellipsis)
+}
+
+func browserCommandArgs(goos, rawURL string) (string, []string) {
+	switch goos {
+	case "darwin":
+		return "open", []string{rawURL}
+	case "windows":
+		return "rundll32", []string{"url.dll,FileProtocolHandler", rawURL}
+	default:
+		return "xdg-open", []string{rawURL}
+	}
 }

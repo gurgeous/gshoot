@@ -2,8 +2,6 @@ package auth
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,29 +10,18 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
+	"github.com/gurgeous/gshoot/internal/util"
 	"github.com/gurgeous/gshoot/internal/ux"
 	"golang.org/x/oauth2"
 )
 
-var openBrowser = openBrowserURL
+var openBrowser = util.OpenBrowserURL
 
 const oauthReadHeaderTimeout = 5 * time.Second
-
-// NoAuthError reports that no usable auth source exists.
-type NoAuthError struct {
-	Command   Command
-	ConfigDir string
-}
-
-func (e *NoAuthError) Error() string {
-	return fmt.Sprintf("gshoot: %s [no auth found]\n", e.Command)
-}
 
 // LoginOptions configures interactive browser login.
 type LoginOptions struct {
@@ -119,7 +106,7 @@ func importOAuthClient(srcPath, dstPath string) error {
 	if cred.Kind != CredentialKindOAuthClient || cred.OAuthClient == nil {
 		return errors.New("client secret file must be a Desktop app OAuth client JSON")
 	}
-	if err := writePrivateFile(dstPath, data); err != nil {
+	if err := util.WritePrivateFile(dstPath, data); err != nil {
 		return fmt.Errorf("save oauth client config: %w", err)
 	}
 	return nil
@@ -135,35 +122,10 @@ func saveOAuthToken(path string, token *oauth2.Token) error {
 	if err != nil {
 		return fmt.Errorf("marshal oauth token: %w", err)
 	}
-	if err := writePrivateFile(path, append(data, '\n')); err != nil {
+	if err := util.WritePrivateFile(path, append(data, '\n')); err != nil {
 		return fmt.Errorf("save oauth token: %w", err)
 	}
 	return nil
-}
-
-func writePrivateFile(path string, data []byte) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return err
-	}
-	tmp, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".tmp-*")
-	if err != nil {
-		return err
-	}
-	tmpPath := tmp.Name()
-	defer os.Remove(tmpPath)
-
-	if _, err := tmp.Write(data); err != nil {
-		_ = tmp.Close()
-		return err
-	}
-	if err := tmp.Chmod(0o600); err != nil {
-		_ = tmp.Close()
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		return err
-	}
-	return os.Rename(tmpPath, path)
 }
 
 func missingClientSecretError(clientPath string) error {
@@ -195,7 +157,7 @@ func friendlyLoginError(err error) error {
 }
 
 func browserLoginFlow(ctx context.Context, config *oauth2.Config, stdout, stderr io.Writer) (*oauth2.Token, error) {
-	state, err := randomState()
+	state, err := util.RandomHex(16)
 	if err != nil {
 		return nil, fmt.Errorf("generate oauth state: %w", err)
 	}
@@ -231,14 +193,6 @@ func cloneConfig(config *oauth2.Config) *oauth2.Config {
 	cloned := *config
 	cloned.Scopes = append([]string(nil), config.Scopes...)
 	return &cloned
-}
-
-func randomState() (string, error) {
-	buf := make([]byte, 16)
-	if _, err := rand.Read(buf); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(buf), nil
 }
 
 func selectLoopbackRedirect(redirectURIs []string) (*url.URL, error) {
@@ -280,11 +234,7 @@ func startLoopbackReceiver(redirectRaw, state string) (string, string, func(cont
 	server := &http.Server{ReadHeaderTimeout: oauthReadHeaderTimeout}
 	mux := http.NewServeMux()
 	mux.HandleFunc(redirectURL.Path, func(w http.ResponseWriter, r *http.Request) {
-		defer func() {
-			go func() {
-				_ = server.Shutdown(context.Background())
-			}()
-		}()
+		defer func() { go func() { _ = server.Shutdown(context.Background()) }() }()
 		q := r.URL.Query()
 		if got := q.Get("state"); got != state {
 			http.Error(w, "state mismatch", http.StatusBadRequest)
@@ -326,17 +276,4 @@ func startLoopbackReceiver(redirectRaw, state string) (string, string, func(cont
 	}
 
 	return redirectURL.String(), "http://" + listener.Addr().String() + redirectURL.Path, wait, nil
-}
-
-func openBrowserURL(rawURL string) error {
-	var cmd *exec.Cmd
-	switch runtime.GOOS {
-	case "darwin":
-		cmd = exec.Command("open", rawURL)
-	case "windows":
-		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", rawURL)
-	default:
-		cmd = exec.Command("xdg-open", rawURL)
-	}
-	return cmd.Start()
 }

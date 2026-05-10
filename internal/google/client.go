@@ -11,21 +11,34 @@ import (
 	"google.golang.org/api/sheets/v4"
 )
 
+func ReadOnlyScopes() []string {
+	return []string{
+		"https://www.googleapis.com/auth/drive.readonly",
+		"https://www.googleapis.com/auth/spreadsheets.readonly",
+	}
+}
+
+func ReadWriteScopes() []string {
+	return []string{
+		"https://www.googleapis.com/auth/drive",
+		"https://www.googleapis.com/auth/spreadsheets",
+	}
+}
+
 // Client holds shared Google API services.
 type Client struct {
-	Ctx    context.Context
 	Drive  *drive.Service
 	Sheets *sheets.Service
 }
 
-// NewClient creates a Google API client with auth for a command's scopes.
-func NewClient(ctx context.Context, cmd auth.Command) (*Client, error) {
+// NewClient creates a Google API client with auth for the requested scopes.
+func NewClient(ctx context.Context, scopes []string) (*Client, error) {
 	// auth
-	resolved, err := auth.Resolve(auth.Options{Command: cmd})
+	resolved, err := auth.Resolve()
 	if err != nil {
 		return nil, err
 	}
-	tokenSource, err := auth.NewTokenSource(ctx, resolved)
+	tokenSource, err := auth.NewTokenSource(ctx, resolved, scopes)
 	if err != nil {
 		return nil, err
 	}
@@ -41,5 +54,5 @@ func NewClient(ctx context.Context, cmd auth.Command) (*Client, error) {
 		return nil, fmt.Errorf("create sheets service: %w", err)
 	}
 
-	return &Client{Ctx: ctx, Drive: drive, Sheets: sheets}, nil
+	return &Client{Drive: drive, Sheets: sheets}, nil
 }

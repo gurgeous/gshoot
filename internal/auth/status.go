@@ -3,7 +3,6 @@ package auth
 import (
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 
 	"github.com/gurgeous/gshoot/internal/util"
@@ -35,7 +34,7 @@ func InspectStatus() Status {
 	status.HasCachedToken = util.FileExists(status.OAuthTokenPath)
 	status.ReadyForLogin = status.HasOAuthClient
 
-	resolved, err := Resolve(Options{Command: CommandList})
+	resolved, err := Resolve()
 	if err == nil {
 		status.ResolvedSource = resolved.Source.Kind
 		status.ResolvedPath = resolved.Source.Path
@@ -65,19 +64,6 @@ func PrintStatus(w io.Writer, status Status) {
 		fmt.Fprintln(w, ux.Warn.Render("Status: no auth configured"))
 		fmt.Fprintln(w, ux.Info.Render("Next step: run `gshoot auth login --client-secret /path/to/client_secret.json`"))
 	}
-}
-
-// Logout clears the cached OAuth session while keeping the client config.
-func Logout() (bool, error) {
-	tokenPath := filepath.Join(ConfigDir(), oauthTokenFileName)
-	err := os.Remove(tokenPath)
-	if err == nil {
-		return true, nil
-	}
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	return false, fmt.Errorf("remove cached oauth token: %w", err)
 }
 
 func presentLine(ok bool, path string) string {

@@ -2,13 +2,14 @@ package list
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
-	"github.com/gurgeous/gshoot/internal/testutil"
+	"github.com/gurgeous/gshoot/internal/testutil/googletest"
 )
 
 func TestRecent(t *testing.T) {
@@ -28,8 +29,8 @@ func TestRecent(t *testing.T) {
 	defer server.Close()
 
 	// run
-	client := testutil.NewDriveTestClient(t, server.URL)
-	files, err := recent(client, 10)
+	client := googletest.NewDriveClient(t, server.URL)
+	files, err := recent(context.Background(), client, 10)
 	if err != nil {
 		t.Fatalf("recent() error = %v", err)
 	}
@@ -45,5 +46,20 @@ func TestRecent(t *testing.T) {
 		if !strings.Contains(got, want) {
 			t.Fatalf("printFiles() output missing %q:\n%s", want, got)
 		}
+	}
+}
+
+func TestRecentError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "nope", http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	_, err := recent(context.Background(), googletest.NewDriveClient(t, server.URL), 10)
+	if err == nil {
+		t.Fatal("recent() error = nil, want error")
+	}
+	if !strings.Contains(err.Error(), "list spreadsheets") {
+		t.Fatalf("recent() error = %q, want list error", err.Error())
 	}
 }
