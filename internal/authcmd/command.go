@@ -7,8 +7,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// NewAuthCommand creates the auth command. This doesn't do much, just houses
-// the login/logout/status subcommands
+// NewAuthCommand creates the auth command, which just houses the
+// login/logout/status subcommands
 func NewAuthCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "auth",

@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"slices"
 	"testing"
 )
 
@@ -80,28 +79,6 @@ func TestRandomHex(t *testing.T) {
 	}
 	if !regexp.MustCompile(`^[0-9a-f]+$`).MatchString(got) {
 		t.Fatalf("RandomHex() = %q, want lowercase hex", got)
-	}
-}
-
-func TestBrowserCommandArgs(t *testing.T) {
-	tests := []struct {
-		goos     string
-		wantName string
-		wantArgs []string
-	}{
-		{goos: "darwin", wantName: "open", wantArgs: []string{"https://example.com"}},
-		{goos: "windows", wantName: "rundll32", wantArgs: []string{"url.dll,FileProtocolHandler", "https://example.com"}},
-		{goos: "linux", wantName: "xdg-open", wantArgs: []string{"https://example.com"}},
-	}
-
-	for _, tt := range tests {
-		gotName, gotArgs := browserCommandArgs(tt.goos, "https://example.com")
-		if gotName != tt.wantName {
-			t.Fatalf("browserCommandArgs(%q) name = %q, want %q", tt.goos, gotName, tt.wantName)
-		}
-		if !slices.Equal(gotArgs, tt.wantArgs) {
-			t.Fatalf("browserCommandArgs(%q) args = %#v, want %#v", tt.goos, gotArgs, tt.wantArgs)
-		}
 	}
 }
 

@@ -2,10 +2,10 @@ package login
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/gurgeous/gshoot/internal/auth"
+	"github.com/gurgeous/gshoot/internal/cmdutil"
 	"github.com/spf13/cobra"
 )
 
@@ -22,12 +22,7 @@ func NewLoginCommand() *cobra.Command {
 			"gshoot auth login",
 			"  gshoot auth login --client-secret ~/Downloads/client_secret.json",
 		}, "\n"),
-		Args: func(_ *cobra.Command, args []string) error {
-			if len(args) == 0 {
-				return nil
-			}
-			return fmt.Errorf("gshoot auth login")
-		},
+		Args: cmdutil.NoArgs("gshoot auth login"),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runLogin(context.Background(), auth.LoginOptions{
 				ClientSecretPath: clientSecretPath,

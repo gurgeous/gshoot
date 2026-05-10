@@ -6,13 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
-	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/gurgeous/gshoot/internal/util"
 	"github.com/gurgeous/gshoot/internal/ux"
@@ -20,8 +17,6 @@ import (
 )
 
 var openBrowser = util.OpenBrowserURL
-
-const oauthReadHeaderTimeout = 5 * time.Second
 
 // LoginOptions configures interactive browser login.
 type LoginOptions struct {
@@ -162,7 +157,7 @@ func browserLoginFlow(ctx context.Context, config *oauth2.Config, stdout, stderr
 		return nil, fmt.Errorf("generate oauth state: %w", err)
 	}
 
-	redirectURL, callbackURL, receive, err := startLoopbackReceiver(config.RedirectURL, state)
+	redirectURL, callbackURL, receive, err := startLoopback(config.RedirectURL, state)
 	if err != nil {
 		return nil, err
 	}
@@ -210,70 +205,4 @@ func selectLoopbackRedirect(redirectURIs []string) (*url.URL, error) {
 		}
 	}
 	return nil, errors.New("oauth client config needs a localhost or 127.0.0.1 redirect URI")
-}
-
-func startLoopbackReceiver(redirectRaw, state string) (string, string, func(context.Context) (string, error), error) {
-	redirectURL, err := url.Parse(redirectRaw)
-	if err != nil {
-		return "", "", nil, fmt.Errorf("parse redirect url: %w", err)
-	}
-
-	host := redirectURL.Hostname()
-	if host == "" {
-		host = "127.0.0.1"
-	}
-
-	listener, err := net.Listen("tcp", net.JoinHostPort(host, "0"))
-	if err != nil {
-		return "", "", nil, fmt.Errorf("listen for oauth callback: %w", err)
-	}
-
-	redirectURL.Host = listener.Addr().String()
-	codeCh := make(chan string, 1)
-	errCh := make(chan error, 1)
-	server := &http.Server{ReadHeaderTimeout: oauthReadHeaderTimeout}
-	mux := http.NewServeMux()
-	mux.HandleFunc(redirectURL.Path, func(w http.ResponseWriter, r *http.Request) {
-		defer func() { go func() { _ = server.Shutdown(context.Background()) }() }()
-		q := r.URL.Query()
-		if got := q.Get("state"); got != state {
-			http.Error(w, "state mismatch", http.StatusBadRequest)
-			errCh <- errors.New("oauth callback state mismatch")
-			return
-		}
-		if gotErr := q.Get("error"); gotErr != "" {
-			http.Error(w, "login failed", http.StatusBadRequest)
-			errCh <- fmt.Errorf("oauth callback error: %s", gotErr)
-			return
-		}
-		code := q.Get("code")
-		if code == "" {
-			http.Error(w, "missing code", http.StatusBadRequest)
-			errCh <- errors.New("oauth callback missing code")
-			return
-		}
-		fmt.Fprintln(w, "gshoot login complete. You can close this tab.")
-		codeCh <- code
-	})
-	server.Handler = mux
-
-	go func() {
-		if serveErr := server.Serve(listener); serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
-			errCh <- serveErr
-		}
-	}()
-
-	wait := func(ctx context.Context) (string, error) {
-		defer listener.Close()
-		select {
-		case code := <-codeCh:
-			return code, nil
-		case err := <-errCh:
-			return "", err
-		case <-ctx.Done():
-			return "", ctx.Err()
-		}
-	}
-
-	return redirectURL.String(), "http://" + listener.Addr().String() + redirectURL.Path, wait, nil
 }

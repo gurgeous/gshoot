@@ -6,6 +6,7 @@ import (
 	"io"
 	"strconv"
 
+	"github.com/gurgeous/gshoot/internal/cmdutil"
 	"github.com/gurgeous/gshoot/internal/google"
 	"github.com/gurgeous/gshoot/internal/util"
 	"github.com/gurgeous/gshoot/internal/ux"
@@ -20,13 +21,8 @@ func NewListCommand() *cobra.Command {
 		Short:         "List your Google Sheets",
 		SilenceErrors: true,
 		SilenceUsage:  true,
-		Args: func(_ *cobra.Command, args []string) error {
-			if len(args) > 0 {
-				return fmt.Errorf("expected `gshoot list`")
-			}
-			return nil
-		},
-		RunE: run,
+		Args:          cmdutil.NoArgs("gshoot list"),
+		RunE:          run,
 	}
 	return cmd
 }

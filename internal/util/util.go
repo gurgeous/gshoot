@@ -135,6 +135,10 @@ func Truncate(s string, length int) string {
 	return ansi.Truncate(s, length, ellipsis)
 }
 
+//
+// helpers
+//
+
 func browserCommandArgs(goos, rawURL string) (string, []string) {
 	switch goos {
 	case "darwin":

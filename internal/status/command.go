@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/gurgeous/gshoot/internal/auth"
+	"github.com/gurgeous/gshoot/internal/cmdutil"
 	"github.com/gurgeous/gshoot/internal/util"
 	"github.com/gurgeous/gshoot/internal/ux"
 	"github.com/spf13/cobra"
@@ -18,12 +19,7 @@ func NewStatusCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "status",
 		Short: "Show auth status",
-		Args: func(_ *cobra.Command, args []string) error {
-			if len(args) == 0 {
-				return nil
-			}
-			return fmt.Errorf("expected `gshoot auth status`")
-		},
+		Args:  cmdutil.NoArgs("gshoot auth status"),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			writeStatus(cmd.OutOrStdout())
 			return nil
