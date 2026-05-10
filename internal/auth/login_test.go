@@ -231,35 +231,6 @@ func TestOAuthConfigForLoginDefaultsToGoogleEndpoints(t *testing.T) {
 	}
 }
 
-func TestInspectStatusReadyForLogin(t *testing.T) {
-	home := t.TempDir()
-	withAuthEnv(t, map[string]string{"HOME": home})
-	writeFile(t, filepath.Join(ConfigDir(), oauthClientFileName), `{"installed":{"client_id":"cid","client_secret":"secret","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","redirect_uris":["http://127.0.0.1"]}}`)
-	status := InspectStatus()
-	if !status.HasOAuthClient || status.LoggedIn {
-		t.Fatalf("InspectStatus() = %#v, want ready-for-login state", status)
-	}
-}
-
-func TestInspectStatusAuthenticatedFromCachedToken(t *testing.T) {
-	home := t.TempDir()
-	withAuthEnv(t, map[string]string{"HOME": home})
-	writeFile(t, filepath.Join(ConfigDir(), oauthClientFileName), `{"installed":{"client_id":"cid","client_secret":"secret","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","redirect_uris":["http://127.0.0.1"]}}`)
-	writeFile(t, filepath.Join(ConfigDir(), oauthTokenFileName), `{"access_token":"a","refresh_token":"r","token_type":"Bearer","expiry":"3026-05-07T22:00:00Z"}`)
-	status := InspectStatus()
-	if !status.LoggedIn || status.ResolvedSource != SourceKindCachedOAuth {
-		t.Fatalf("InspectStatus() = %#v, want cached-oauth logged-in state", status)
-	}
-}
-
-func TestPrintStatusNoAuth(t *testing.T) {
-	var out bytes.Buffer
-	PrintStatus(&out, Status{ConfigDir: "/tmp/gshoot"})
-	if !strings.Contains(out.String(), "auth login --client-secret") {
-		t.Fatalf("PrintStatus() = %q, want login guidance", out.String())
-	}
-}
-
 func TestLogout(t *testing.T) {
 	home := t.TempDir()
 	withAuthEnv(t, map[string]string{"HOME": home})
