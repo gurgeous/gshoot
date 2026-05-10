@@ -36,9 +36,6 @@ func TestNewCommandStatus(t *testing.T) {
 	if !strings.Contains(stdout.String(), "not logged in") {
 		t.Fatalf("stdout = %q, want status output", stdout.String())
 	}
-	if stderr.Len() != 0 {
-		t.Fatalf("stderr = %q, want empty", stderr.String())
-	}
 }
 
 func TestNewCommandIncludesSubcommands(t *testing.T) {

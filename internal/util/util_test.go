@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"testing"
 )
 
@@ -98,13 +99,8 @@ func TestBrowserCommandArgs(t *testing.T) {
 		if gotName != tt.wantName {
 			t.Fatalf("browserCommandArgs(%q) name = %q, want %q", tt.goos, gotName, tt.wantName)
 		}
-		if len(gotArgs) != len(tt.wantArgs) {
+		if !slices.Equal(gotArgs, tt.wantArgs) {
 			t.Fatalf("browserCommandArgs(%q) args = %#v, want %#v", tt.goos, gotArgs, tt.wantArgs)
-		}
-		for i := range gotArgs {
-			if gotArgs[i] != tt.wantArgs[i] {
-				t.Fatalf("browserCommandArgs(%q) args = %#v, want %#v", tt.goos, gotArgs, tt.wantArgs)
-			}
 		}
 	}
 }

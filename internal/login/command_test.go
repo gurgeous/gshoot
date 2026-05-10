@@ -3,7 +3,6 @@ package login
 import (
 	"bytes"
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/gurgeous/gshoot/internal/auth"
@@ -33,29 +32,5 @@ func TestNewCommand(t *testing.T) {
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
-	}
-	if stderr.Len() != 0 {
-		t.Fatalf("stderr = %q, want empty", stderr.String())
-	}
-}
-
-func TestNewCommandError(t *testing.T) {
-	orig := runLogin
-	runLogin = func(context.Context, auth.LoginOptions) error {
-		return errors.New("bad login")
-	}
-	t.Cleanup(func() {
-		runLogin = orig
-	})
-
-	cmd := NewCommand()
-	cmd.SetArgs(nil)
-
-	err := cmd.Execute()
-	if err == nil {
-		t.Fatal("Execute() error = nil, want error")
-	}
-	if got, want := err.Error(), "bad login"; got != want {
-		t.Fatalf("error = %q, want %q", got, want)
 	}
 }

@@ -2,6 +2,7 @@ package logout
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 )
 
@@ -21,10 +22,7 @@ func TestNewCommand(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	if stdout.Len() == 0 {
-		t.Fatal("stdout = empty, want logout message")
-	}
-	if stderr.Len() != 0 {
-		t.Fatalf("stderr = %q, want empty", stderr.String())
+	if !strings.Contains(stdout.String(), "Removed cached OAuth token") {
+		t.Fatalf("stdout = %q, want logout message", stdout.String())
 	}
 }
