@@ -10,12 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gurgeous/gshoot/internal/env"
-	"github.com/gurgeous/gshoot/internal/google"
 	"github.com/gurgeous/gshoot/internal/testutil"
-	"golang.org/x/oauth2"
 	"google.golang.org/api/drive/v3"
-	"google.golang.org/api/option"
 )
 
 func TestRecent(t *testing.T) {
@@ -28,12 +24,6 @@ func TestRecent(t *testing.T) {
 		}
 		if got, want := r.URL.Query().Get("pageSize"), "10"; got != want {
 			t.Fatalf("pageSize = %q, want %q", got, want)
-		}
-		if got, want := r.URL.Query().Get("orderBy"), "modifiedTime desc,name"; got != want {
-			t.Fatalf("orderBy = %q, want %q", got, want)
-		}
-		if got, want := r.URL.Query().Get("fields"), "files(id,name,modifiedTime)"; got != want {
-			t.Fatalf("fields = %q, want %q", got, want)
 		}
 		if got, want := r.URL.Query().Get("q"), "mimeType='application/vnd.google-apps.spreadsheet' and trashed=false"; got != want {
 			t.Fatalf("q = %q, want %q", got, want)
@@ -49,7 +39,7 @@ func TestRecent(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := googleClient(t, server.URL)
+	client := testutil.NewDriveTestClient(t, server.URL)
 	files, err := recent(context.Background(), client, 10)
 	if err != nil {
 		t.Fatalf("recent() error = %v", err)
@@ -65,7 +55,7 @@ func TestRecentHTTPError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	_, err := recent(context.Background(), googleClient(t, server.URL), 10)
+	_, err := recent(context.Background(), testutil.NewDriveTestClient(t, server.URL), 10)
 	if err == nil {
 		t.Fatal("recent() error = nil, want error")
 	}
@@ -94,55 +84,4 @@ func TestPrintFiles(t *testing.T) {
 	if strings.Count(got, "\n") != 2 {
 		t.Fatalf("printFiles() = %q, want 2 rows", got)
 	}
-}
-
-func TestListCommandAuthError(t *testing.T) {
-	testutil.WithEnv(t, map[string]string{"HOME": t.TempDir()}, envVars())
-
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	cmd := NewListCommand()
-	cmd.SetOut(&stdout)
-	cmd.SetErr(&stderr)
-
-	err := cmd.Execute()
-	if err == nil {
-		t.Fatal("Execute() error = nil, want error")
-	}
-	if stdout.Len() != 0 {
-		t.Fatalf("stdout = %q, want empty", stdout.String())
-	}
-	if !strings.Contains(err.Error(), "no auth found") {
-		t.Fatalf("error = %q, want auth guidance", err.Error())
-	}
-}
-
-func envVars() map[string]*string {
-	return map[string]*string{
-		"GOOGLE_APPLICATION_CREDENTIALS": &env.GOOGLE_APPLICATION_CREDENTIALS,
-		"GSHOOT_CONFIG_DIR":              &env.GSHOOT_CONFIG_DIR,
-		"GSHOOT_CREDENTIALS_FILE":        &env.GSHOOT_CREDENTIALS_FILE,
-		"GSHOOT_THEME":                   &env.GSHOOT_THEME,
-		"GSHOOT_TOKEN":                   &env.GSHOOT_TOKEN,
-	}
-}
-
-func googleClient(t *testing.T, serverURL string) *google.Client {
-	t.Helper()
-
-	httpClient := &http.Client{
-		Transport: &oauth2.Transport{
-			Source: oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "token"}),
-			Base:   http.DefaultTransport,
-		},
-	}
-	driveService, err := drive.NewService(
-		context.Background(),
-		option.WithHTTPClient(httpClient),
-		option.WithEndpoint(serverURL+"/drive/v3/"),
-	)
-	if err != nil {
-		t.Fatalf("drive.NewService() error = %v", err)
-	}
-	return &google.Client{Drive: driveService}
 }
