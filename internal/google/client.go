@@ -17,8 +17,7 @@ type Client struct {
 	Sheets *sheets.Service
 }
 
-// New creates a shared Google API client.
-func New(ctx context.Context, tokenSource oauth2.TokenSource) (*Client, error) {
+func newClient(ctx context.Context, tokenSource oauth2.TokenSource) (*Client, error) {
 	httpClient := oauth2.NewClient(ctx, tokenSource)
 	drive, err := drive.NewService(ctx, option.WithHTTPClient(httpClient))
 	if err != nil {
@@ -44,5 +43,5 @@ func ClientForCommand(ctx context.Context, cmd auth.Command) (*Client, error) {
 		return nil, err
 	}
 
-	return New(ctx, tokenSource)
+	return newClient(ctx, tokenSource)
 }

@@ -37,6 +37,11 @@ func IsTty(w io.Writer) bool {
 	return ok && term.IsTerminal(int(file.Fd()))
 }
 
+func FileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
 //
 // strings
 //

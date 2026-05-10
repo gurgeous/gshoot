@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/gurgeous/gshoot/internal/util"
 )
 
 func TestResolveMissingAuthGuidesLogin(t *testing.T) {
@@ -156,7 +158,7 @@ func TestLoginFlowErrorAddsGoogleGuidance(t *testing.T) {
 			t.Fatalf("Login() error = %q, want %q", msg, want)
 		}
 	}
-	if fileExists(filepath.Join(ConfigDir(), oauthTokenFileName)) {
+	if util.FileExists(filepath.Join(ConfigDir(), oauthTokenFileName)) {
 		t.Fatal("Login() should not save a token on exchange failure")
 	}
 }
@@ -267,7 +269,7 @@ func TestLogout(t *testing.T) {
 	if !removed {
 		t.Fatal("Logout() removed = false, want true")
 	}
-	if fileExists(filepath.Join(ConfigDir(), oauthTokenFileName)) {
+	if util.FileExists(filepath.Join(ConfigDir(), oauthTokenFileName)) {
 		t.Fatal("Logout() should remove the cached token")
 	}
 }

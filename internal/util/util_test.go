@@ -2,6 +2,8 @@ package util
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -80,5 +82,22 @@ func TestIsTTY(t *testing.T) {
 	var out bytes.Buffer
 	if IsTty(&out) {
 		t.Fatal("IsTTY() = true, want false")
+	}
+}
+
+func TestFileExists(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "exists.txt")
+	if err := os.WriteFile(path, []byte("x"), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	if !FileExists(path) {
+		t.Fatalf("FileExists(%q) = false, want true", path)
+	}
+	if FileExists(filepath.Join(dir, "missing.txt")) {
+		t.Fatal("FileExists(missing) = true, want false")
 	}
 }

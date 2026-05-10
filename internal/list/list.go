@@ -3,6 +3,7 @@ package list
 import (
 	"context"
 	"fmt"
+	"io"
 	"strconv"
 
 	"github.com/gurgeous/gshoot/internal/auth"
@@ -53,20 +54,7 @@ func run(cmd *cobra.Command, _ []string) error {
 	// done
 	dots.SetDescription(fmt.Sprintf("%d recent spreadsheets", len(files)))
 	dots.Stop()
-	out := cmd.OutOrStdout()
-	for i, file := range files {
-		const width = 30
-		num := ux.Dim.Render(fmt.Sprintf("%2d.", i+1))
-		name := fmt.Sprintf("%-"+strconv.Itoa(width)+"s", util.Truncate(file.Name, width))
-		date := ux.Dim.Render(util.DateAndTimeStr(file.ModifiedTime))
-		fmt.Fprintf(
-			out,
-			" %s %s   %s\n",
-			num,
-			util.Hyperlink(out, util.SpreadsheetURL(file.Id), name),
-			date,
-		)
-	}
+	printFiles(cmd.OutOrStdout(), files)
 	return nil
 }
 
@@ -83,4 +71,20 @@ func recent(ctx context.Context, client *google.Client, limit int) ([]*drive.Fil
 		return nil, fmt.Errorf("list spreadsheets: %w", err)
 	}
 	return res.Files, nil
+}
+
+func printFiles(out io.Writer, files []*drive.File) {
+	for i, file := range files {
+		const width = 30
+		num := ux.Dim.Render(fmt.Sprintf("%2d.", i+1))
+		name := fmt.Sprintf("%-"+strconv.Itoa(width)+"s", util.Truncate(file.Name, width))
+		date := ux.Dim.Render(util.DateAndTimeStr(file.ModifiedTime))
+		fmt.Fprintf(
+			out,
+			" %s %s   %s\n",
+			num,
+			util.Hyperlink(out, util.SpreadsheetURL(file.Id), name),
+			date,
+		)
+	}
 }

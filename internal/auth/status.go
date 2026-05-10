@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/gurgeous/gshoot/internal/util"
 	"github.com/gurgeous/gshoot/internal/ux"
 )
 
@@ -30,8 +31,8 @@ func InspectStatus() Status {
 		OAuthClientPath: filepath.Join(configDir, oauthClientFileName),
 		OAuthTokenPath:  filepath.Join(configDir, oauthTokenFileName),
 	}
-	status.HasOAuthClient = fileExists(status.OAuthClientPath)
-	status.HasCachedToken = fileExists(status.OAuthTokenPath)
+	status.HasOAuthClient = util.FileExists(status.OAuthClientPath)
+	status.HasCachedToken = util.FileExists(status.OAuthTokenPath)
 	status.ReadyForLogin = status.HasOAuthClient
 
 	resolved, err := Resolve(Options{Command: CommandList})
@@ -77,11 +78,6 @@ func Logout() (bool, error) {
 		return false, nil
 	}
 	return false, fmt.Errorf("remove cached oauth token: %w", err)
-}
-
-func fileExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
 }
 
 func presentLine(ok bool, path string) string {

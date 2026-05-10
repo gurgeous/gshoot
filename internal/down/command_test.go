@@ -5,11 +5,11 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"reflect"
 	"testing"
 
 	"github.com/gurgeous/gshoot/internal/env"
 	"github.com/gurgeous/gshoot/internal/google"
+	"github.com/gurgeous/gshoot/internal/testutil"
 )
 
 func TestNewCommandStdout(t *testing.T) {
@@ -20,7 +20,7 @@ func TestNewCommandStdout(t *testing.T) {
 		return [][]string{{"name", "count"}, {"alpha", "1"}}, nil
 	})
 	defer restore()
-	withDownEnv(t, map[string]string{"GSHOOT_TOKEN": "token", "HOME": t.TempDir()})
+	testutil.WithEnv(t, map[string]string{"GSHOOT_TOKEN": "token", "HOME": t.TempDir()}, envVars())
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -45,7 +45,7 @@ func TestNewCommandOutputFile(t *testing.T) {
 		return [][]string{{"name", "count"}, {"alpha", "1"}}, nil
 	})
 	defer restore()
-	withDownEnv(t, map[string]string{"GSHOOT_TOKEN": "token", "HOME": t.TempDir()})
+	testutil.WithEnv(t, map[string]string{"GSHOOT_TOKEN": "token", "HOME": t.TempDir()}, envVars())
 
 	path := filepath.Join(t.TempDir(), "out.csv")
 	var stdout bytes.Buffer
@@ -85,49 +85,12 @@ func stubDownload(t *testing.T, fn func(spreadsheetName, sheetName string) ([][]
 	}
 }
 
-func withDownEnv(t *testing.T, overrides map[string]string) {
-	t.Helper()
-
-	vars := map[string]*string{
+func envVars() map[string]*string {
+	return map[string]*string{
 		"GOOGLE_APPLICATION_CREDENTIALS": &env.GOOGLE_APPLICATION_CREDENTIALS,
 		"GSHOOT_CONFIG_DIR":              &env.GSHOOT_CONFIG_DIR,
 		"GSHOOT_CREDENTIALS_FILE":        &env.GSHOOT_CREDENTIALS_FILE,
 		"GSHOOT_THEME":                   &env.GSHOOT_THEME,
 		"GSHOOT_TOKEN":                   &env.GSHOOT_TOKEN,
 	}
-
-	old := make(map[string]string, len(vars))
-	oldSet := make(map[string]bool, len(vars))
-	for name, ptr := range vars {
-		old[name] = *ptr
-		_, oldSet[name] = os.LookupEnv(name)
-		reflect.ValueOf(ptr).Elem().SetString("")
-		if err := os.Unsetenv(name); err != nil {
-			t.Fatalf("Unsetenv(%s) error = %v", name, err)
-		}
-	}
-
-	for name, value := range overrides {
-		if ptr, ok := vars[name]; ok {
-			reflect.ValueOf(ptr).Elem().SetString(value)
-		}
-		if err := os.Setenv(name, value); err != nil {
-			t.Fatalf("Setenv(%s) error = %v", name, err)
-		}
-	}
-
-	t.Cleanup(func() {
-		for name, value := range old {
-			reflect.ValueOf(vars[name]).Elem().SetString(value)
-			if oldSet[name] {
-				if err := os.Setenv(name, value); err != nil {
-					t.Fatalf("restore env %s: %v", name, err)
-				}
-				continue
-			}
-			if err := os.Unsetenv(name); err != nil {
-				t.Fatalf("unset env %s: %v", name, err)
-			}
-		}
-	})
 }

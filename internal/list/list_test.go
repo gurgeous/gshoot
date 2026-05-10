@@ -2,24 +2,23 @@ package list
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
-	"os"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/gurgeous/gshoot/internal/env"
+	"github.com/gurgeous/gshoot/internal/google"
+	"github.com/gurgeous/gshoot/internal/testutil"
+	"golang.org/x/oauth2"
+	"google.golang.org/api/drive/v3"
+	"google.golang.org/api/option"
 )
 
-func TestListCommand(t *testing.T) {
-	origLocal := time.Local
-	time.Local = time.FixedZone("PDT", -7*60*60)
-	defer func() { time.Local = origLocal }()
-
+func TestRecent(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got, want := r.Header.Get("Authorization"), "Bearer token"; got != want {
 			t.Fatalf("Authorization = %q, want %q", got, want)
@@ -50,83 +49,55 @@ func TestListCommand(t *testing.T) {
 	}))
 	defer server.Close()
 
-	restoreHTTP := stubGoogleAPITransport(t, server.URL)
-	defer restoreHTTP()
-	withListEnv(t, map[string]string{
-		"GSHOOT_TOKEN": "token",
-		"HOME":         t.TempDir(),
-	})
-
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	cmd := NewListCommand()
-	cmd.SetOut(&stdout)
-	cmd.SetErr(&stderr)
-	cmd.SetArgs([]string{})
-
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("Execute() error = %v", err)
+	client := googleClient(t, server.URL)
+	files, err := recent(context.Background(), client, 10)
+	if err != nil {
+		t.Fatalf("recent() error = %v", err)
 	}
-
-	out := stdout.String()
-	for _, want := range []string{
-		"Alpha",
-		"Beta",
-		"PDT",
-	} {
-		if !strings.Contains(out, want) {
-			t.Fatalf("stdout missing %q:\n%s", want, out)
-		}
-	}
-	if strings.Count(out, "\n") != 2 {
-		t.Fatalf("stdout = %q, want 2 rows", out)
-	}
-	for _, want := range []string{
-		"listing spreadsheets...",
-		"2 recent spreadsheets",
-	} {
-		if !strings.Contains(stderr.String(), want) {
-			t.Fatalf("stderr missing %q:\n%s", want, stderr.String())
-		}
+	if len(files) != 2 || files[0].Name != "Alpha" || files[1].Name != "Beta" {
+		t.Fatalf("recent() = %#v, want Alpha/Beta", files)
 	}
 }
 
-func TestListCommandHTTPError(t *testing.T) {
+func TestRecentHTTPError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "nope", http.StatusInternalServerError)
 	}))
 	defer server.Close()
 
-	restoreHTTP := stubGoogleAPITransport(t, server.URL)
-	defer restoreHTTP()
-	withListEnv(t, map[string]string{
-		"GSHOOT_TOKEN": "token",
-		"HOME":         t.TempDir(),
-	})
-
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	cmd := NewListCommand()
-	cmd.SetOut(&stdout)
-	cmd.SetErr(&stderr)
-
-	err := cmd.Execute()
+	_, err := recent(context.Background(), googleClient(t, server.URL), 10)
 	if err == nil {
-		t.Fatal("Execute() error = nil, want error")
-	}
-	if stdout.Len() != 0 {
-		t.Fatalf("stdout = %q, want empty", stdout.String())
+		t.Fatal("recent() error = nil, want error")
 	}
 	if !strings.Contains(err.Error(), "list spreadsheets") {
-		t.Fatalf("error = %q, want list error", err.Error())
+		t.Fatalf("recent() error = %q, want list error", err.Error())
 	}
-	if !strings.Contains(stderr.String(), "list failed") {
-		t.Fatalf("stderr = %q, want failure status", stderr.String())
+}
+
+func TestPrintFiles(t *testing.T) {
+	origLocal := time.Local
+	time.Local = time.FixedZone("PDT", -7*60*60)
+	defer func() { time.Local = origLocal }()
+
+	var out bytes.Buffer
+	printFiles(&out, []*drive.File{
+		{Id: "1", Name: "Alpha", ModifiedTime: "2026-05-07T12:00:00Z"},
+		{Id: "2", Name: "Beta", ModifiedTime: "2026-05-07T11:00:00Z"},
+	})
+
+	got := out.String()
+	for _, want := range []string{"Alpha", "Beta", "PDT"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("printFiles() output missing %q:\n%s", want, got)
+		}
+	}
+	if strings.Count(got, "\n") != 2 {
+		t.Fatalf("printFiles() = %q, want 2 rows", got)
 	}
 }
 
 func TestListCommandAuthError(t *testing.T) {
-	withListEnv(t, map[string]string{"HOME": t.TempDir()})
+	testutil.WithEnv(t, map[string]string{"HOME": t.TempDir()}, envVars())
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -146,83 +117,32 @@ func TestListCommandAuthError(t *testing.T) {
 	}
 }
 
-func stubGoogleAPITransport(t *testing.T, serverURL string) func() {
-	t.Helper()
-
-	serverBase, err := url.Parse(serverURL)
-	if err != nil {
-		t.Fatalf("Parse(serverURL) error = %v", err)
-	}
-
-	orig := http.DefaultTransport
-	http.DefaultTransport = roundTripperFunc(func(req *http.Request) (*http.Response, error) {
-		cloned := req.Clone(req.Context())
-		cloned.URL = cloneURL(req.URL)
-		cloned.URL.Scheme = serverBase.Scheme
-		cloned.URL.Host = serverBase.Host
-		cloned.Host = serverBase.Host
-		return orig.RoundTrip(cloned)
-	})
-
-	return func() {
-		http.DefaultTransport = orig
-	}
-}
-
-func withListEnv(t *testing.T, overrides map[string]string) {
-	t.Helper()
-
-	vars := map[string]*string{
+func envVars() map[string]*string {
+	return map[string]*string{
 		"GOOGLE_APPLICATION_CREDENTIALS": &env.GOOGLE_APPLICATION_CREDENTIALS,
 		"GSHOOT_CONFIG_DIR":              &env.GSHOOT_CONFIG_DIR,
 		"GSHOOT_CREDENTIALS_FILE":        &env.GSHOOT_CREDENTIALS_FILE,
 		"GSHOOT_THEME":                   &env.GSHOOT_THEME,
 		"GSHOOT_TOKEN":                   &env.GSHOOT_TOKEN,
 	}
-
-	old := make(map[string]string, len(vars))
-	oldSet := make(map[string]bool, len(vars))
-	for name, ptr := range vars {
-		old[name] = *ptr
-		_, oldSet[name] = os.LookupEnv(name)
-		reflect.ValueOf(ptr).Elem().SetString("")
-		if err := os.Unsetenv(name); err != nil {
-			t.Fatalf("Unsetenv(%s) error = %v", name, err)
-		}
-	}
-
-	for name, value := range overrides {
-		if ptr, ok := vars[name]; ok {
-			reflect.ValueOf(ptr).Elem().SetString(value)
-		}
-		if err := os.Setenv(name, value); err != nil {
-			t.Fatalf("Setenv(%s) error = %v", name, err)
-		}
-	}
-
-	t.Cleanup(func() {
-		for name, value := range old {
-			reflect.ValueOf(vars[name]).Elem().SetString(value)
-			if oldSet[name] {
-				if err := os.Setenv(name, value); err != nil {
-					t.Fatalf("restore env %s: %v", name, err)
-				}
-				continue
-			}
-			if err := os.Unsetenv(name); err != nil {
-				t.Fatalf("unset env %s: %v", name, err)
-			}
-		}
-	})
 }
 
-func cloneURL(u *url.URL) *url.URL {
-	cloned := *u
-	return &cloned
-}
+func googleClient(t *testing.T, serverURL string) *google.Client {
+	t.Helper()
 
-type roundTripperFunc func(*http.Request) (*http.Response, error)
-
-func (fn roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
-	return fn(req)
+	httpClient := &http.Client{
+		Transport: &oauth2.Transport{
+			Source: oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "token"}),
+			Base:   http.DefaultTransport,
+		},
+	}
+	driveService, err := drive.NewService(
+		context.Background(),
+		option.WithHTTPClient(httpClient),
+		option.WithEndpoint(serverURL+"/drive/v3/"),
+	)
+	if err != nil {
+		t.Fatalf("drive.NewService() error = %v", err)
+	}
+	return &google.Client{Drive: driveService}
 }
