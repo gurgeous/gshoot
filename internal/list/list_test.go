@@ -2,7 +2,6 @@ package list
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -30,7 +29,7 @@ func TestRecent(t *testing.T) {
 
 	// run
 	client := testutil.NewDriveTestClient(t, server.URL)
-	files, err := recent(context.Background(), client, 10)
+	files, err := recent(client, 10)
 	if err != nil {
 		t.Fatalf("recent() error = %v", err)
 	}

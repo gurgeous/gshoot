@@ -20,6 +20,7 @@ func NewDriveTestClient(t TestingT, serverURL string) *google.Client {
 			Base:   http.DefaultTransport,
 		},
 	}
+	ctx := context.Background()
 	driveService, err := drive.NewService(
 		context.Background(),
 		option.WithHTTPClient(httpClient),
@@ -28,5 +29,5 @@ func NewDriveTestClient(t TestingT, serverURL string) *google.Client {
 	if err != nil {
 		t.Fatalf("drive.NewService() error = %v", err)
 	}
-	return &google.Client{Drive: driveService}
+	return &google.Client{Ctx: ctx, Drive: driveService}
 }

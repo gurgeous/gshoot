@@ -13,6 +13,7 @@ import (
 
 // Client holds shared Google API services.
 type Client struct {
+	Ctx    context.Context
 	Drive  *drive.Service
 	Sheets *sheets.Service
 }
@@ -40,5 +41,5 @@ func NewClient(ctx context.Context, cmd auth.Command) (*Client, error) {
 		return nil, fmt.Errorf("create sheets service: %w", err)
 	}
 
-	return &Client{Drive: drive, Sheets: sheets}, nil
+	return &Client{Ctx: ctx, Drive: drive, Sheets: sheets}, nil
 }
