@@ -27,7 +27,7 @@ func NewCommand() *cobra.Command {
 		Args: args,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
-			client, err := google.ClientForCommand(ctx, auth.CommandDown)
+			client, err := google.NewClient(ctx, auth.CommandDown)
 			if err != nil {
 				return err
 			}

@@ -32,12 +32,16 @@ func NewListCommand() *cobra.Command {
 	return cmd
 }
 
+//
+// guts of command
+//
+
 func run(cmd *cobra.Command, _ []string) error {
 	dots := ux.StartDots(cmd.ErrOrStderr(), "gshoot: opening Google Sheets...")
 	ctx := context.Background()
 
 	dots.SetDescription("gshoot: authenticating...")
-	client, err := google.ClientForCommand(ctx, auth.CommandList)
+	client, err := google.NewClient(ctx, auth.CommandList)
 	if err != nil {
 		return err
 	}
@@ -73,6 +77,7 @@ func recent(ctx context.Context, client *google.Client, limit int) ([]*drive.Fil
 	return res.Files, nil
 }
 
+// print results
 func printFiles(out io.Writer, files []*drive.File) {
 	for i, file := range files {
 		const width = 30

@@ -17,7 +17,19 @@ type Client struct {
 	Sheets *sheets.Service
 }
 
-func newClient(ctx context.Context, tokenSource oauth2.TokenSource) (*Client, error) {
+// NewClient creates a Google API client with auth for a command's scopes.
+func NewClient(ctx context.Context, cmd auth.Command) (*Client, error) {
+	// auth
+	resolved, err := auth.Resolve(auth.Options{Command: cmd})
+	if err != nil {
+		return nil, err
+	}
+	tokenSource, err := auth.NewTokenSource(ctx, resolved)
+	if err != nil {
+		return nil, err
+	}
+
+	// services
 	httpClient := oauth2.NewClient(ctx, tokenSource)
 	drive, err := drive.NewService(ctx, option.WithHTTPClient(httpClient))
 	if err != nil {
@@ -29,19 +41,4 @@ func newClient(ctx context.Context, tokenSource oauth2.TokenSource) (*Client, er
 	}
 
 	return &Client{Drive: drive, Sheets: sheets}, nil
-}
-
-// ClientForCommand creates a Google API client with auth for a command's scopes.
-func ClientForCommand(ctx context.Context, cmd auth.Command) (*Client, error) {
-	resolved, err := auth.Resolve(auth.Options{Command: cmd})
-	if err != nil {
-		return nil, err
-	}
-
-	tokenSource, err := auth.NewTokenSource(ctx, resolved)
-	if err != nil {
-		return nil, err
-	}
-
-	return newClient(ctx, tokenSource)
 }
