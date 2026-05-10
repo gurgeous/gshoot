@@ -9,8 +9,8 @@ import (
 
 var runLogout = auth.Logout
 
-// NewCommand creates the auth logout command.
-func NewCommand() *cobra.Command {
+// NewLogoutCommand creates the auth logout command.
+func NewLogoutCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "logout",
 		Short: "Clear cached OAuth token",

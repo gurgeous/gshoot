@@ -12,8 +12,8 @@ import (
 
 var downloadSheet = Download
 
-// NewCommand creates the down command.
-func NewCommand() *cobra.Command {
+// NewDownCommand creates the down command.
+func NewDownCommand() *cobra.Command {
 	var outputPath string
 
 	cmd := &cobra.Command{

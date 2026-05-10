@@ -15,7 +15,7 @@ func TestNewCommand(t *testing.T) {
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	cmd := NewCommand()
+	cmd := NewLogoutCommand()
 	cmd.SetOut(&stdout)
 	cmd.SetErr(&stderr)
 

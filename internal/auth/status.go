@@ -7,6 +7,12 @@ import (
 
 	"github.com/gurgeous/gshoot/internal/util"
 	"github.com/gurgeous/gshoot/internal/ux"
+	"github.com/spf13/cobra"
+)
+
+var (
+	status      = InspectStatus
+	printStatus = PrintStatus
 )
 
 // Status summarizes the current auth state.
@@ -63,6 +69,29 @@ func PrintStatus(w io.Writer, status Status) {
 	default:
 		fmt.Fprintln(w, ux.Warn.Render("Status: no auth configured"))
 		fmt.Fprintln(w, ux.Info.Render("Next step: run `gshoot auth login --client-secret /path/to/client_secret.json`"))
+	}
+}
+
+// NewStatusCommand creates the auth status command.
+func NewStatusCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "status",
+		Short: "Show auth status",
+		Args:  noArgs("gshoot auth status"),
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			printStatus(cmd.OutOrStdout(), status())
+			return nil
+		},
+	}
+	return cmd
+}
+
+func noArgs(usage string) cobra.PositionalArgs {
+	return func(_ *cobra.Command, args []string) error {
+		if len(args) == 0 {
+			return nil
+		}
+		return fmt.Errorf("expected `%s`", usage)
 	}
 }
 

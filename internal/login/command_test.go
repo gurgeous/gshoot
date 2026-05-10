@@ -25,7 +25,7 @@ func TestNewCommand(t *testing.T) {
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	cmd := NewCommand()
+	cmd := NewLoginCommand()
 	cmd.SetOut(&stdout)
 	cmd.SetErr(&stderr)
 	cmd.SetArgs([]string{"--client-secret", "/tmp/client.json"})

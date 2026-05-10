@@ -11,8 +11,8 @@ import (
 
 var runLogin = auth.Login
 
-// NewCommand creates the auth login command.
-func NewCommand() *cobra.Command {
+// NewLoginCommand creates the auth login command.
+func NewLoginCommand() *cobra.Command {
 	var clientSecretPath string
 
 	cmd := &cobra.Command{
