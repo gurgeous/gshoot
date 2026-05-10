@@ -13,25 +13,19 @@ import (
 	"google.golang.org/api/drive/v3"
 )
 
-func init() { rootCmd.AddCommand(newListCommand()) }
-
-func newListCommand() *cobra.Command {
-	cmd := &cobra.Command{
+func init() {
+	listCommand := &cobra.Command{
 		Use:           "list",
 		Short:         "List your Google Sheets",
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		Args:          noArgs("gshoot list"),
-		RunE:          run,
+		RunE:          ListHandler,
 	}
-	return cmd
+	rootCmd.AddCommand(listCommand)
 }
 
-//
-// guts of command
-//
-
-func run(cmd *cobra.Command, _ []string) error {
+func ListHandler(cmd *cobra.Command, _ []string) error {
 	dots := ux.StartDots(cmd.ErrOrStderr(), "gshoot: opening Google Sheets...")
 	ctx := context.Background()
 

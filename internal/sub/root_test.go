@@ -10,7 +10,7 @@ func TestRunRootHelp(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	code := Run([]string{"--help"}, &stdout, &stderr)
+	code := Main([]string{"--help"}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("Run() code = %d, want 0", code)
 	}
@@ -23,7 +23,6 @@ func TestRunRootHelp(t *testing.T) {
 		"  -v, --version  print version number",
 		"Commands:",
 		"  auth           Login (or logout) from Google Sheets",
-		"  up             Upload a local CSV file to a Google Sheet",
 		"  down           Download a Google Sheet as CSV",
 		"  list           List your Google Sheets",
 		`Run "gshoot <command> --help" for more information on a command.`,
@@ -46,7 +45,7 @@ func TestRunVersion(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	code := Run([]string{"--version"}, &stdout, &stderr)
+	code := Main([]string{"--version"}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("Run() code = %d, want 0", code)
 	}
@@ -62,7 +61,7 @@ func TestRunUnknownCommand(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	code := Run([]string{"wat"}, &stdout, &stderr)
+	code := Main([]string{"wat"}, &stdout, &stderr)
 	if code != 1 {
 		t.Fatalf("Run() code = %d, want 1", code)
 	}
@@ -86,7 +85,7 @@ func TestRunDownMissingArgs(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	code := Run([]string{"down"}, &stdout, &stderr)
+	code := Main([]string{"down"}, &stdout, &stderr)
 	if code != 1 {
 		t.Fatalf("Run() code = %d, want 1", code)
 	}
@@ -107,7 +106,6 @@ func TestRunSubcommandHelp(t *testing.T) {
 		{name: "auth", args: []string{"auth", "--help"}, want: []string{"Login (or logout) from Google Sheets", "USAGE", "COMMANDS"}},
 		{name: "auth status", args: []string{"auth", "status", "--help"}, want: []string{"Show auth status", "USAGE"}},
 		{name: "auth logout", args: []string{"auth", "logout", "--help"}, want: []string{"Clear cached OAuth token", "USAGE"}},
-		{name: "up", args: []string{"up", "--help"}, want: []string{"Upload a local CSV file to a Google Sheet", "USAGE"}},
 		{name: "down", args: []string{"down", "--help"}, want: []string{"Download a Google Sheet as CSV", "USAGE", "FLAGS", "EXAMPLES"}},
 		{name: "list", args: []string{"list", "--help"}, want: []string{"List your Google Sheets", "USAGE"}},
 	}
@@ -117,7 +115,7 @@ func TestRunSubcommandHelp(t *testing.T) {
 			var stdout bytes.Buffer
 			var stderr bytes.Buffer
 
-			code := Run(tt.args, &stdout, &stderr)
+			code := Main(tt.args, &stdout, &stderr)
 			if code != 0 {
 				t.Fatalf("Run() code = %d, want 0", code)
 			}

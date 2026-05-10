@@ -11,37 +11,41 @@ import (
 
 var (
 	version = "dev"
+	tagline = fmt.Sprintf("Magically %s from Google Sheets.", ux.Brand.Render("import/export CSVs"))
 	rootCmd = &cobra.Command{
 		Use:           "gshoot",
-		Short:         fmt.Sprintf("Magically %s from Google Sheets.", ux.Brand.Render("import/export CSVs")),
+		Short:         tagline,
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		CompletionOptions: cobra.CompletionOptions{
 			HiddenDefaultCmd: true,
 		},
 	}
+	showVersion = false
 )
 
 func init() {
-	var showVersion bool
-
 	rootCmd.Flags().BoolVarP(&showVersion, "version", "v", false, "print version number")
 	rootCmd.SetHelpFunc(func(command *cobra.Command, _ []string) {
 		writeHelp(command.OutOrStdout(), command)
 	})
-	rootCmd.RunE = func(cmd *cobra.Command, _ []string) error {
-		if showVersion {
-			fmt.Fprintf(cmd.OutOrStdout(), "gshoot %s\n", version)
-			return nil
-		}
-		writeHelp(cmd.OutOrStdout(), cmd)
-		return nil
-	}
-	rootCmd.AddCommand(newStubCmd("up", "Upload a local CSV file to a Google Sheet"))
+	rootCmd.RunE = RootHandler
 }
 
-// Run executes the gshoot CLI.
-func Run(args []string, stdout, stderr io.Writer) int {
+func RootHandler(cmd *cobra.Command, _ []string) error {
+	if showVersion {
+		fmt.Fprintf(cmd.OutOrStdout(), "gshoot %s\n", version)
+		return nil
+	}
+	writeHelp(cmd.OutOrStdout(), cmd)
+	return nil
+}
+
+//
+// main
+//
+
+func Main(args []string, stdout, stderr io.Writer) int {
 	ux.Init()
 
 	resetCommand(rootCmd)
@@ -55,15 +59,6 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	}
 
 	return 0
-}
-
-func newStubCmd(use, short string) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   use,
-		Short: short,
-		Run:   func(*cobra.Command, []string) {},
-	}
-	return cmd
 }
 
 func isRootCmd(cmd *cobra.Command) bool {
