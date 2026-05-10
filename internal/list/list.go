@@ -13,14 +13,6 @@ import (
 	"google.golang.org/api/drive/v3"
 )
 
-var (
-	// grrr, dep injection
-	listRecent     = recent
-	newGoogle      = google.New
-	newTokenSource = auth.NewTokenSource
-	resolveAuth    = auth.Resolve
-)
-
 // NewListCommand creates the list command.
 func NewListCommand() *cobra.Command {
 	cmd := &cobra.Command{
@@ -43,26 +35,15 @@ func run(cmd *cobra.Command, _ []string) error {
 	dots := ux.StartDots(cmd.ErrOrStderr(), "gshoot: opening Google Sheets...")
 	ctx := context.Background()
 
-	// auth
 	dots.SetDescription("gshoot: authenticating...")
-	resolved, err := resolveAuth(auth.Options{Command: auth.CommandList})
-	if err != nil {
-		return err
-	}
-	tokenSource, err := newTokenSource(ctx, resolved)
-	if err != nil {
-		return err
-	}
-
-	// create client
-	client, err := newGoogle(ctx, tokenSource)
+	client, err := google.ClientForCommand(ctx, auth.CommandList)
 	if err != nil {
 		return err
 	}
 
 	// list
 	dots.SetDescription("gshoot: listing spreadsheets...")
-	files, err := listRecent(ctx, client, 10)
+	files, err := recent(ctx, client, 10)
 	if err != nil {
 		dots.SetDescription("list failed")
 		dots.Stop()

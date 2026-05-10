@@ -5,35 +5,22 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
-	"github.com/gurgeous/gshoot/internal/auth"
+	"github.com/gurgeous/gshoot/internal/env"
 	"github.com/gurgeous/gshoot/internal/google"
-	"golang.org/x/oauth2"
 )
 
 func TestNewCommandStdout(t *testing.T) {
-	restore := stubCommandDeps()
-	defer restore()
-
-	resolveAuth = func(opts auth.Options) (auth.Resolved, error) {
-		if opts.Command != auth.CommandDown {
-			t.Fatalf("Resolve() command = %q, want down", opts.Command)
-		}
-		return auth.Resolved{Scopes: auth.ScopesForCommand(auth.CommandDown)}, nil
-	}
-	newTokenSource = func(_ context.Context, _ auth.Resolved) (oauth2.TokenSource, error) {
-		return oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "token"}), nil
-	}
-	newGoogle = func(context.Context, oauth2.TokenSource) (*google.Client, error) {
-		return &google.Client{}, nil
-	}
-	downloadSheet = func(_ context.Context, _ *google.Client, spreadsheetName, sheetName string) ([][]string, error) {
+	restore := stubDownload(t, func(spreadsheetName, sheetName string) ([][]string, error) {
 		if spreadsheetName != "Budget" || sheetName != "" {
 			t.Fatalf("Download() args = (%q, %q)", spreadsheetName, sheetName)
 		}
 		return [][]string{{"name", "count"}, {"alpha", "1"}}, nil
-	}
+	})
+	defer restore()
+	withDownEnv(t, map[string]string{"GSHOOT_TOKEN": "token", "HOME": t.TempDir()})
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -54,21 +41,11 @@ func TestNewCommandStdout(t *testing.T) {
 }
 
 func TestNewCommandOutputFile(t *testing.T) {
-	restore := stubCommandDeps()
-	defer restore()
-
-	resolveAuth = func(auth.Options) (auth.Resolved, error) {
-		return auth.Resolved{Scopes: auth.ScopesForCommand(auth.CommandDown)}, nil
-	}
-	newTokenSource = func(_ context.Context, _ auth.Resolved) (oauth2.TokenSource, error) {
-		return oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "token"}), nil
-	}
-	newGoogle = func(context.Context, oauth2.TokenSource) (*google.Client, error) {
-		return &google.Client{}, nil
-	}
-	downloadSheet = func(_ context.Context, _ *google.Client, _, _ string) ([][]string, error) {
+	restore := stubDownload(t, func(_, _ string) ([][]string, error) {
 		return [][]string{{"name", "count"}, {"alpha", "1"}}, nil
-	}
+	})
+	defer restore()
+	withDownEnv(t, map[string]string{"GSHOOT_TOKEN": "token", "HOME": t.TempDir()})
 
 	path := filepath.Join(t.TempDir(), "out.csv")
 	var stdout bytes.Buffer
@@ -96,15 +73,61 @@ func TestNewCommandOutputFile(t *testing.T) {
 	}
 }
 
-func stubCommandDeps() func() {
-	origResolve := resolveAuth
-	origToken := newTokenSource
-	origGoogle := newGoogle
+func stubDownload(t *testing.T, fn func(spreadsheetName, sheetName string) ([][]string, error)) func() {
+	t.Helper()
+
 	origDownload := downloadSheet
+	downloadSheet = func(_ context.Context, _ *google.Client, spreadsheetName, sheetName string) ([][]string, error) {
+		return fn(spreadsheetName, sheetName)
+	}
 	return func() {
-		resolveAuth = origResolve
-		newTokenSource = origToken
-		newGoogle = origGoogle
 		downloadSheet = origDownload
 	}
+}
+
+func withDownEnv(t *testing.T, overrides map[string]string) {
+	t.Helper()
+
+	vars := map[string]*string{
+		"GOOGLE_APPLICATION_CREDENTIALS": &env.GOOGLE_APPLICATION_CREDENTIALS,
+		"GSHOOT_CONFIG_DIR":              &env.GSHOOT_CONFIG_DIR,
+		"GSHOOT_CREDENTIALS_FILE":        &env.GSHOOT_CREDENTIALS_FILE,
+		"GSHOOT_THEME":                   &env.GSHOOT_THEME,
+		"GSHOOT_TOKEN":                   &env.GSHOOT_TOKEN,
+	}
+
+	old := make(map[string]string, len(vars))
+	oldSet := make(map[string]bool, len(vars))
+	for name, ptr := range vars {
+		old[name] = *ptr
+		_, oldSet[name] = os.LookupEnv(name)
+		reflect.ValueOf(ptr).Elem().SetString("")
+		if err := os.Unsetenv(name); err != nil {
+			t.Fatalf("Unsetenv(%s) error = %v", name, err)
+		}
+	}
+
+	for name, value := range overrides {
+		if ptr, ok := vars[name]; ok {
+			reflect.ValueOf(ptr).Elem().SetString(value)
+		}
+		if err := os.Setenv(name, value); err != nil {
+			t.Fatalf("Setenv(%s) error = %v", name, err)
+		}
+	}
+
+	t.Cleanup(func() {
+		for name, value := range old {
+			reflect.ValueOf(vars[name]).Elem().SetString(value)
+			if oldSet[name] {
+				if err := os.Setenv(name, value); err != nil {
+					t.Fatalf("restore env %s: %v", name, err)
+				}
+				continue
+			}
+			if err := os.Unsetenv(name); err != nil {
+				t.Fatalf("unset env %s: %v", name, err)
+			}
+		}
+	})
 }

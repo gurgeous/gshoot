@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/gurgeous/gshoot/internal/auth"
 	"golang.org/x/oauth2"
 	"google.golang.org/api/drive/v3"
 	"google.golang.org/api/option"
@@ -29,4 +30,19 @@ func New(ctx context.Context, tokenSource oauth2.TokenSource) (*Client, error) {
 	}
 
 	return &Client{Drive: drive, Sheets: sheets}, nil
+}
+
+// ClientForCommand creates a Google API client with auth for a command's scopes.
+func ClientForCommand(ctx context.Context, cmd auth.Command) (*Client, error) {
+	resolved, err := auth.Resolve(auth.Options{Command: cmd})
+	if err != nil {
+		return nil, err
+	}
+
+	tokenSource, err := auth.NewTokenSource(ctx, resolved)
+	if err != nil {
+		return nil, err
+	}
+
+	return New(ctx, tokenSource)
 }

@@ -12,12 +12,7 @@ import (
 	"google.golang.org/api/drive/v3"
 )
 
-var (
-	resolveAuth    = auth.Resolve
-	newTokenSource = auth.NewTokenSource
-	newGoogle      = google.New
-	downloadSheet  = Download
-)
+var downloadSheet = Download
 
 // NewCommand creates the down command.
 func NewCommand() *cobra.Command {
@@ -33,17 +28,7 @@ func NewCommand() *cobra.Command {
 		Args: args,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
-			resolved, err := resolveAuth(auth.Options{Command: auth.CommandDown})
-			if err != nil {
-				return err
-			}
-
-			tokenSource, err := newTokenSource(ctx, resolved)
-			if err != nil {
-				return err
-			}
-
-			client, err := newGoogle(ctx, tokenSource)
+			client, err := google.ClientForCommand(ctx, auth.CommandDown)
 			if err != nil {
 				return err
 			}
