@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/gurgeous/gshoot/internal/auth"
+	"github.com/gurgeous/gshoot/internal/google"
 	"github.com/gurgeous/gshoot/internal/ux"
 	"golang.org/x/oauth2"
 )
@@ -73,15 +74,13 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	}
 
 	ctx := context.Background()
-	resolved, err := resolveAuth(auth.Options{
-		Command: auth.CommandUp,
-	})
+	resolved, err := resolveAuth()
 	if err != nil {
 		fmt.Fprintln(stderr, ux.Error.Render(err.Error()))
 		return 1
 	}
 
-	tokenSource, err := newTokenSource(ctx, resolved)
+	tokenSource, err := newTokenSource(ctx, resolved, google.ReadWriteScopes())
 	if err != nil {
 		fmt.Fprintln(stderr, ux.Error.Render(err.Error()))
 		return 1

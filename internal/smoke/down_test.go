@@ -19,13 +19,10 @@ func TestRunDownSmoke(t *testing.T) {
 	tempDir := t.TempDir()
 	var ran [][]string
 
-	resolveAuth = func(opts auth.Options) (auth.Resolved, error) {
-		if opts.Command != auth.CommandUp {
-			t.Fatalf("Resolve() command = %q, want up", opts.Command)
-		}
-		return auth.Resolved{Scopes: auth.ScopesForCommand(auth.CommandUp)}, nil
+	resolveAuth = func() (auth.Resolved, error) {
+		return auth.Resolved{}, nil
 	}
-	newTokenSource = func(context.Context, auth.Resolved) (oauth2.TokenSource, error) {
+	newTokenSource = func(context.Context, auth.Resolved, []string) (oauth2.TokenSource, error) {
 		return oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "token"}), nil
 	}
 	newSmokeClient = func(context.Context, oauth2.TokenSource) (Client, error) {

@@ -4,18 +4,14 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/gurgeous/gshoot/internal/auth"
+	"github.com/gurgeous/gshoot/internal/authcmd"
 	"github.com/gurgeous/gshoot/internal/down"
 	"github.com/gurgeous/gshoot/internal/list"
 	"github.com/gurgeous/gshoot/internal/ux"
 	"github.com/spf13/cobra"
 )
 
-var (
-	version        = "dev"
-	resolveAuth    = auth.Resolve
-	newTokenSource = auth.NewTokenSource
-)
+var version = "dev"
 
 // Run executes the gshoot CLI.
 func Run(args []string, stdout, stderr io.Writer) int {
@@ -64,9 +60,9 @@ func newRootCmd() *cobra.Command {
 		writeHelp(command.OutOrStdout(), command)
 	})
 	cmd.AddCommand(
-		auth.NewCommand(),
+		authcmd.NewAuthCommand(),
 		newStubCmd("up", "Upload a local CSV file to a Google Sheet"),
-		down.NewCommand(),
+		down.NewDownCommand(),
 		list.NewListCommand(),
 	)
 
@@ -80,15 +76,6 @@ func newStubCmd(use, short string) *cobra.Command {
 		Run:   func(*cobra.Command, []string) {},
 	}
 	return cmd
-}
-
-func noArgs(usage string) cobra.PositionalArgs {
-	return func(_ *cobra.Command, args []string) error {
-		if len(args) == 0 {
-			return nil
-		}
-		return fmt.Errorf("expected `%s`", usage)
-	}
 }
 
 func isRootCmd(cmd *cobra.Command) bool {

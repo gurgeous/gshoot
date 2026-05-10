@@ -3,22 +3,15 @@ package list
 import (
 	"context"
 	"fmt"
+	"io"
 	"strconv"
 
-	"github.com/gurgeous/gshoot/internal/auth"
+	"github.com/gurgeous/gshoot/internal/cmdutil"
 	"github.com/gurgeous/gshoot/internal/google"
 	"github.com/gurgeous/gshoot/internal/util"
 	"github.com/gurgeous/gshoot/internal/ux"
 	"github.com/spf13/cobra"
 	"google.golang.org/api/drive/v3"
-)
-
-var (
-	// grrr, dep injection
-	listRecent     = recent
-	newGoogle      = google.New
-	newTokenSource = auth.NewTokenSource
-	resolveAuth    = auth.Resolve
 )
 
 // NewListCommand creates the list command.
@@ -28,64 +21,39 @@ func NewListCommand() *cobra.Command {
 		Short:         "List your Google Sheets",
 		SilenceErrors: true,
 		SilenceUsage:  true,
-		Args: func(_ *cobra.Command, args []string) error {
-			if len(args) > 0 {
-				return fmt.Errorf("expected `gshoot list`")
-			}
-			return nil
-		},
-		RunE: run,
+		Args:          cmdutil.NoArgs("gshoot list"),
+		RunE:          run,
 	}
 	return cmd
 }
+
+//
+// guts of command
+//
 
 func run(cmd *cobra.Command, _ []string) error {
 	dots := ux.StartDots(cmd.ErrOrStderr(), "gshoot: opening Google Sheets...")
 	ctx := context.Background()
 
 	// auth
-	dots.SetDescription("gshoot: authenticating...")
-	resolved, err := resolveAuth(auth.Options{Command: auth.CommandList})
-	if err != nil {
-		return err
-	}
-	tokenSource, err := newTokenSource(ctx, resolved)
-	if err != nil {
-		return err
-	}
-
-	// create client
-	client, err := newGoogle(ctx, tokenSource)
+	client, err := google.NewClient(ctx, google.ReadOnlyScopes())
 	if err != nil {
 		return err
 	}
 
 	// list
-	dots.SetDescription("gshoot: listing spreadsheets...")
-	files, err := listRecent(ctx, client, 10)
+	files, err := recent(ctx, client, 10)
 	if err != nil {
 		dots.SetDescription("list failed")
 		dots.Stop()
 		return err
 	}
 
-	// done
+	// done, print
 	dots.SetDescription(fmt.Sprintf("%d recent spreadsheets", len(files)))
 	dots.Stop()
-	out := cmd.OutOrStdout()
-	for i, file := range files {
-		const width = 30
-		num := ux.Dim.Render(fmt.Sprintf("%2d.", i+1))
-		name := fmt.Sprintf("%-"+strconv.Itoa(width)+"s", util.Truncate(file.Name, width))
-		date := ux.Dim.Render(util.DateAndTimeStr(file.ModifiedTime))
-		fmt.Fprintf(
-			out,
-			" %s %s   %s\n",
-			num,
-			util.Hyperlink(out, util.SpreadsheetURL(file.Id), name),
-			date,
-		)
-	}
+	printFiles(cmd.OutOrStdout(), files)
+
 	return nil
 }
 
@@ -102,4 +70,21 @@ func recent(ctx context.Context, client *google.Client, limit int) ([]*drive.Fil
 		return nil, fmt.Errorf("list spreadsheets: %w", err)
 	}
 	return res.Files, nil
+}
+
+// now print the results
+func printFiles(out io.Writer, files []*drive.File) {
+	for i, file := range files {
+		const width = 30
+		num := ux.Dim.Render(fmt.Sprintf("%2d.", i+1))
+		name := fmt.Sprintf("%-"+strconv.Itoa(width)+"s", util.Truncate(file.Name, width))
+		date := ux.Dim.Render(util.DateAndTimeStr(file.ModifiedTime))
+		fmt.Fprintf(
+			out,
+			" %s %s   %s\n",
+			num,
+			util.Hyperlink(out, util.SpreadsheetURL(file.Id), name),
+			date,
+		)
+	}
 }

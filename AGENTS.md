@@ -1,9 +1,8 @@
-# AGENTS
-
 ## Important
 
-- Avoid overly specific tests; assert only the meaningful behavior
-- Overly specific tests waste time, money, and tokens
+- Avoid overly specific tests; assert only meaningful behavior
+- Over-testing wastes time/money
+- In `httptest` flows, only assert important behavior (not every detail)
 
 ## Project
 
@@ -11,6 +10,7 @@
 - Use `mise run format` instead of `gofmt` directly
 - If user-facing text changes, ask before reverting it; usually fix tests instead
 - Use `mv` for file moves/renames; use patches for content edits
+- When creating a PR, write a succinct title/body from the diff vs `main`; do not use auto-filled wip text
 - Small Go CLI, not a framework or service
 - Be succinct, especially in Markdown
 - Prefer `mise run` tasks when they exist

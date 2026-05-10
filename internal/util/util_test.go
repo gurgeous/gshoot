@@ -2,12 +2,13 @@ package util
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
+	"regexp"
 	"testing"
 )
 
 func TestIndent(t *testing.T) {
-	t.Parallel()
-
 	got := Indent("a\nb", "  ")
 	want := "  a\n  b"
 	if got != want {
@@ -16,58 +17,72 @@ func TestIndent(t *testing.T) {
 }
 
 func TestPadRight(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
-		name    string
-		text    string
-		padding int
-		want    string
+		s      string
+		length int
+		want   string
 	}{
-		{name: "pads shorter", text: "a", padding: 3, want: "a  "},
-		{name: "adds one space when equal", text: "abc", padding: 3, want: "abc "},
-		{name: "adds one space when longer", text: "abcd", padding: 3, want: "abcd "},
+		{s: "a", length: 3, want: "a  "},
+		{s: "abc", length: 3, want: "abc "},
+		{s: "abcd", length: 3, want: "abcd "},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			if got := PadRight(tt.text, tt.padding); got != tt.want {
-				t.Fatalf("PadRight() = %q, want %q", got, tt.want)
-			}
-		})
+		if got := PadRight(tt.s, tt.length); got != tt.want {
+			t.Fatalf("PadRight() = %q, want %q", got, tt.want)
+		}
 	}
 }
 
-func TestTruncate(t *testing.T) {
-	t.Parallel()
+func TestFileExists(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "exists.txt")
+	_ = os.WriteFile(path, []byte("x"), 0o600)
+	if !FileExists(path) {
+		t.Fatalf("FileExists(%q) = false, want true", path)
+	}
+	if FileExists(filepath.Join(dir, "missing.txt")) {
+		t.Fatal("FileExists(missing) = true, want false")
+	}
+}
 
-	tests := []struct {
-		name  string
-		text  string
-		width int
-		want  string
-	}{
-		{name: "keeps shorter", text: "abc", width: 5, want: "abc"},
-		{name: "truncates ascii", text: "abcdef", width: 5, want: "abcd…"},
-		{name: "single cell", text: "abcdef", width: 1, want: "…"},
-		{name: "zero width", text: "abcdef", width: 0, want: ""},
-		{name: "wide rune", text: "猫猫猫", width: 3, want: "猫…"},
+func TestWritePrivateFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "nested", "secret.txt")
+	if err := WritePrivateFile(path, []byte("top secret\n")); err != nil {
+		t.Fatalf("WritePrivateFile() error = %v", err)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			if got := Truncate(tt.text, tt.width); got != tt.want {
-				t.Fatalf("Truncate() = %q, want %q", got, tt.want)
-			}
-		})
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	if got, want := string(data), "top secret\n"; got != want {
+		t.Fatalf("file contents = %q, want %q", got, want)
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("Stat() error = %v", err)
+	}
+	if got, want := info.Mode().Perm(), os.FileMode(0o600); got != want {
+		t.Fatalf("file mode = %#o, want %#o", got, want)
+	}
+}
+
+func TestRandomHex(t *testing.T) {
+	got, err := RandomHex(16)
+	if err != nil {
+		t.Fatalf("RandomHex() error = %v", err)
+	}
+	if len(got) != 32 {
+		t.Fatalf("len(RandomHex()) = %d, want 32", len(got))
+	}
+	if !regexp.MustCompile(`^[0-9a-f]+$`).MatchString(got) {
+		t.Fatalf("RandomHex() = %q, want lowercase hex", got)
 	}
 }
 
 func TestHyperlink(t *testing.T) {
-	t.Parallel()
-
 	var out bytes.Buffer
 	if got := Hyperlink(&out, "https://example.com", "Alpha"); got != "Alpha" {
 		t.Fatalf("Hyperlink() = %q, want plain label", got)
@@ -75,10 +90,28 @@ func TestHyperlink(t *testing.T) {
 }
 
 func TestIsTTY(t *testing.T) {
-	t.Parallel()
-
 	var out bytes.Buffer
 	if IsTty(&out) {
 		t.Fatal("IsTTY() = true, want false")
+	}
+}
+
+func TestTruncate(t *testing.T) {
+	tests := []struct {
+		s      string
+		length int
+		want   string
+	}{
+		{s: "abc", length: 5, want: "abc"},
+		{s: "abcdef", length: 5, want: "abcd…"},
+		{s: "abcdef", length: 1, want: "…"},
+		{s: "abcdef", length: 0, want: ""},
+		{s: "猫猫猫", length: 3, want: "猫…"},
+	}
+
+	for _, tt := range tests {
+		if got := Truncate(tt.s, tt.length); got != tt.want {
+			t.Fatalf("Truncate() = %q, want %q", got, tt.want)
+		}
 	}
 }

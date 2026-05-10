@@ -12,8 +12,6 @@ import (
 )
 
 func TestDownloadDefaultSheet(t *testing.T) {
-	t.Parallel()
-
 	restore := stubDownloadDeps()
 	defer restore()
 
@@ -59,8 +57,6 @@ func TestDownloadDefaultSheet(t *testing.T) {
 }
 
 func TestDownloadNamedSheet(t *testing.T) {
-	t.Parallel()
-
 	restore := stubDownloadDeps()
 	defer restore()
 
@@ -90,8 +86,6 @@ func TestDownloadNamedSheet(t *testing.T) {
 }
 
 func TestDownloadSpreadsheetNotFound(t *testing.T) {
-	t.Parallel()
-
 	restore := stubDownloadDeps()
 	defer restore()
 
@@ -111,8 +105,6 @@ func TestDownloadSpreadsheetNotFound(t *testing.T) {
 }
 
 func TestDownloadSheetNotFound(t *testing.T) {
-	t.Parallel()
-
 	restore := stubDownloadDeps()
 	defer restore()
 
@@ -140,8 +132,6 @@ func TestDownloadSheetNotFound(t *testing.T) {
 }
 
 func TestDownloadNoSheets(t *testing.T) {
-	t.Parallel()
-
 	restore := stubDownloadDeps()
 	defer restore()
 
@@ -164,8 +154,6 @@ func TestDownloadNoSheets(t *testing.T) {
 }
 
 func TestWriteCSV(t *testing.T) {
-	t.Parallel()
-
 	var out bytes.Buffer
 	rows := [][]string{
 		{"name", "count"},

@@ -3,62 +3,16 @@ package auth
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/adrg/xdg"
 )
-
-func TestScopesForCommand(t *testing.T) {
-	tests := []struct {
-		name string
-		cmd  Command
-		want []string
-	}{
-		{
-			name: "up",
-			cmd:  CommandUp,
-			want: []string{
-				"https://www.googleapis.com/auth/drive",
-				"https://www.googleapis.com/auth/spreadsheets",
-			},
-		},
-		{
-			name: "down",
-			cmd:  CommandDown,
-			want: []string{
-				"https://www.googleapis.com/auth/drive.readonly",
-				"https://www.googleapis.com/auth/spreadsheets.readonly",
-			},
-		},
-		{
-			name: "list",
-			cmd:  CommandList,
-			want: []string{
-				"https://www.googleapis.com/auth/drive.readonly",
-				"https://www.googleapis.com/auth/spreadsheets.readonly",
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := ScopesForCommand(tt.cmd); !reflect.DeepEqual(got, tt.want) {
-				t.Fatalf("ScopesForCommand() = %#v, want %#v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestScopesForCommandUnknown(t *testing.T) {
-	if got := ScopesForCommand(Command("wat")); got != nil {
-		t.Fatalf("ScopesForCommand() = %#v, want nil", got)
-	}
-}
 
 func TestConfigDir(t *testing.T) {
 	home := t.TempDir()
@@ -86,7 +40,7 @@ func TestConfigDir(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			withTestEnv(t, tt.env)
+			withAuthEnv(t, tt.env)
 			if tt.name == "xdg" {
 				if err := os.Setenv("XDG_CONFIG_HOME", "/tmp/xdg"); err != nil {
 					t.Fatalf("Setenv(XDG_CONFIG_HOME): %v", err)
@@ -168,8 +122,8 @@ func TestResolveSourcePrecedence(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			withTestEnv(t, tt.env)
-			got, err := Resolve(Options{Command: CommandDown})
+			withAuthEnv(t, tt.env)
+			got, err := Resolve()
 			if err != nil {
 				t.Fatalf("Resolve() error = %v", err)
 			}
@@ -199,9 +153,9 @@ func TestResolveSourcePrecedence(t *testing.T) {
 
 func TestResolveWellKnownADC(t *testing.T) {
 	home := t.TempDir()
-	withTestEnv(t, map[string]string{"HOME": home})
+	withAuthEnv(t, map[string]string{"HOME": home})
 	adcPath := writeFile(t, filepath.Join(xdg.ConfigHome, "gcloud", "application_default_credentials.json"), `{"type":"authorized_user","client_id":"adc","client_secret":"secret","refresh_token":"refresh"}`)
-	got, err := Resolve(Options{Command: CommandList})
+	got, err := Resolve()
 	if err != nil {
 		t.Fatalf("Resolve() error = %v", err)
 	}
@@ -217,8 +171,8 @@ func TestResolveWellKnownADC(t *testing.T) {
 
 func TestResolveMissingAuth(t *testing.T) {
 	home := t.TempDir()
-	withTestEnv(t, map[string]string{"HOME": home})
-	_, err := Resolve(Options{Command: CommandDown})
+	withAuthEnv(t, map[string]string{"HOME": home})
+	_, err := Resolve()
 	if err == nil {
 		t.Fatal("Resolve() error = nil, want error")
 	}
@@ -238,8 +192,8 @@ func TestResolveMissingAuth(t *testing.T) {
 }
 
 func TestResolveExplicitCredentialFileMissing(t *testing.T) {
-	withTestEnv(t, map[string]string{"GSHOOT_CREDENTIALS_FILE": "/does/not/exist.json", "HOME": t.TempDir()})
-	_, err := Resolve(Options{Command: CommandDown})
+	withAuthEnv(t, map[string]string{"GSHOOT_CREDENTIALS_FILE": "/does/not/exist.json", "HOME": t.TempDir()})
+	_, err := Resolve()
 	if err == nil {
 		t.Fatal("Resolve() error = nil, want error")
 	}
@@ -250,8 +204,8 @@ func TestResolveExplicitCredentialFileMissing(t *testing.T) {
 }
 
 func TestResolveApplicationCredentialsMissing(t *testing.T) {
-	withTestEnv(t, map[string]string{"GOOGLE_APPLICATION_CREDENTIALS": "/does/not/exist.json", "HOME": t.TempDir()})
-	_, err := Resolve(Options{Command: CommandList})
+	withAuthEnv(t, map[string]string{"GOOGLE_APPLICATION_CREDENTIALS": "/does/not/exist.json", "HOME": t.TempDir()})
+	_, err := Resolve()
 	if err == nil {
 		t.Fatal("Resolve() error = nil, want error")
 	}
@@ -263,8 +217,8 @@ func TestResolveApplicationCredentialsMissing(t *testing.T) {
 
 func TestResolveExplicitCredentialFileCorrupt(t *testing.T) {
 	path := writeFile(t, filepath.Join(t.TempDir(), "bad.json"), `{"type":`)
-	withTestEnv(t, map[string]string{"GSHOOT_CREDENTIALS_FILE": path, "HOME": t.TempDir()})
-	_, err := Resolve(Options{Command: CommandDown})
+	withAuthEnv(t, map[string]string{"GSHOOT_CREDENTIALS_FILE": path, "HOME": t.TempDir()})
+	_, err := Resolve()
 	if err == nil {
 		t.Fatal("Resolve() error = nil, want error")
 	}
@@ -276,9 +230,9 @@ func TestResolveExplicitCredentialFileCorrupt(t *testing.T) {
 
 func TestResolveWellKnownADCCorrupt(t *testing.T) {
 	home := t.TempDir()
-	withTestEnv(t, map[string]string{"HOME": home})
+	withAuthEnv(t, map[string]string{"HOME": home})
 	writeFile(t, filepath.Join(xdg.ConfigHome, "gcloud", "application_default_credentials.json"), `{"type":`)
-	_, err := Resolve(Options{Command: CommandList})
+	_, err := Resolve()
 	if err == nil {
 		t.Fatal("Resolve() error = nil, want error")
 	}
@@ -292,26 +246,14 @@ func TestResolveCachedOAuthInvalid(t *testing.T) {
 	configDir := t.TempDir()
 	writeFile(t, filepath.Join(configDir, oauthTokenFileName), `{"access_token":`)
 
-	withTestEnv(t, map[string]string{"GSHOOT_CONFIG_DIR": configDir, "HOME": t.TempDir()})
-	_, err := Resolve(Options{Command: CommandDown})
+	withAuthEnv(t, map[string]string{"GSHOOT_CONFIG_DIR": configDir, "HOME": t.TempDir()})
+	_, err := Resolve()
 	if err == nil {
 		t.Fatal("Resolve() error = nil, want error")
 	}
 
 	if !strings.Contains(err.Error(), "cached oauth token") {
 		t.Fatalf("Resolve() error = %q, want cached token context", err.Error())
-	}
-}
-
-func TestResolveUnknownCommand(t *testing.T) {
-	withTestEnv(t, map[string]string{"HOME": t.TempDir()})
-	_, err := Resolve(Options{Command: Command("wat")})
-	if err == nil {
-		t.Fatal("Resolve() error = nil, want error")
-	}
-
-	if !strings.Contains(err.Error(), "unknown command") {
-		t.Fatalf("Resolve() error = %q, want unknown command", err.Error())
 	}
 }
 
@@ -408,7 +350,6 @@ func TestLoadOAuthTokenInvalidJSON(t *testing.T) {
 
 func TestNewTokenSourceExpiredCachedOAuthWithoutClientConfig(t *testing.T) {
 	resolved := Resolved{
-		Scopes:          ScopesForCommand(CommandList),
 		OAuthClientPath: filepath.Join(t.TempDir(), "oauth-client.json"),
 		Source: Source{
 			Kind: SourceKindCachedOAuth,
@@ -421,7 +362,7 @@ func TestNewTokenSourceExpiredCachedOAuthWithoutClientConfig(t *testing.T) {
 		},
 	}
 
-	_, err := NewTokenSource(context.Background(), resolved)
+	_, err := NewTokenSource(context.Background(), resolved, readOnlyScopes())
 	if err == nil {
 		t.Fatal("NewTokenSource() error = nil, want error")
 	}
@@ -432,7 +373,6 @@ func TestNewTokenSourceExpiredCachedOAuthWithoutClientConfig(t *testing.T) {
 
 func TestNewTokenSourceValidCachedOAuthWithoutClientConfig(t *testing.T) {
 	resolved := Resolved{
-		Scopes:          ScopesForCommand(CommandList),
 		OAuthClientPath: filepath.Join(t.TempDir(), "oauth-client.json"),
 		Source: Source{
 			Kind: SourceKindCachedOAuth,
@@ -444,7 +384,7 @@ func TestNewTokenSourceValidCachedOAuthWithoutClientConfig(t *testing.T) {
 		},
 	}
 
-	src, err := NewTokenSource(context.Background(), resolved)
+	src, err := NewTokenSource(context.Background(), resolved, readOnlyScopes())
 	if err != nil {
 		t.Fatalf("NewTokenSource() error = %v", err)
 	}
@@ -455,6 +395,159 @@ func TestNewTokenSourceValidCachedOAuthWithoutClientConfig(t *testing.T) {
 	}
 	if token.AccessToken != "valid" {
 		t.Fatalf("Token() access token = %q, want valid", token.AccessToken)
+	}
+}
+
+func TestNewTokenSourceRefreshesCachedOAuth(t *testing.T) {
+	var tokenEndpointHit bool
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tokenEndpointHit = true
+		if err := r.ParseForm(); err != nil {
+			t.Fatalf("ParseForm() error = %v", err)
+		}
+		if got, want := r.Form.Get("grant_type"), "refresh_token"; got != want {
+			t.Fatalf("grant_type = %q, want %q", got, want)
+		}
+		if got, want := r.Form.Get("refresh_token"), "refresh-token"; got != want {
+			t.Fatalf("refresh_token = %q, want %q", got, want)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"access_token":"refreshed","token_type":"Bearer","expires_in":3600}`))
+	}))
+	defer tokenServer.Close()
+
+	configDir := t.TempDir()
+	writeFile(t, filepath.Join(configDir, oauthClientFileName), `{"installed":{"client_id":"cid","client_secret":"secret","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"`+tokenServer.URL+`","redirect_uris":["http://127.0.0.1/oauth2/callback"]}}`)
+	resolved := Resolved{
+		OAuthClientPath: filepath.Join(configDir, oauthClientFileName),
+		Source: Source{
+			Kind: SourceKindCachedOAuth,
+			OAuthToken: &OAuthToken{
+				AccessToken:  "expired",
+				RefreshToken: "refresh-token",
+				TokenType:    "Bearer",
+				Expiry:       time.Now().Add(-time.Hour),
+			},
+		},
+	}
+
+	src, err := NewTokenSource(context.Background(), resolved, readOnlyScopes())
+	if err != nil {
+		t.Fatalf("NewTokenSource() error = %v", err)
+	}
+
+	token, err := src.Token()
+	if err != nil {
+		t.Fatalf("Token() error = %v", err)
+	}
+	if !tokenEndpointHit {
+		t.Fatal("token endpoint was not called")
+	}
+	if got, want := token.AccessToken, "refreshed"; got != want {
+		t.Fatalf("Token() access token = %q, want %q", got, want)
+	}
+}
+
+func TestNewTokenSourceCachedOAuthRefreshFailure(t *testing.T) {
+	var tokenEndpointHit bool
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tokenEndpointHit = true
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"error":"invalid_grant","error_description":"Token has been expired or revoked."}`))
+	}))
+	defer tokenServer.Close()
+
+	configDir := t.TempDir()
+	writeFile(t, filepath.Join(configDir, oauthClientFileName), `{"installed":{"client_id":"cid","client_secret":"secret","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"`+tokenServer.URL+`","redirect_uris":["http://127.0.0.1/oauth2/callback"]}}`)
+	resolved := Resolved{
+		OAuthClientPath: filepath.Join(configDir, oauthClientFileName),
+		Source: Source{
+			Kind: SourceKindCachedOAuth,
+			OAuthToken: &OAuthToken{
+				AccessToken:  "expired",
+				RefreshToken: "refresh-token",
+				TokenType:    "Bearer",
+				Expiry:       time.Now().Add(-time.Hour),
+			},
+		},
+	}
+
+	src, err := NewTokenSource(context.Background(), resolved, readOnlyScopes())
+	if err != nil {
+		t.Fatalf("NewTokenSource() error = %v", err)
+	}
+
+	_, err = src.Token()
+	if err == nil {
+		t.Fatal("Token() error = nil, want error")
+	}
+	if !tokenEndpointHit {
+		t.Fatal("token endpoint was not called")
+	}
+	msg := err.Error()
+	for _, want := range []string{"invalid_grant", "expired or revoked"} {
+		if !strings.Contains(msg, want) {
+			t.Fatalf("Token() error = %q, want %q", msg, want)
+		}
+	}
+}
+
+func TestNewTokenSourceRefreshesAuthorizedUser(t *testing.T) {
+	var tokenEndpointHit bool
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tokenEndpointHit = true
+		if err := r.ParseForm(); err != nil {
+			t.Fatalf("ParseForm() error = %v", err)
+		}
+		if got, want := r.Form.Get("grant_type"), "refresh_token"; got != want {
+			t.Fatalf("grant_type = %q, want %q", got, want)
+		}
+		if got, want := r.Form.Get("refresh_token"), "refresh"; got != want {
+			t.Fatalf("refresh_token = %q, want %q", got, want)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"access_token":"authorized-user-access","token_type":"Bearer","expires_in":3600}`))
+	}))
+	defer tokenServer.Close()
+
+	src, err := NewTokenSource(context.Background(), Resolved{
+		Source: Source{
+			Kind: SourceKindCredentialsFile,
+			CredentialFile: &CredentialFile{
+				Kind: CredentialKindAuthorizedUser,
+				AuthorizedUser: &AuthorizedUser{
+					ClientID:     "cid",
+					ClientSecret: "secret",
+					RefreshToken: "refresh",
+					TokenURI:     tokenServer.URL,
+				},
+			},
+		},
+	}, readOnlyScopes())
+	if err != nil {
+		t.Fatalf("NewTokenSource() error = %v", err)
+	}
+
+	token, err := src.Token()
+	if err != nil {
+		t.Fatalf("Token() error = %v", err)
+	}
+	if !tokenEndpointHit {
+		t.Fatal("token endpoint was not called")
+	}
+	if got, want := token.AccessToken, "authorized-user-access"; got != want {
+		t.Fatalf("Token() access token = %q, want %q", got, want)
+	}
+}
+
+func TestOAuthEndpointAuthorizedUserFallsBackToGoogle(t *testing.T) {
+	endpoint := oauthEndpoint("", (&AuthorizedUser{}).TokenURI)
+	if got, want := endpoint.AuthURL, "https://accounts.google.com/o/oauth2/auth"; got != want {
+		t.Fatalf("endpoint.AuthURL = %q, want %q", got, want)
+	}
+	if got, want := endpoint.TokenURL, "https://oauth2.googleapis.com/token"; got != want {
+		t.Fatalf("endpoint.TokenURL = %q, want %q", got, want)
 	}
 }
 
@@ -480,4 +573,11 @@ func writeFile(t *testing.T, path, body string) string {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 	return path
+}
+
+func readOnlyScopes() []string {
+	return []string{
+		"https://www.googleapis.com/auth/drive.readonly",
+		"https://www.googleapis.com/auth/spreadsheets.readonly",
+	}
 }

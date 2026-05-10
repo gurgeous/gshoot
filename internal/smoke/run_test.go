@@ -18,7 +18,7 @@ func TestRunRequiresBinary(t *testing.T) {
 	defer restore()
 
 	executablePath = func() (string, error) { return filepath.Join(t.TempDir(), "missing-smoke"), nil }
-	resolveAuth = func(auth.Options) (auth.Resolved, error) {
+	resolveAuth = func() (auth.Resolved, error) {
 		t.Fatal("Resolve() should not be called")
 		return auth.Resolved{}, nil
 	}
@@ -48,10 +48,10 @@ func TestRunInfersSiblingBinary(t *testing.T) {
 	gshootPath := writeExecutable(t, filepath.Join(exeDir, "gshoot"))
 
 	executablePath = func() (string, error) { return exePath, nil }
-	resolveAuth = func(auth.Options) (auth.Resolved, error) {
-		return auth.Resolved{Scopes: auth.ScopesForCommand(auth.CommandUp)}, nil
+	resolveAuth = func() (auth.Resolved, error) {
+		return auth.Resolved{}, nil
 	}
-	newTokenSource = func(context.Context, auth.Resolved) (oauth2.TokenSource, error) {
+	newTokenSource = func(context.Context, auth.Resolved, []string) (oauth2.TokenSource, error) {
 		return oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "token"}), nil
 	}
 	newSmokeClient = func(context.Context, oauth2.TokenSource) (Client, error) {
@@ -87,7 +87,7 @@ func TestRunPropagatesAuthError(t *testing.T) {
 	restore := stubSmokeDeps(t)
 	defer restore()
 
-	resolveAuth = func(auth.Options) (auth.Resolved, error) {
+	resolveAuth = func() (auth.Resolved, error) {
 		return auth.Resolved{}, errors.New("no auth")
 	}
 

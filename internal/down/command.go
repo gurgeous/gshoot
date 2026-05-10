@@ -6,21 +6,14 @@ import (
 	"os"
 	"strings"
 
-	"github.com/gurgeous/gshoot/internal/auth"
 	"github.com/gurgeous/gshoot/internal/google"
 	"github.com/spf13/cobra"
-	"google.golang.org/api/drive/v3"
 )
 
-var (
-	resolveAuth    = auth.Resolve
-	newTokenSource = auth.NewTokenSource
-	newGoogle      = google.New
-	downloadSheet  = Download
-)
+var downloadSheet = Download
 
-// NewCommand creates the down command.
-func NewCommand() *cobra.Command {
+// NewDownCommand creates the down command.
+func NewDownCommand() *cobra.Command {
 	var outputPath string
 
 	cmd := &cobra.Command{
@@ -33,17 +26,7 @@ func NewCommand() *cobra.Command {
 		Args: args,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
-			resolved, err := resolveAuth(auth.Options{Command: auth.CommandDown})
-			if err != nil {
-				return err
-			}
-
-			tokenSource, err := newTokenSource(ctx, resolved)
-			if err != nil {
-				return err
-			}
-
-			client, err := newGoogle(ctx, tokenSource)
+			client, err := google.NewClient(ctx, google.ReadOnlyScopes())
 			if err != nil {
 				return err
 			}
@@ -80,19 +63,4 @@ func args(_ *cobra.Command, args []string) error {
 		return nil
 	}
 	return fmt.Errorf("expected `gshoot down <spreadsheet> [sheet]`")
-}
-
-// Recent returns recent spreadsheets ordered by modified time.
-func Recent(ctx context.Context, client *google.Client, limit int) ([]*drive.File, error) {
-	res, err := client.Drive.Files.List().
-		Context(ctx).
-		Q("mimeType='application/vnd.google-apps.spreadsheet' and trashed=false").
-		OrderBy("modifiedTime desc,name").
-		PageSize(int64(limit)).
-		Fields("files(id,name,modifiedTime)").
-		Do()
-	if err != nil {
-		return nil, fmt.Errorf("list spreadsheets: %w", err)
-	}
-	return res.Files, nil
 }
