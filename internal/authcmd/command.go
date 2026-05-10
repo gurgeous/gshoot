@@ -1,9 +1,9 @@
 package authcmd
 
 import (
-	"github.com/gurgeous/gshoot/internal/auth"
 	"github.com/gurgeous/gshoot/internal/login"
 	"github.com/gurgeous/gshoot/internal/logout"
+	"github.com/gurgeous/gshoot/internal/status"
 	"github.com/spf13/cobra"
 )
 
@@ -17,7 +17,7 @@ func NewAuthCommand() *cobra.Command {
 	cmd.AddCommand(
 		login.NewLoginCommand(),
 		logout.NewLogoutCommand(),
-		auth.NewStatusCommand(),
+		status.NewStatusCommand(),
 	)
 	return cmd
 }

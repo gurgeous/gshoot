@@ -78,15 +78,6 @@ func newStubCmd(use, short string) *cobra.Command {
 	return cmd
 }
 
-func noArgs(usage string) cobra.PositionalArgs {
-	return func(_ *cobra.Command, args []string) error {
-		if len(args) == 0 {
-			return nil
-		}
-		return fmt.Errorf("expected `%s`", usage)
-	}
-}
-
 func isRootCmd(cmd *cobra.Command) bool {
 	return cmd != nil && !cmd.HasParent()
 }

@@ -1,24 +1,26 @@
-package auth
+package status
 
 import (
 	"bytes"
 	"io"
 	"strings"
 	"testing"
+
+	"github.com/gurgeous/gshoot/internal/auth"
 )
 
 func TestNewStatusCommand(t *testing.T) {
-	origStatus := status
-	origPrint := printStatus
-	status = func() Status {
-		return Status{ConfigDir: "/tmp/gshoot", ReadyForLogin: true}
+	origStatus := runStatus
+	origPrint := writeStatus
+	runStatus = func() auth.Status {
+		return auth.Status{ConfigDir: "/tmp/gshoot", ReadyForLogin: true}
 	}
-	printStatus = func(w io.Writer, status Status) {
+	writeStatus = func(w io.Writer, status auth.Status) {
 		_, _ = io.WriteString(w, "Status: not logged in yet\n")
 	}
 	t.Cleanup(func() {
-		status = origStatus
-		printStatus = origPrint
+		runStatus = origStatus
+		writeStatus = origPrint
 	})
 
 	var stdout bytes.Buffer

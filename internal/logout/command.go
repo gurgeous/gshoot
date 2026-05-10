@@ -14,7 +14,12 @@ func NewLogoutCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "logout",
 		Short: "Clear cached OAuth token",
-		Args:  noArgs("gshoot auth logout"),
+		Args: func(_ *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return nil
+			}
+			return fmt.Errorf("gshoot auth logout")
+		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			removed, err := runLogout()
 			if err != nil {
@@ -29,13 +34,4 @@ func NewLogoutCommand() *cobra.Command {
 		},
 	}
 	return cmd
-}
-
-func noArgs(usage string) cobra.PositionalArgs {
-	return func(_ *cobra.Command, args []string) error {
-		if len(args) == 0 {
-			return nil
-		}
-		return fmt.Errorf("expected `%s`", usage)
-	}
 }

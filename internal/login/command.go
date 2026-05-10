@@ -22,7 +22,12 @@ func NewLoginCommand() *cobra.Command {
 			"gshoot auth login",
 			"  gshoot auth login --client-secret ~/Downloads/client_secret.json",
 		}, "\n"),
-		Args: noArgs("gshoot auth login"),
+		Args: func(_ *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return nil
+			}
+			return fmt.Errorf("gshoot auth login")
+		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runLogin(context.Background(), auth.LoginOptions{
 				ClientSecretPath: clientSecretPath,
@@ -33,13 +38,4 @@ func NewLoginCommand() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&clientSecretPath, "client-secret", "", "path to a downloaded Google Desktop app OAuth client JSON")
 	return cmd
-}
-
-func noArgs(usage string) cobra.PositionalArgs {
-	return func(_ *cobra.Command, args []string) error {
-		if len(args) == 0 {
-			return nil
-		}
-		return fmt.Errorf("expected `%s`", usage)
-	}
 }
