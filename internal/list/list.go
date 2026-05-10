@@ -40,14 +40,13 @@ func run(cmd *cobra.Command, _ []string) error {
 	dots := ux.StartDots(cmd.ErrOrStderr(), "gshoot: opening Google Sheets...")
 	ctx := context.Background()
 
-	dots.SetDescription("gshoot: authenticating...")
+	// auth
 	client, err := google.NewClient(ctx, auth.CommandList)
 	if err != nil {
 		return err
 	}
 
 	// list
-	dots.SetDescription("gshoot: listing spreadsheets...")
 	files, err := recent(ctx, client, 10)
 	if err != nil {
 		dots.SetDescription("list failed")
@@ -55,10 +54,11 @@ func run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	// done
+	// done, print
 	dots.SetDescription(fmt.Sprintf("%d recent spreadsheets", len(files)))
 	dots.Stop()
 	printFiles(cmd.OutOrStdout(), files)
+
 	return nil
 }
 
@@ -77,7 +77,7 @@ func recent(ctx context.Context, client *google.Client, limit int) ([]*drive.Fil
 	return res.Files, nil
 }
 
-// print results
+// now print the results
 func printFiles(out io.Writer, files []*drive.File) {
 	for i, file := range files {
 		const width = 30
