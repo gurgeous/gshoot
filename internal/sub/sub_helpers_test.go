@@ -2,10 +2,68 @@ package sub
 
 import (
 	"bytes"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"os"
+	"strings"
+	"testing"
 
 	"github.com/gurgeous/gshoot/internal/env"
 	"github.com/gurgeous/gshoot/internal/testutil"
 )
+
+//
+// mock google apis inside TestMain
+//
+
+// tests cna mess with this
+var (
+	googleAPIHandler http.Handler = invalid
+	invalid          http.Handler = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "google api test handler not installed", http.StatusInternalServerError)
+	})
+)
+
+func TestMain(m *testing.M) {
+	// create a fake server that points at googleAPIHandler
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		googleAPIHandler.ServeHTTP(w, r)
+	}))
+	defer server.Close()
+
+	orig := http.DefaultTransport
+	defer func() { http.DefaultTransport = orig }()
+	http.DefaultTransport = roundTripper(func(req *http.Request) (*http.Response, error) {
+		if !strings.Contains(req.URL.Host, "googleapis.com") {
+			return orig.RoundTrip(req)
+		}
+		target, _ := url.Parse(server.URL)
+		cloned := req.Clone(req.Context())
+		cloned.URL.Scheme = target.Scheme
+		cloned.URL.Host = target.Host
+		cloned.Host = target.Host
+		return orig.RoundTrip(cloned)
+	})
+
+	os.Exit(m.Run())
+}
+
+func withGoogleAPI(t testutil.TestingT, handler http.Handler) {
+	t.Helper()
+	t.Cleanup(func() { googleAPIHandler = invalid })
+	googleAPIHandler = handler
+}
+
+type roundTripper func(*http.Request) (*http.Response, error)
+
+func (fn roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	return fn(req)
+}
+
+//
+// env mocks
+//
 
 func withRawTokenAuth(t testutil.TestingT) {
 	t.Helper()
@@ -24,6 +82,10 @@ func envVars() map[string]*string {
 		"GSHOOT_TOKEN":                   &env.GSHOOT_TOKEN,
 	}
 }
+
+//
+// tempdir
+//
 
 type tempDirT interface {
 	testutil.TestingT

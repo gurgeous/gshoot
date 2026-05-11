@@ -3,10 +3,8 @@ package sub
 import (
 	"encoding/json"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 
-	"github.com/gurgeous/gshoot/internal/testutil/googletest"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,7 +15,7 @@ import (
 func TestListCommand(t *testing.T) {
 	withRawTokenAuth(t)
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	withGoogleAPI(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got, want := r.URL.Path, "/drive/v3/files"; got != want {
 			t.Fatalf("path = %q, want %q", got, want)
 		}
@@ -29,8 +27,6 @@ func TestListCommand(t *testing.T) {
 			},
 		})
 	}))
-	defer server.Close()
-	googletest.WithGoogleAPI(t, server.URL)
 
 	code, stdout, _ := testMain("list")
 	assert.Equal(t, 0, code)
@@ -45,11 +41,9 @@ func TestListCommand(t *testing.T) {
 func TestListCommandError(t *testing.T) {
 	withRawTokenAuth(t)
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	withGoogleAPI(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "nope", http.StatusInternalServerError)
 	}))
-	defer server.Close()
-	googletest.WithGoogleAPI(t, server.URL)
 
 	code, _, stderr := testMain("list")
 	assert.Equal(t, 1, code)
