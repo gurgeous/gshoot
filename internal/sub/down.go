@@ -2,9 +2,7 @@ package sub
 
 import (
 	"context"
-	"encoding/csv"
 	"fmt"
-	"io"
 	"os"
 	"strings"
 
@@ -68,7 +66,7 @@ func DownHandler(cmd *cobra.Command, args []string) error {
 
 	// fetch
 	dots.SetDescription("fetching")
-	values, err := downloadSheet(ctx, client, args[0], sheetName)
+	rows, err := downloadSheet(ctx, client, args[0], sheetName)
 	if err != nil {
 		return err
 	}
@@ -88,21 +86,9 @@ func DownHandler(cmd *cobra.Command, args []string) error {
 		writer = file
 	}
 
-	return util.CSVWrite(writer, values)
+	return util.CSVWrite(writer, rows)
 }
 
 //
 // helpers
 //
-
-// WriteCSV writes rows as CSV.
-func WriteCSV(w io.Writer, rows [][]string) error {
-	writer := csv.NewWriter(w)
-	for _, row := range rows {
-		if err := writer.Write(row); err != nil {
-			return err
-		}
-	}
-	writer.Flush()
-	return nil
-}

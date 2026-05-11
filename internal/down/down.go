@@ -2,9 +2,7 @@ package down
 
 import (
 	"context"
-	"encoding/csv"
 	"fmt"
-	"io"
 	"sort"
 	"strings"
 
@@ -14,6 +12,7 @@ import (
 )
 
 var (
+	// wrap files.list, with pagination
 	listSpreadsheets = func(ctx context.Context, client *google.Client) ([]*drive.File, error) {
 		items := make([]*drive.File, 0, 64)
 		pageToken := ""
@@ -131,21 +130,6 @@ func Download(ctx context.Context, client *google.Client, spreadsheetName, sheet
 	}
 
 	return rectangularize(values), nil
-}
-
-// WriteCSV writes rows as CSV.
-func WriteCSV(w io.Writer, rows [][]string) error {
-	writer := csv.NewWriter(w)
-	for _, row := range rows {
-		if err := writer.Write(row); err != nil {
-			return err
-		}
-	}
-	writer.Flush()
-	if err := writer.Error(); err != nil {
-		return err
-	}
-	return nil
 }
 
 func findSpreadsheet(items []*drive.File, target string) (*drive.File, bool) {
