@@ -1,13 +1,10 @@
 package cli
 
 import (
-	"context"
 	"fmt"
 	"io"
 
 	"github.com/alecthomas/kong"
-	"github.com/gurgeous/gshoot/internal/auth"
-	"github.com/gurgeous/gshoot/internal/google"
 	"github.com/gurgeous/gshoot/internal/ux"
 )
 
@@ -16,12 +13,20 @@ var (
 	tagline = fmt.Sprintf("Magically %s from Google Sheets.", ux.Brand.Render("import/export CSVs"))
 )
 
+//
+// Kong
+//
+
 type CLI struct {
 	Version bool    `name:"version" short:"v" help:"Print version number."`
 	Auth    AuthCmd `cmd:"" help:"Login or logout from Google Sheets."`
 	List    ListCmd `cmd:"" help:"List your Google Sheets."`
 	Down    DownCmd `cmd:"" help:"Download a Google Sheet as CSV."`
 }
+
+//
+// Main entrypoint
+//
 
 type app struct {
 	stdout io.Writer
@@ -82,112 +87,4 @@ func Main(args []string, stdout, stderr io.Writer) (code int) {
 	}
 
 	return 0
-}
-
-type AuthCmd struct {
-	Login  AuthLoginCmd  `cmd:"" help:"Run browser OAuth login."`
-	Logout AuthLogoutCmd `cmd:"" help:"Clear cached OAuth token."`
-	Status AuthStatusCmd `cmd:"" help:"Show auth status."`
-}
-
-type AuthLoginCmd struct {
-	ClientSecretPath string `name:"client-secret" help:"Path to a downloaded Google Desktop app OAuth client JSON."`
-}
-
-func (c *AuthLoginCmd) Run(app *app) error {
-	return runLogin(context.Background(), auth.LoginOptions{
-		ClientSecretPath: c.ClientSecretPath,
-		Stdout:           app.stdout,
-		Stderr:           app.stderr,
-	})
-}
-
-type AuthLogoutCmd struct{}
-
-func (c *AuthLogoutCmd) Run(app *app) error {
-	removed, err := runLogout()
-	if err != nil {
-		return err
-	}
-	if removed {
-		fmt.Fprintln(app.stdout, "Removed cached OAuth token. OAuth client config was kept.")
-		return nil
-	}
-	fmt.Fprintln(app.stdout, "No cached OAuth token was present.")
-	return nil
-}
-
-type AuthStatusCmd struct{}
-
-func (c *AuthStatusCmd) Run(app *app) error {
-	writeStatus(app.stdout)
-	return nil
-}
-
-type ListCmd struct{}
-
-func (c *ListCmd) Run(app *app) error {
-	ctx := context.Background()
-	dots := ux.StartDots(app.stderr, "connecting to Google Sheets...")
-	client, err := google.NewClient(ctx, google.ReadOnlyScopes())
-	if err != nil {
-		return err
-	}
-
-	dots.SetDescription("getting list of spreadsheets...")
-	files, err := client.ListSpreadsheets(ctx, 10)
-	if err != nil {
-		return err
-	}
-	dots.SetDescription(fmt.Sprintf("%d recent spreadsheets", len(files)))
-	dots.Stop()
-
-	printFiles(app.stdout, files)
-	return nil
-}
-
-type DownCmd struct {
-	Output      string `name:"output" short:"o" help:"Where to write the CSV."`
-	Spreadsheet string `arg:"" name:"spreadsheet" help:"Spreadsheet name."`
-	Sheet       string `arg:"" optional:"" name:"sheet" help:"Sheet name."`
-}
-
-func (c *DownCmd) Run(app *app) error {
-	ctx := context.Background()
-	dots := ux.StartDots(app.stderr, "connecting to Google Sheets...")
-
-	client, err := google.NewClient(ctx, google.ReadOnlyScopes())
-	if err != nil {
-		return err
-	}
-
-	dots.SetDescription("finding spreadsheet...")
-	spreadsheet, err := client.FindSpreadsheet(ctx, c.Spreadsheet)
-	if err != nil {
-		return fmt.Errorf("could not find spreadsheet '%s': %w", c.Spreadsheet, err)
-	}
-	if spreadsheet == nil {
-		return fmt.Errorf("could not find spreadsheet '%s'", c.Spreadsheet)
-	}
-
-	dots.SetDescription("finding specific sheet...")
-	sheet, err := client.FindSheet(ctx, spreadsheet.Id, c.Sheet)
-	if err != nil {
-		return err
-	}
-	if sheet == nil {
-		return fmt.Errorf("in spreadsheet '%s', could not find sheet '%s'", c.Spreadsheet, c.Sheet)
-	}
-
-	dots.SetDescription("downloading cells...")
-	rows, err := client.GetRows(ctx, spreadsheet.Id, sheet)
-	if err != nil {
-		return err
-	}
-	if c.Output != "" {
-		dots.SetDescription(fmt.Sprintf("saving %s", c.Output))
-	}
-	dots.Stop()
-
-	return writeRows(app.stdout, rows, c.Output)
 }

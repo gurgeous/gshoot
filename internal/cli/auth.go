@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -15,6 +16,46 @@ var (
 	runLogout   = auth.Logout
 	resolveAuth = auth.Resolve
 )
+
+type AuthCmd struct {
+	Login  AuthLoginCmd  `cmd:"" help:"Run browser OAuth login."`
+	Logout AuthLogoutCmd `cmd:"" help:"Clear cached OAuth token."`
+	Status AuthStatusCmd `cmd:"" help:"Show auth status."`
+}
+
+type AuthLoginCmd struct {
+	ClientSecretPath string `name:"client-secret" help:"Path to a downloaded Google Desktop app OAuth client JSON."`
+}
+
+func (c *AuthLoginCmd) Run(app *app) error {
+	return runLogin(context.Background(), auth.LoginOptions{
+		ClientSecretPath: c.ClientSecretPath,
+		Stdout:           app.stdout,
+		Stderr:           app.stderr,
+	})
+}
+
+type AuthLogoutCmd struct{}
+
+func (c *AuthLogoutCmd) Run(app *app) error {
+	removed, err := runLogout()
+	if err != nil {
+		return err
+	}
+	if removed {
+		fmt.Fprintln(app.stdout, "Removed cached OAuth token. OAuth client config was kept.")
+		return nil
+	}
+	fmt.Fprintln(app.stdout, "No cached OAuth token was present.")
+	return nil
+}
+
+type AuthStatusCmd struct{}
+
+func (c *AuthStatusCmd) Run(app *app) error {
+	writeStatus(app.stdout)
+	return nil
+}
 
 func writeStatus(w io.Writer) {
 	configDir := auth.ConfigDir()
