@@ -4,8 +4,8 @@ package env
 import "os"
 
 //
-// env vars used by gshoot. note that charm adds support for NO_COLOR and
-// friends
+// environment variables used by gshoot. note that charm also looks at many env
+// vars, like NO_COLOR, TERM, etc. Those are not listed here.
 //
 
 // GOOGLE_APPLICATION_CREDENTIALS points to ADC credentials JSON.
