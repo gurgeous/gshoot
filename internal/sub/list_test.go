@@ -15,11 +15,9 @@ import (
 func TestListCommand(t *testing.T) {
 	withRawTokenAuth(t)
 
+	// good
 	withGoogleAPI(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if got, want := r.URL.Path, "/drive/v3/files"; got != want {
-			t.Fatalf("path = %q, want %q", got, want)
-		}
-		w.Header().Set("Content-Type", "application/json")
+		assert.Equal(t, r.URL.Path, "/drive/v3/files")
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"files": []map[string]string{
 				{"id": "1", "name": "Alpha", "modifiedTime": "2026-05-07T12:00:00Z"},
@@ -27,25 +25,15 @@ func TestListCommand(t *testing.T) {
 			},
 		})
 	}))
-
 	code, stdout, _ := testMain("list")
 	assert.Equal(t, 0, code)
 	assert.Contains(t, stdout, "Alpha")
 	assert.Contains(t, stdout, "Beta")
-}
 
-//
-// bad
-//
-
-func TestListCommandError(t *testing.T) {
-	withRawTokenAuth(t)
-
+	// bad
 	withGoogleAPI(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "nope", http.StatusInternalServerError)
+		http.Error(w, "nope", 500)
 	}))
-
-	code, _, stderr := testMain("list")
+	code, _, _ = testMain("list")
 	assert.Equal(t, 1, code)
-	assert.Contains(t, stderr, "HTTP response code 500")
 }

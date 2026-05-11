@@ -28,6 +28,7 @@ var (
 func TestMain(m *testing.M) {
 	// create a fake server that points at googleAPIHandler
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		googleAPIHandler.ServeHTTP(w, r)
 	}))
 	defer server.Close()
