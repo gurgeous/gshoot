@@ -112,26 +112,33 @@ func (c *Client) FindSpreadsheet(ctx context.Context, name string) (*drive.File,
 	return nil, nil // failure
 }
 
+// FirstSheet returns the first sheet
+func (c *Client) FirstSheet(ctx context.Context, spreadsheetID string) (*sheets.Sheet, error) {
+	items, err := c.ListSheets(ctx, spreadsheetID)
+	if err != nil {
+		return nil, err
+	}
+	return items[0], nil
+}
+
 // FindSheet returns the sheet with this name, or the first sheet when name is empty (case insensitive)
 func (c *Client) FindSheet(ctx context.Context, spreadsheetID, name string) (*sheets.Sheet, error) {
 	items, err := c.ListSheets(ctx, spreadsheetID)
 	if err != nil {
 		return nil, err
 	}
-	// no name, return first sheet
-	if name == "" {
-		return items[0], nil
-	}
 	for _, item := range items {
-		if item.Properties != nil && strings.EqualFold(item.Properties.Title, name) {
+		if strings.EqualFold(item.Properties.Title, name) {
 			return item, nil
 		}
 	}
 	return nil, nil
 }
 
+type Rows [][]string
+
 // GetRows returns stringified cell values for a sheet.
-func (c *Client) GetRows(ctx context.Context, spreadsheetID string, sheet *sheets.Sheet) ([][]string, error) {
+func (c *Client) GetRows(ctx context.Context, spreadsheetID string, sheet *sheets.Sheet) (Rows, error) {
 	if sheet == nil || sheet.Properties == nil {
 		return nil, fmt.Errorf("get values for %s: missing sheet properties", spreadsheetID)
 	}
@@ -156,7 +163,7 @@ func (c *Client) GetRows(ctx context.Context, spreadsheetID string, sheet *sheet
 // misc
 //
 
-func Rectangularize(rows [][]string) [][]string {
+func Rectangularize(rows Rows) Rows {
 	width := 0
 	for _, row := range rows {
 		width = max(width, len(row))

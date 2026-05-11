@@ -3,6 +3,7 @@ package sub
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/gurgeous/gshoot/internal/util"
 	"github.com/gurgeous/gshoot/internal/ux"
 	"github.com/spf13/cobra"
+	"google.golang.org/api/sheets/v4"
 )
 
 var (
@@ -46,10 +48,6 @@ func init() {
 //
 
 func DownHandler(cmd *cobra.Command, args []string) error {
-	ctx := context.Background()
-	stdout := cmd.OutOrStdout()
-	stderr := cmd.ErrOrStderr()
-
 	// parse args
 	spreadsheetName := args[0]
 	sheetName := ""
@@ -57,40 +55,54 @@ func DownHandler(cmd *cobra.Command, args []string) error {
 		sheetName = args[1]
 	}
 
-	// auth
-	dots := ux.StartDots(stderr, "opening Google Sheets...")
-	client, err := google.NewClient(ctx, google.ReadOnlyScopes())
-	if err != nil {
-		return err
-	}
+	dots := ux.StartDots(cmd.ErrOrStderr(), "opening Google Sheets...")
+	var rows google.Rows
+	{
+		defer dots.Stop()
 
-	// fetch
-	dots.SetDescription("finding spreadsheet...")
-	spreadsheet, err := client.FindSpreadsheet(ctx, spreadsheetName)
-	if err != nil {
-		return fmt.Errorf("could not find spreadsheet '%s'", spreadsheetName)
-	}
-	// now find sheet
-	dots.SetDescription("finding that sheet...")
-	sheet, err := client.FindSheet(ctx, spreadsheet.Id, sheetName)
-	if err != nil {
-		return fmt.Errorf("in spreadsheet '%s', could not find sheet '%s'", spreadsheetName, sheetName)
-	}
+		// auth
+		ctx := context.Background()
+		client, err := google.NewClient(ctx, google.ReadOnlyScopes())
+		if err != nil {
+			return err
+		}
 
-	// download
-	dots.SetDescription("downloading rows...")
-	raw, err := client.GetRows(ctx, spreadsheet.Id, sheet)
-	if err != nil {
-		return err
+		// fetch
+		dots.SetDescription("finding spreadsheet...")
+		spreadsheet, err := client.FindSpreadsheet(ctx, spreadsheetName)
+		if err != nil {
+			return fmt.Errorf("could not find spreadsheet '%s'", spreadsheetName)
+		}
+
+		// now find sheet
+		dots.SetDescription("finding that sheet...")
+		var sheet *sheets.Sheet
+		if sheetName == "" {
+			sheet, err = client.FirstSheet(ctx, spreadsheet.Id)
+		} else {
+			sheet, err = client.FindSheet(ctx, spreadsheet.Id, sheetName)
+			if sheet == nil {
+				return fmt.Errorf("in spreadsheet '%s', could not find sheet '%s'", spreadsheetName, sheetName)
+			}
+		}
+		if err != nil {
+			return err
+		}
+
+		// download
+		dots.SetDescription("downloading rows...")
+		raw, err := client.GetRows(ctx, spreadsheet.Id, sheet)
+		if err != nil {
+			return err
+		}
+		rows = google.Rectangularize(raw)
+		if outputPath != "" {
+			dots.SetDescription(fmt.Sprintf("saving %s", outputPath))
+		}
 	}
-	rows := google.Rectangularize(raw)
-	if outputPath != "" {
-		dots.SetDescription(fmt.Sprintf("saving %s", outputPath))
-	}
-	dots.Stop()
 
 	// write
-	writer := stdout
+	var writer io.Writer
 	if outputPath != "" {
 		file, err := os.Create(outputPath)
 		if err != nil {
@@ -98,6 +110,9 @@ func DownHandler(cmd *cobra.Command, args []string) error {
 		}
 		defer file.Close()
 		writer = file
+	} else {
+		writer = cmd.OutOrStdout()
 	}
+
 	return util.CSVWrite(writer, rows)
 }
