@@ -15,7 +15,7 @@
 - Be succinct, especially in Markdown
 - Prefer `mise run` tasks when they exist
 - Run small relevant checks while working; run the full check before commits
-- Keep commit messages under 80 chars
+- Keep commit/PR messages under 80 chars
 
 ## Layout
 
@@ -44,6 +44,7 @@
 
 - Use TDD: write or extend the test or `smoke` coverage first, then implement
 - Keep unit tests deterministic and network-free
+- Use `assert.`, not `require.`
 - Avoid trivial tests
 - Put real API coverage in the manual smoke path
 - Write smoke and other temp files under `tmp/`

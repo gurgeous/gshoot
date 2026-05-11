@@ -15,8 +15,8 @@ func TestListCommand(t *testing.T) {
 		assert.Equal(t, r.URL.Path, "/drive/v3/files")
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"files": []map[string]string{
-				{"id": "1", "name": "Alpha", "modifiedTime": "2026-05-07T12:00:00Z"},
-				{"id": "2", "name": "Beta", "modifiedTime": "2026-05-07T11:00:00Z"},
+				{"id": "1", "name": "Alpha", "modifiedByMeTime": "2026-05-07T12:00:00Z"},
+				{"id": "2", "name": "Beta", "modifiedByMeTime": "2026-05-07T11:00:00Z"},
 			},
 		})
 	})

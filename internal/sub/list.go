@@ -22,7 +22,7 @@ func init() {
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		Args:          noArgs("gshoot list"),
-		RunE:          ListHandler,
+		RunE:          listHandler,
 	}
 	rootCmd.AddCommand(listCommand)
 }
@@ -31,39 +31,33 @@ func init() {
 // handler
 //
 
-func ListHandler(cmd *cobra.Command, _ []string) error {
+func listHandler(cmd *cobra.Command, _ []string) error {
 	ctx := context.Background()
 	stdout := cmd.OutOrStdout()
 	stderr := cmd.ErrOrStderr()
 
 	// auth
-	dots := ux.StartDots(stderr, "opening Google Sheets...")
+	dots := ux.StartDots(stderr, "connecting to Google Sheets...")
 	client, err := google.NewClient(ctx, google.ReadOnlyScopes())
 	if err != nil {
 		return err
 	}
 
 	// fetch
-	dots.SetDescription("fetching spreadsheets")
-	res, err := client.Drive.Files.List().
-		Context(ctx).
-		Q("mimeType='application/vnd.google-apps.spreadsheet' and trashed=false").
-		OrderBy("modifiedTime desc,name").
-		PageSize(int64(10)).
-		Fields("files(id,name,modifiedTime)").
-		Do()
+	dots.SetDescription("getting list of spreadsheets...")
+	files, err := client.ListSpreadsheets(ctx, 10)
 	if err != nil {
 		return err
 	}
-	dots.SetDescription(fmt.Sprintf("%d recent spreadsheets", len(res.Files)))
+	dots.SetDescription(fmt.Sprintf("%d recent spreadsheets", len(files)))
 	dots.Stop()
 
 	// print
-	for i, file := range res.Files {
+	for i, file := range files {
 		const width = 30
 		num := ux.Dim.Render(fmt.Sprintf("%2d.", i+1))
 		name := fmt.Sprintf("%-"+strconv.Itoa(width)+"s", util.Truncate(file.Name, width))
-		date := ux.Dim.Render(util.DateAndTimeStr(file.ModifiedTime))
+		date := ux.Dim.Render(util.DateAndTimeStr(file.ModifiedByMeTime))
 		fmt.Fprintf(
 			stdout,
 			" %s %s   %s\n",
