@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/alecthomas/kong"
-	"github.com/gurgeous/gshoot/internal/auth"
-	"github.com/gurgeous/gshoot/internal/ux"
+	"github.com/gurgeous/gshoot/auth"
+	"github.com/gurgeous/gshoot/ux"
 )
 
 const helpHint = "gshoot: try 'gshoot --help' for more information"

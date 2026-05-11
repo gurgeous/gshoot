@@ -3,8 +3,8 @@ package auth
 import (
 	"testing"
 
-	"github.com/gurgeous/gshoot/internal/env"
-	"github.com/gurgeous/gshoot/internal/testutil"
+	"github.com/gurgeous/gshoot/env"
+	"github.com/gurgeous/gshoot/testutil"
 )
 
 func withAuthEnv(t *testing.T, overrides map[string]string) {

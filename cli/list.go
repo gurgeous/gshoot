@@ -8,9 +8,9 @@ import (
 
 	"google.golang.org/api/drive/v3"
 
-	"github.com/gurgeous/gshoot/internal/google"
-	"github.com/gurgeous/gshoot/internal/util"
-	"github.com/gurgeous/gshoot/internal/ux"
+	"github.com/gurgeous/gshoot/google"
+	"github.com/gurgeous/gshoot/util"
+	"github.com/gurgeous/gshoot/ux"
 )
 
 type ListCmd struct{}

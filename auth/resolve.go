@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/adrg/xdg"
-	"github.com/gurgeous/gshoot/internal/env"
+	"github.com/gurgeous/gshoot/env"
 )
 
 const (

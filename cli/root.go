@@ -5,8 +5,7 @@ import (
 	"io"
 
 	"github.com/alecthomas/kong"
-	"github.com/gurgeous/gshoot/internal/ux"
-	"github.com/k0kubun/pp/v3"
+	"github.com/gurgeous/gshoot/ux"
 )
 
 var (
@@ -54,10 +53,7 @@ func Main(args []string, stdout, stderr io.Writer) (code int) {
 	}
 
 	// parse args
-	pp.Print(args)
 	ctx, err := parser.Parse(args)
-	pp.Print(ctx)
-	pp.Print(err)
 	if err != nil {
 		writeError(stderr, err)
 		return 1

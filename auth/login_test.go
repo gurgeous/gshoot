@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gurgeous/gshoot/internal/util"
+	"github.com/gurgeous/gshoot/util"
 )
 
 func TestResolveMissingAuthGuidesLogin(t *testing.T) {

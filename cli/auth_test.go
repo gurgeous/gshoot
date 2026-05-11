@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gurgeous/gshoot/internal/auth"
-	"github.com/gurgeous/gshoot/internal/testutil"
-	"github.com/gurgeous/gshoot/internal/util"
+	"github.com/gurgeous/gshoot/auth"
+	"github.com/gurgeous/gshoot/testutil"
+	"github.com/gurgeous/gshoot/util"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -11,8 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/gurgeous/gshoot/internal/util"
-	"github.com/gurgeous/gshoot/internal/ux"
+	"github.com/gurgeous/gshoot/util"
+	"github.com/gurgeous/gshoot/ux"
 	"golang.org/x/oauth2"
 )
 

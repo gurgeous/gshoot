@@ -6,9 +6,9 @@ import (
 	"io"
 	"path/filepath"
 
-	"github.com/gurgeous/gshoot/internal/auth"
-	"github.com/gurgeous/gshoot/internal/util"
-	"github.com/gurgeous/gshoot/internal/ux"
+	"github.com/gurgeous/gshoot/auth"
+	"github.com/gurgeous/gshoot/util"
+	"github.com/gurgeous/gshoot/ux"
 )
 
 var (

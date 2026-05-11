@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/gurgeous/gshoot/internal/cli"
+	"github.com/gurgeous/gshoot/cli"
 )
 
 func main() {

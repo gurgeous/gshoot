@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gurgeous/gshoot/internal/env"
-	"github.com/gurgeous/gshoot/internal/testutil"
+	"github.com/gurgeous/gshoot/env"
+	"github.com/gurgeous/gshoot/testutil"
 )
 
 //

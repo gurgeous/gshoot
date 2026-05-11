@@ -4,8 +4,8 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/gurgeous/gshoot/internal/google"
-	"github.com/gurgeous/gshoot/internal/testutil"
+	"github.com/gurgeous/gshoot/google"
+	"github.com/gurgeous/gshoot/testutil"
 	"golang.org/x/oauth2"
 	"google.golang.org/api/drive/v3"
 	"google.golang.org/api/option"
