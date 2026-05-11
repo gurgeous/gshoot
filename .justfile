@@ -4,12 +4,8 @@ default:
 build:
   go build -o bin/gshoot ./cmd/gshoot
 
-build-smoke:
-  go build -o bin/smoke ./cmd/smoke
-
-smoke: build build-smoke
-  ./bin/smoke
-  just banner "✓ smoke ✓"
+run *ARGS: build
+  gshoot {{ARGS}}
 
 #
 # hygiene

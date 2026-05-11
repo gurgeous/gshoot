@@ -6,11 +6,12 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/gurgeous/gshoot/internal/ux"
+	"github.com/k0kubun/pp/v3"
 )
 
 var (
-	version = "dev"
-	tagline = fmt.Sprintf("Magically %s from Google Sheets.", ux.Brand.Render("import/export CSVs"))
+	Version   = "dev"
+	CommitSHA = ""
 )
 
 //
@@ -33,24 +34,13 @@ type app struct {
 	stderr io.Writer
 }
 
-type exitCode int
-
 func Main(args []string, stdout, stderr io.Writer) (code int) {
+	type exitCode int
+
+	// init
 	ux.Init()
-
-	defer func() {
-		recovered := recover()
-		if recovered == nil {
-			return
-		}
-		if exit, ok := recovered.(exitCode); ok {
-			code = int(exit)
-			return
-		}
-		panic(recovered)
-	}()
-
 	cli := CLI{}
+	tagline := fmt.Sprintf("Magically %s from Google Sheets.", ux.Brand.Render("import/export CSVs"))
 	parser, err := kong.New(
 		&cli,
 		kong.Name("gshoot"),
@@ -63,14 +53,27 @@ func Main(args []string, stdout, stderr io.Writer) (code int) {
 		return 1
 	}
 
+	// parse args
+	if len(args) == 0 {
+		if err := parser.PrintUsage(false); err != nil {
+			writeError(stderr, err)
+			return 1
+		}
+		return 0
+	}
+
+	// parse args
+	pp.Print(args)
 	ctx, err := parser.Parse(args)
+	pp.Print(ctx)
+	pp.Print(err)
 	if err != nil {
 		writeError(stderr, err)
 		return 1
 	}
 
 	if cli.Version {
-		fmt.Fprintf(stdout, "gshoot %s\n", version)
+		fmt.Fprintf(stdout, "gshoot %s\n", Version)
 		return 0
 	}
 	if ctx.Command() == "" || ctx.Command() == "auth" {
