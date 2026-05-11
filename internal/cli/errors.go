@@ -1,4 +1,4 @@
-package sub
+package cli
 
 import (
 	"errors"
@@ -6,6 +6,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/alecthomas/kong"
 	"github.com/gurgeous/gshoot/internal/auth"
 	"github.com/gurgeous/gshoot/internal/ux"
 )
@@ -28,25 +29,13 @@ func writeError(w io.Writer, err error) {
 }
 
 func errorSummary(err error) string {
+	var parseErr *kong.ParseError
+	if errors.As(err, &parseErr) {
+		err = parseErr.Unwrap()
+	}
 	msg := strings.TrimSpace(err.Error())
 	if line, _, ok := strings.Cut(msg, "\n"); ok {
 		msg = line
 	}
-	if name, ok := cobraUnknownCommand(msg); ok {
-		return fmt.Sprintf("unknown command %q", name)
-	}
 	return strings.TrimPrefix(msg, "gshoot: ")
-}
-
-func cobraUnknownCommand(msg string) (string, bool) {
-	const prefix = `unknown command "`
-	if !strings.HasPrefix(msg, prefix) {
-		return "", false
-	}
-	rest := strings.TrimPrefix(msg, prefix)
-	name, _, ok := strings.Cut(rest, `"`)
-	if !ok || name == "" {
-		return "", false
-	}
-	return name, true
 }

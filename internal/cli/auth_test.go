@@ -1,7 +1,6 @@
-package sub
+package cli
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"path/filepath"
@@ -11,6 +10,7 @@ import (
 	"github.com/gurgeous/gshoot/internal/auth"
 	"github.com/gurgeous/gshoot/internal/testutil"
 	"github.com/gurgeous/gshoot/internal/util"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestLoginCommand(t *testing.T) {
@@ -28,16 +28,8 @@ func TestLoginCommand(t *testing.T) {
 		runLogin = orig
 	})
 
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	cmd := newLoginCommand()
-	cmd.SetOut(&stdout)
-	cmd.SetErr(&stderr)
-	cmd.SetArgs([]string{"--client-secret", "/tmp/client.json"})
-
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("Execute() error = %v", err)
-	}
+	code, _, _ := testMain("auth", "login", "--client-secret", "/tmp/client.json")
+	assert.Equal(t, 0, code)
 }
 
 func TestLogoutCommand(t *testing.T) {
@@ -47,18 +39,9 @@ func TestLogoutCommand(t *testing.T) {
 		runLogout = orig
 	})
 
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	cmd := newLogoutCommand()
-	cmd.SetOut(&stdout)
-	cmd.SetErr(&stderr)
-
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("Execute() error = %v", err)
-	}
-	if !strings.Contains(stdout.String(), "Removed cached OAuth token") {
-		t.Fatalf("stdout = %q, want logout message", stdout.String())
-	}
+	code, stdout, _ := testMain("auth", "logout")
+	assert.Equal(t, 0, code)
+	assert.Contains(t, stdout, "Removed cached OAuth token")
 }
 
 func TestStatusCommand(t *testing.T) {
@@ -77,17 +60,9 @@ func TestStatusCommand(t *testing.T) {
 		t.Fatalf("WritePrivateFile() error = %v", err)
 	}
 
-	var stdout bytes.Buffer
-	cmd := newStatusCommand()
-	cmd.SetOut(&stdout)
-	cmd.SetArgs(nil)
-
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("Execute() error = %v", err)
-	}
-	if !strings.Contains(stdout.String(), "not logged in") {
-		t.Fatalf("stdout = %q, want status output", stdout.String())
-	}
+	code, stdout, _ := testMain("auth", "status")
+	assert.Equal(t, 0, code)
+	assert.Contains(t, stdout, "not logged in")
 }
 
 func TestWriteStatusAuthenticated(t *testing.T) {
@@ -105,11 +80,9 @@ func TestWriteStatusAuthenticated(t *testing.T) {
 	})
 
 	testutil.WithEnv(t, map[string]string{"HOME": t.TempDir()}, nil)
-	var out bytes.Buffer
+	var out strings.Builder
 	writeStatus(&out)
-	if !strings.Contains(out.String(), "authenticated via cached_oauth") {
-		t.Fatalf("writeStatus() = %q, want authenticated output", out.String())
-	}
+	assert.Contains(t, out.String(), "authenticated via cached_oauth")
 }
 
 func TestWriteStatusNoAuth(t *testing.T) {
@@ -122,9 +95,7 @@ func TestWriteStatusNoAuth(t *testing.T) {
 	})
 
 	testutil.WithEnv(t, map[string]string{"HOME": t.TempDir()}, nil)
-	var out bytes.Buffer
+	var out strings.Builder
 	writeStatus(&out)
-	if !strings.Contains(out.String(), "auth login --client-secret") {
-		t.Fatalf("writeStatus() = %q, want login guidance", out.String())
-	}
+	assert.Contains(t, out.String(), "auth login --client-secret")
 }
