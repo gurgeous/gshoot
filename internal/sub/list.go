@@ -57,7 +57,7 @@ func listHandler(cmd *cobra.Command, _ []string) error {
 		const width = 30
 		num := ux.Dim.Render(fmt.Sprintf("%2d.", i+1))
 		name := fmt.Sprintf("%-"+strconv.Itoa(width)+"s", util.Truncate(file.Name, width))
-		date := ux.Dim.Render(util.DateAndTimeStr(file.ModifiedTime))
+		date := ux.Dim.Render(util.DateAndTimeStr(file.ModifiedByMeTime))
 		fmt.Fprintf(
 			stdout,
 			" %s %s   %s\n",

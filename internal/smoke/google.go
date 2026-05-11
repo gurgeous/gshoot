@@ -63,7 +63,7 @@ func (c *GoogleClient) findOrCreateSpreadsheet(ctx context.Context, name string)
 		call := c.drive.Files.List().
 			Context(ctx).
 			Q("mimeType='application/vnd.google-apps.spreadsheet' and trashed=false").
-			OrderBy("modifiedTime desc,name").
+			OrderBy("modifiedByMeTime desc, name").
 			PageSize(1000).
 			Fields("nextPageToken,files(id,name)")
 		if pageToken != "" {

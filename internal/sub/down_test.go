@@ -18,7 +18,7 @@ func TestDownCommand(t *testing.T) {
 		case r.URL.Path == "/drive/v3/files":
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"files": []map[string]string{
-					{"id": "sheet-1", "name": "Budget", "modifiedTime": "2026-05-07T12:00:00Z"},
+					{"id": "sheet-1", "name": "Budget", "modifiedByMeTime": "2026-05-07T12:00:00Z"},
 				},
 			})
 		case r.URL.Path == "/v4/spreadsheets/sheet-1":

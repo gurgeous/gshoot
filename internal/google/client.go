@@ -19,14 +19,10 @@ import (
 const defaultSpreadsheetLimit = 100
 
 //
-// scopes - readonly and rw
 //
 
 func ReadOnlyScopes() []string {
-	return []string{
-		"https://www.googleapis.com/auth/drive.readonly",
-		"https://www.googleapis.com/auth/spreadsheets.readonly",
-	}
+	return []string{}
 }
 
 func ReadWriteScopes() []string {
@@ -73,24 +69,28 @@ func (c *Client) ListSpreadsheets(ctx context.Context, limit int) ([]*drive.File
 	if limit <= 0 {
 		limit = defaultSpreadsheetLimit
 	}
+
+	// https://developers.google.com/workspace/drive/api/reference/rest/v3/files/list
 	res, err := c.Drive.Files.List().
 		Context(ctx).
 		Q("mimeType='application/vnd.google-apps.spreadsheet' and trashed=false").
-		OrderBy("modifiedTime desc,name").
+		OrderBy("modifiedByMeTime desc, name").
 		PageSize(int64(limit)).
-		Fields("files(id,name,modifiedTime)").
+		Fields("files(*)").
 		Do()
 	if err != nil {
 		return nil, err
 	}
+	// litter.Dump(res.Files[0])
 	return res.Files, nil
 }
 
 // ListSheets returns the sheets (tabs) in a spreadsheet.
 func (c *Client) ListSheets(ctx context.Context, spreadsheetID string) ([]*sheets.Sheet, error) {
+	// https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets/get
 	res, err := c.Sheets.Spreadsheets.Get(spreadsheetID).
 		Context(ctx).
-		Fields("sheets(properties(sheetId,title))").
+		Fields("sheets(properties(*))").
 		Do()
 	if err != nil {
 		return nil, err
@@ -113,6 +113,7 @@ func (c *Client) FindSpreadsheet(ctx context.Context, name string) (*drive.File,
 }
 
 // FindSheet returns the sheet with this name, or the first sheet when name is empty (case insensitive)
+// see ListSpreadsheets for scopes
 func (c *Client) FindSheet(ctx context.Context, spreadsheetID, name string) (*sheets.Sheet, error) {
 	items, err := c.ListSheets(ctx, spreadsheetID)
 	if err != nil {
@@ -136,7 +137,8 @@ func (c *Client) GetRows(ctx context.Context, spreadsheetID string, sheet *sheet
 	if sheet == nil || sheet.Properties == nil {
 		return nil, fmt.Errorf("get values for %s: missing sheet properties", spreadsheetID)
 	}
-	res, err := c.Sheets.Spreadsheets.Values.Get(spreadsheetID, sheetRange(sheet.Properties.Title)).
+	// https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets.values/get
+	res, err := c.Sheets.Spreadsheets.Values.Get(spreadsheetID, sheetRange(sheet)).
 		Context(ctx).
 		Do()
 	if err != nil {
@@ -176,7 +178,7 @@ func Rectangularize(rows Rows) Rows {
 //
 
 // Single quotes in sheet titles are escaped by doubling them.
-func sheetRange(sheetTitle string) string {
-	escaped := strings.ReplaceAll(sheetTitle, "'", "''")
+func sheetRange(sheet *sheets.Sheet) string {
+	escaped := strings.ReplaceAll(sheet.Properties.Title, "'", "''")
 	return fmt.Sprintf("'%s'", escaped)
 }

@@ -17,22 +17,21 @@ import (
 // pkg init
 //
 
-var outputPath string
+var (
+	outputPath      string
+	spreadsheetName string
+	sheetName       string
+)
 
 func init() {
 	downCommand := &cobra.Command{
 		Use:   "down <spreadsheet> [sheet]",
 		Short: "Download a Google Sheet as CSV",
 		Example: strings.Join([]string{
-			"gshoot down Budget",
-			"  gshoot down Budget Q1 --output q1.csv",
+			"gshoot down Budget                      # output first sheet",
+			"gshoot down Budget Q1 --output q1.csv   # save sheet q1 to q1.csv",
 		}, "\n"),
-		Args: func(_ *cobra.Command, args []string) error {
-			if len(args) >= 1 && len(args) <= 2 {
-				return nil
-			}
-			return fmt.Errorf("expected `gshoot down <spreadsheet> [sheet]`")
-		},
+		Args: downArgs,
 		RunE: downHandler,
 	}
 	downCommand.Flags().StringVarP(&outputPath, "output", "o", "", "where to write the CSV")
@@ -43,14 +42,18 @@ func init() {
 // handler
 //
 
-func downHandler(cmd *cobra.Command, args []string) error {
-	// parse args
-	spreadsheetName := args[0]
-	sheetName := ""
+func downArgs(_ *cobra.Command, args []string) error {
+	if len(args) == 0 || len(args) > 2 {
+		return fmt.Errorf("expected `gshoot down <spreadsheet> [sheet]`")
+	}
+	spreadsheetName = args[0]
 	if len(args) == 2 {
 		sheetName = args[1]
 	}
+	return nil
+}
 
+func downHandler(cmd *cobra.Command, args []string) error {
 	dots := ux.StartDots(cmd.ErrOrStderr(), "opening Google Sheets...")
 	var rows google.Rows
 	{

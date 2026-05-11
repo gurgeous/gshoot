@@ -107,7 +107,7 @@ class Main
   def file
     banner "Searching Google Drive for '#{docfile}'..."
     q = "mimeType='#{MIME}' and trashed=false"
-    drive.list_files(q:, order_by: "modifiedTime desc,name").files.find { name_match?(_1.name, docfile) }
+    drive.list_files(q:, order_by: "modifiedByMeTime desc,name").files.find { name_match?(_1.name, docfile) }
   end
   memoize :file
 

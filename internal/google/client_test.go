@@ -22,7 +22,7 @@ func TestListSpreadsheets(t *testing.T) {
 		gotPageSize = r.URL.Query().Get("pageSize")
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"files": []map[string]string{
-				{"id": "1", "name": "Alpha", "modifiedTime": "2026-05-07T12:00:00Z"},
+				{"id": "1", "name": "Alpha", "modifiedByMeTime": "2026-05-07T12:00:00Z"},
 			},
 		})
 	}))
@@ -40,8 +40,8 @@ func TestFindSpreadsheet(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"files": []map[string]string{
-				{"id": "1", "name": "Alpha", "modifiedTime": "2026-05-07T12:00:00Z"},
-				{"id": "2", "name": "Budget", "modifiedTime": "2026-05-07T11:00:00Z"},
+				{"id": "1", "name": "Alpha", "modifiedByMeTime": "2026-05-07T12:00:00Z"},
+				{"id": "2", "name": "Budget", "modifiedByMeTime": "2026-05-07T11:00:00Z"},
 			},
 		})
 	}))
