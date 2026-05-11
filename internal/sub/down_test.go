@@ -22,8 +22,8 @@ func TestDownCommand(t *testing.T) {
 	// => file
 	path := filepath.Join(t.TempDir(), "out.csv")
 	_, stdout, _ = testMain("down", "Budget", "--output", path)
-	assert.Equal(t, "", stdout)
 	data, _ := os.ReadFile(path)
+	assert.Equal(t, "", stdout)
 	assert.Equal(t, "name,count\nalpha,1\n", string(data))
 }
 

@@ -14,10 +14,14 @@ import (
 	"google.golang.org/api/sheets/v4"
 )
 
-var (
-	// downloadSheet = down.Download
-	outputPath  string
-	downCommand = &cobra.Command{
+//
+// pkg init
+//
+
+var outputPath string
+
+func init() {
+	downCommand := &cobra.Command{
 		Use:   "down <spreadsheet> [sheet]",
 		Short: "Download a Google Sheet as CSV",
 		Example: strings.Join([]string{
@@ -30,15 +34,8 @@ var (
 			}
 			return fmt.Errorf("expected `gshoot down <spreadsheet> [sheet]`")
 		},
-		RunE: DownHandler,
+		RunE: downHandler,
 	}
-)
-
-//
-// pkg init
-//
-
-func init() {
 	downCommand.Flags().StringVarP(&outputPath, "output", "o", "", "where to write the CSV")
 	rootCmd.AddCommand(downCommand)
 }
@@ -47,7 +44,7 @@ func init() {
 // handler
 //
 
-func DownHandler(cmd *cobra.Command, args []string) error {
+func downHandler(cmd *cobra.Command, args []string) error {
 	// parse args
 	spreadsheetName := args[0]
 	sheetName := ""

@@ -44,6 +44,7 @@
 
 - Use TDD: write or extend the test or `smoke` coverage first, then implement
 - Keep unit tests deterministic and network-free
+- Use `assert.`, not `require.`
 - Avoid trivial tests
 - Put real API coverage in the manual smoke path
 - Write smoke and other temp files under `tmp/`

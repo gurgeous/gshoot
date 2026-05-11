@@ -22,7 +22,7 @@ func init() {
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		Args:          noArgs("gshoot list"),
-		RunE:          ListHandler,
+		RunE:          listHandler,
 	}
 	rootCmd.AddCommand(listCommand)
 }
@@ -31,7 +31,7 @@ func init() {
 // handler
 //
 
-func ListHandler(cmd *cobra.Command, _ []string) error {
+func listHandler(cmd *cobra.Command, _ []string) error {
 	ctx := context.Background()
 	stdout := cmd.OutOrStdout()
 	stderr := cmd.ErrOrStderr()
