@@ -22,6 +22,12 @@ var (
 	})
 )
 
+type roundTripper func(*http.Request) (*http.Response, error)
+
+func (fn roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	return fn(req)
+}
+
 func TestMain(m *testing.M) {
 	// create a fake server that points at googleAPIHandler
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -45,18 +51,6 @@ func TestMain(m *testing.M) {
 	})
 
 	os.Exit(m.Run())
-}
-
-func withAPI(t *testing.T, handler http.HandlerFunc) {
-	t.Helper()
-	t.Cleanup(func() { googleAPIHandler = invalid })
-	googleAPIHandler = handler
-}
-
-type roundTripper func(*http.Request) (*http.Response, error)
-
-func (fn roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	return fn(req)
 }
 
 //

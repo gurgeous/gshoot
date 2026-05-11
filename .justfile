@@ -14,6 +14,10 @@ check: lint test build
 
 ci: check
 
+clean:
+  go clean -testcache
+  rm -f bin/gshoot
+
 format:
   go mod tidy
   golangci-lint fmt
