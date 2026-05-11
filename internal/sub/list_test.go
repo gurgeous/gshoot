@@ -2,7 +2,6 @@ package sub
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -12,8 +11,13 @@ import (
 	"github.com/gurgeous/gshoot/internal/testutil/googletest"
 )
 
-func TestRecent(t *testing.T) {
-	// stub
+//
+// good
+//
+
+func TestListCommand(t *testing.T) {
+	withRawTokenAuth(t)
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got, want := r.URL.Path, "/drive/v3/files"; got != want {
 			t.Fatalf("path = %q, want %q", got, want)
@@ -27,39 +31,36 @@ func TestRecent(t *testing.T) {
 		})
 	}))
 	defer server.Close()
+	googletest.WithGoogleAPI(t, server.URL)
 
-	// run
-	client := googletest.NewDriveClient(t, server.URL)
-	files, err := recent(context.Background(), client, 10)
-	if err != nil {
-		t.Fatalf("recent() error = %v", err)
-	}
-	if files[0].Name != "Alpha" || files[1].Name != "Beta" {
-		t.Fatalf("recent() = %#v, want Alpha/Beta", files)
-	}
-
-	// print
-	var out bytes.Buffer
-	printFiles(&out, files)
-	got := out.String()
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	_ = Main([]string{"list"}, &stdout, &stderr)
+	got := stdout.String()
 	for _, want := range []string{"Alpha", "Beta"} {
 		if !strings.Contains(got, want) {
-			t.Fatalf("printFiles() output missing %q:\n%s", want, got)
+			t.Fatalf("stdout missing %q:\n%s", want, got)
 		}
 	}
 }
 
-func TestRecentError(t *testing.T) {
+//
+// bad
+//
+
+func TestListCommandError(t *testing.T) {
+	withRawTokenAuth(t)
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "nope", http.StatusInternalServerError)
 	}))
 	defer server.Close()
+	googletest.WithGoogleAPI(t, server.URL)
 
-	_, err := recent(context.Background(), googletest.NewDriveClient(t, server.URL), 10)
-	if err == nil {
-		t.Fatal("recent() error = nil, want error")
-	}
-	if !strings.Contains(err.Error(), "list spreadsheets") {
-		t.Fatalf("recent() error = %q, want list error", err.Error())
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := Main([]string{"list"}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("Main() code = %d, want 1", code)
 	}
 }

@@ -13,8 +13,7 @@ import (
 
 var (
 	downloadSheet = down.Download
-
-	outputPath string
+	outputPath    string
 )
 
 func init() {

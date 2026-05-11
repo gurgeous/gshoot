@@ -7,9 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/gurgeous/gshoot/internal/env"
 	"github.com/gurgeous/gshoot/internal/google"
-	"github.com/gurgeous/gshoot/internal/testutil"
 )
 
 func TestDownCommandStdout(t *testing.T) {
@@ -20,17 +18,13 @@ func TestDownCommandStdout(t *testing.T) {
 		return [][]string{{"name", "count"}, {"alpha", "1"}}, nil
 	})
 	defer restore()
-	testutil.WithEnv(t, map[string]string{"GSHOOT_TOKEN": "token", "HOME": t.TempDir()}, envVars())
+	withRawTokenAuth(t)
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	cmd := newDownCommand()
-	cmd.SetOut(&stdout)
-	cmd.SetErr(&stderr)
-	cmd.SetArgs([]string{"Budget"})
-
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("Execute() error = %v", err)
+	code := Main([]string{"down", "Budget"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("Main() code = %d, want 0", code)
 	}
 	if got, want := stdout.String(), "name,count\nalpha,1\n"; got != want {
 		t.Fatalf("stdout = %q, want %q", got, want)
@@ -45,18 +39,14 @@ func TestDownCommandOutputFile(t *testing.T) {
 		return [][]string{{"name", "count"}, {"alpha", "1"}}, nil
 	})
 	defer restore()
-	testutil.WithEnv(t, map[string]string{"GSHOOT_TOKEN": "token", "HOME": t.TempDir()}, envVars())
+	withRawTokenAuth(t)
 
 	path := filepath.Join(t.TempDir(), "out.csv")
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	cmd := newDownCommand()
-	cmd.SetOut(&stdout)
-	cmd.SetErr(&stderr)
-	cmd.SetArgs([]string{"Budget", "--output", path})
-
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("Execute() error = %v", err)
+	code := Main([]string{"down", "Budget", "--output", path}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("Main() code = %d, want 0", code)
 	}
 	if stdout.Len() != 0 {
 		t.Fatalf("stdout = %q, want empty", stdout.String())
@@ -82,15 +72,5 @@ func stubDownload(t *testing.T, fn func(spreadsheetName, sheetName string) ([][]
 	}
 	return func() {
 		downloadSheet = origDownload
-	}
-}
-
-func envVars() map[string]*string {
-	return map[string]*string{
-		"GOOGLE_APPLICATION_CREDENTIALS": &env.GOOGLE_APPLICATION_CREDENTIALS,
-		"GSHOOT_CONFIG_DIR":              &env.GSHOOT_CONFIG_DIR,
-		"GSHOOT_CREDENTIALS_FILE":        &env.GSHOOT_CREDENTIALS_FILE,
-		"GSHOOT_THEME":                   &env.GSHOOT_THEME,
-		"GSHOOT_TOKEN":                   &env.GSHOOT_TOKEN,
 	}
 }

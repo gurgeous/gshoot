@@ -6,13 +6,13 @@ import (
 
 	"github.com/gurgeous/gshoot/internal/ux"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 var (
 	version = "dev"
 	tagline = fmt.Sprintf("Magically %s from Google Sheets.", ux.Brand.Render("import/export CSVs"))
 	rootCmd = &cobra.Command{
-		RunE:          RootHandler,
 		Use:           "gshoot",
 		Short:         tagline,
 		SilenceErrors: true,
@@ -20,7 +20,10 @@ var (
 		CompletionOptions: cobra.CompletionOptions{
 			HiddenDefaultCmd: true,
 		},
+		RunE: RootHandler,
 	}
+
+	// args
 	showVersion = false
 )
 
@@ -47,6 +50,7 @@ func RootHandler(cmd *cobra.Command, _ []string) error {
 func Main(args []string, stdout, stderr io.Writer) int {
 	ux.Init()
 
+	resetCommand(rootCmd)
 	rootCmd.SetArgs(args)
 	rootCmd.SetOut(stdout)
 	rootCmd.SetErr(stderr)
@@ -57,4 +61,22 @@ func Main(args []string, stdout, stderr io.Writer) int {
 	}
 
 	return 0
+}
+
+func resetCommand(cmd *cobra.Command) {
+	resetFlagSet(cmd.Flags())
+	resetFlagSet(cmd.PersistentFlags())
+	for _, sub := range cmd.Commands() {
+		resetCommand(sub)
+	}
+}
+
+func resetFlagSet(flags *pflag.FlagSet) {
+	if flags == nil {
+		return
+	}
+	flags.VisitAll(func(flag *pflag.Flag) {
+		_ = flag.Value.Set(flag.DefValue)
+		flag.Changed = false
+	})
 }
