@@ -37,14 +37,14 @@ func listHandler(cmd *cobra.Command, _ []string) error {
 	stderr := cmd.ErrOrStderr()
 
 	// auth
-	dots := ux.StartDots(stderr, "opening Google Sheets...")
+	dots := ux.StartDots(stderr, "connecting to Google Sheets...")
 	client, err := google.NewClient(ctx, google.ReadOnlyScopes())
 	if err != nil {
 		return err
 	}
 
 	// fetch
-	dots.SetDescription("fetching spreadsheets")
+	dots.SetDescription("getting list of spreadsheets...")
 	files, err := client.ListSpreadsheets(ctx, 10)
 	if err != nil {
 		return err

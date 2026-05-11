@@ -49,7 +49,6 @@ func NewClient(ctx context.Context, scopes []string) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	// services
 	httpClient := oauth2.NewClient(ctx, tokenSource)
 	drive, err := drive.NewService(ctx, option.WithHTTPClient(httpClient))
@@ -65,12 +64,12 @@ func NewClient(ctx context.Context, scopes []string) (*Client, error) {
 }
 
 // ListSpreadsheets returns recently modified spreadsheets.
+// https://developers.google.com/workspace/drive/api/reference/rest/v3/files/list
 func (c *Client) ListSpreadsheets(ctx context.Context, limit int) ([]*drive.File, error) {
 	if limit <= 0 {
 		limit = defaultSpreadsheetLimit
 	}
 
-	// https://developers.google.com/workspace/drive/api/reference/rest/v3/files/list
 	res, err := c.Drive.Files.List().
 		Context(ctx).
 		Q("mimeType='application/vnd.google-apps.spreadsheet' and trashed=false").
@@ -83,19 +82,6 @@ func (c *Client) ListSpreadsheets(ctx context.Context, limit int) ([]*drive.File
 	}
 	// litter.Dump(res.Files[0])
 	return res.Files, nil
-}
-
-// ListSheets returns the sheets (tabs) in a spreadsheet.
-func (c *Client) ListSheets(ctx context.Context, spreadsheetID string) ([]*sheets.Sheet, error) {
-	// https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets/get
-	res, err := c.Sheets.Spreadsheets.Get(spreadsheetID).
-		Context(ctx).
-		Fields("sheets(properties(*))").
-		Do()
-	if err != nil {
-		return nil, err
-	}
-	return res.Sheets, nil
 }
 
 // FindSpreadsheet returns the most recent spreadsheet with this name (case insensitive)
@@ -112,10 +98,23 @@ func (c *Client) FindSpreadsheet(ctx context.Context, name string) (*drive.File,
 	return nil, nil // failure
 }
 
+// GetSheets returns the sheets (tabs) in a spreadsheet.
+// https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets/get
+func (c *Client) GetSheets(ctx context.Context, spreadsheetID string) ([]*sheets.Sheet, error) {
+	res, err := c.Sheets.Spreadsheets.Get(spreadsheetID).
+		Context(ctx).
+		Fields("sheets(properties(*))").
+		Do()
+	if err != nil {
+		return nil, err
+	}
+	return res.Sheets, nil
+}
+
 // FindSheet returns the sheet with this name, or the first sheet when name is empty (case insensitive)
 // see ListSpreadsheets for scopes
 func (c *Client) FindSheet(ctx context.Context, spreadsheetID, name string) (*sheets.Sheet, error) {
-	items, err := c.ListSheets(ctx, spreadsheetID)
+	items, err := c.GetSheets(ctx, spreadsheetID)
 	if err != nil {
 		return nil, err
 	}
@@ -134,9 +133,6 @@ type Rows [][]string
 
 // GetRows returns stringified cell values for a sheet.
 func (c *Client) GetRows(ctx context.Context, spreadsheetID string, sheet *sheets.Sheet) (Rows, error) {
-	if sheet == nil || sheet.Properties == nil {
-		return nil, fmt.Errorf("get values for %s: missing sheet properties", spreadsheetID)
-	}
 	// https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets.values/get
 	res, err := c.Sheets.Spreadsheets.Values.Get(spreadsheetID, sheetRange(sheet)).
 		Context(ctx).
@@ -163,12 +159,12 @@ func Rectangularize(rows Rows) Rows {
 	}
 
 	out := make([][]string, 0, len(rows))
-	for _, row := range rows {
-		copy := append([]string(nil), row...)
-		if len(copy) < cols {
-			copy = append(copy, make([]string, cols-len(copy))...)
+	for _, src := range rows {
+		dst := append([]string(nil), src...)
+		if len(dst) < cols {
+			dst = append(dst, make([]string, cols-len(dst))...)
 		}
-		out = append(out, copy)
+		out = append(out, dst)
 	}
 	return out
 }
@@ -177,7 +173,7 @@ func Rectangularize(rows Rows) Rows {
 // helpers
 //
 
-// Single quotes in sheet titles are escaped by doubling them.
+// Turn sheet title into a quote range (for Values.Get, etc)
 func sheetRange(sheet *sheets.Sheet) string {
 	escaped := strings.ReplaceAll(sheet.Properties.Title, "'", "''")
 	return fmt.Sprintf("'%s'", escaped)

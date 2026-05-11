@@ -53,10 +53,10 @@ func downArgs(_ *cobra.Command, args []string) error {
 	return nil
 }
 
-func downHandler(cmd *cobra.Command, args []string) error {
-	dots := ux.StartDots(cmd.ErrOrStderr(), "opening Google Sheets...")
+func downHandler(cmd *cobra.Command, _ []string) error {
 	var rows google.Rows
 	{
+		dots := ux.StartDots(cmd.ErrOrStderr(), "connecting to Google Sheets...")
 		defer dots.Stop()
 
 		// auth
@@ -74,7 +74,7 @@ func downHandler(cmd *cobra.Command, args []string) error {
 		}
 
 		// now find sheet
-		dots.SetDescription("finding that sheet...")
+		dots.SetDescription("finding specific sheet...")
 		sheet, err := client.FindSheet(ctx, spreadsheet.Id, sheetName)
 		if err != nil {
 			return err
@@ -84,7 +84,7 @@ func downHandler(cmd *cobra.Command, args []string) error {
 		}
 
 		// download
-		dots.SetDescription("downloading rows...")
+		dots.SetDescription("downloading cells...")
 		rows, err = client.GetRows(ctx, spreadsheet.Id, sheet)
 		if err != nil {
 			return err
