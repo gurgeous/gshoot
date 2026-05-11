@@ -1,14 +1,13 @@
 package sub
 
 import (
-	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"github.com/gurgeous/gshoot/internal/testutil/googletest"
+	"github.com/stretchr/testify/assert"
 )
 
 //
@@ -33,15 +32,10 @@ func TestListCommand(t *testing.T) {
 	defer server.Close()
 	googletest.WithGoogleAPI(t, server.URL)
 
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	_ = Main([]string{"list"}, &stdout, &stderr)
-	got := stdout.String()
-	for _, want := range []string{"Alpha", "Beta"} {
-		if !strings.Contains(got, want) {
-			t.Fatalf("stdout missing %q:\n%s", want, got)
-		}
-	}
+	code, stdout, _ := testMain("list")
+	assert.Equal(t, 0, code)
+	assert.Contains(t, stdout, "Alpha")
+	assert.Contains(t, stdout, "Beta")
 }
 
 //
@@ -57,10 +51,7 @@ func TestListCommandError(t *testing.T) {
 	defer server.Close()
 	googletest.WithGoogleAPI(t, server.URL)
 
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	code := Main([]string{"list"}, &stdout, &stderr)
-	if code != 1 {
-		t.Fatalf("Main() code = %d, want 1", code)
-	}
+	code, _, stderr := testMain("list")
+	assert.Equal(t, 1, code)
+	assert.Contains(t, stderr, "HTTP response code 500")
 }

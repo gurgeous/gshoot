@@ -1,7 +1,6 @@
 package sub
 
 import (
-	"bytes"
 	"context"
 	"os"
 	"path/filepath"
@@ -20,17 +19,15 @@ func TestDownCommandStdout(t *testing.T) {
 	defer restore()
 	withRawTokenAuth(t)
 
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	code := Main([]string{"down", "Budget"}, &stdout, &stderr)
+	code, stdout, stderr := testMain("down", "Budget")
 	if code != 0 {
 		t.Fatalf("Main() code = %d, want 0", code)
 	}
-	if got, want := stdout.String(), "name,count\nalpha,1\n"; got != want {
+	if got, want := stdout, "name,count\nalpha,1\n"; got != want {
 		t.Fatalf("stdout = %q, want %q", got, want)
 	}
-	if stderr.Len() != 0 {
-		t.Fatalf("stderr = %q, want empty", stderr.String())
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
 	}
 }
 
@@ -42,14 +39,12 @@ func TestDownCommandOutputFile(t *testing.T) {
 	withRawTokenAuth(t)
 
 	path := filepath.Join(t.TempDir(), "out.csv")
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	code := Main([]string{"down", "Budget", "--output", path}, &stdout, &stderr)
+	code, stdout, stderr := testMain("down", "Budget", "--output", path)
 	if code != 0 {
 		t.Fatalf("Main() code = %d, want 0", code)
 	}
-	if stdout.Len() != 0 {
-		t.Fatalf("stdout = %q, want empty", stdout.String())
+	if stdout != "" {
+		t.Fatalf("stdout = %q, want empty", stdout)
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -58,8 +53,8 @@ func TestDownCommandOutputFile(t *testing.T) {
 	if got, want := string(data), "name,count\nalpha,1\n"; got != want {
 		t.Fatalf("file = %q, want %q", got, want)
 	}
-	if stderr.Len() != 0 {
-		t.Fatalf("stderr = %q, want empty", stderr.String())
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
 	}
 }
 
