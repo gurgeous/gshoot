@@ -2,18 +2,22 @@ package sub
 
 import (
 	"context"
+	"encoding/csv"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
 	"github.com/gurgeous/gshoot/internal/down"
 	"github.com/gurgeous/gshoot/internal/google"
+	"github.com/gurgeous/gshoot/internal/util"
 	"github.com/gurgeous/gshoot/internal/ux"
 	"github.com/spf13/cobra"
 )
 
 var (
 	downloadSheet = down.Download
+	outputPath    string
 	downCommand   = &cobra.Command{
 		Use:   "down <spreadsheet> [sheet]",
 		Short: "Download a Google Sheet as CSV",
@@ -29,13 +33,20 @@ var (
 		},
 		RunE: DownHandler,
 	}
-	outputPath string
 )
+
+//
+// pkg init
+//
 
 func init() {
 	downCommand.Flags().StringVarP(&outputPath, "output", "o", "", "where to write the CSV")
 	rootCmd.AddCommand(downCommand)
 }
+
+//
+// handler
+//
 
 func DownHandler(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
@@ -66,7 +77,7 @@ func DownHandler(cmd *cobra.Command, args []string) error {
 	}
 	dots.Stop()
 
-	// write to stdout or file
+	// write
 	writer := stdout
 	if outputPath != "" {
 		file, err := os.Create(outputPath)
@@ -77,5 +88,21 @@ func DownHandler(cmd *cobra.Command, args []string) error {
 		writer = file
 	}
 
-	return down.WriteCSV(writer, values)
+	return util.CSVWrite(writer, values)
+}
+
+//
+// helpers
+//
+
+// WriteCSV writes rows as CSV.
+func WriteCSV(w io.Writer, rows [][]string) error {
+	writer := csv.NewWriter(w)
+	for _, row := range rows {
+		if err := writer.Write(row); err != nil {
+			return err
+		}
+	}
+	writer.Flush()
+	return nil
 }

@@ -28,7 +28,7 @@ func init() {
 }
 
 //
-// command handler
+// handler
 //
 
 func ListHandler(cmd *cobra.Command, _ []string) error {
