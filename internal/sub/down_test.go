@@ -1,71 +1,67 @@
 package sub
 
 import (
-	"context"
+	"encoding/json"
+	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
-	"github.com/gurgeous/gshoot/internal/google"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDownCommandStdout(t *testing.T) {
-	restore := stubDownload(t, func(spreadsheetName, sheetName string) ([][]string, error) {
-		if spreadsheetName != "Budget" || sheetName != "" {
-			t.Fatalf("Download() args = (%q, %q)", spreadsheetName, sheetName)
-		}
-		return [][]string{{"name", "count"}, {"alpha", "1"}}, nil
-	})
-	defer restore()
 	withRawTokenAuth(t)
+	withAPI(t, newDownAPIHandler(t))
 
 	code, stdout, stderr := testMain("down", "Budget")
-	if code != 0 {
-		t.Fatalf("Main() code = %d, want 0", code)
-	}
-	if got, want := stdout, "name,count\nalpha,1\n"; got != want {
-		t.Fatalf("stdout = %q, want %q", got, want)
-	}
-	if stderr != "" {
-		t.Fatalf("stderr = %q, want empty", stderr)
-	}
+	require.Equal(t, 0, code)
+	assert.Equal(t, "name,count\nalpha,1\n", stdout)
+	assert.Contains(t, stderr, "fetching")
 }
 
 func TestDownCommandOutputFile(t *testing.T) {
-	restore := stubDownload(t, func(_, _ string) ([][]string, error) {
-		return [][]string{{"name", "count"}, {"alpha", "1"}}, nil
-	})
-	defer restore()
 	withRawTokenAuth(t)
+	withAPI(t, newDownAPIHandler(t))
 
 	path := filepath.Join(t.TempDir(), "out.csv")
 	code, stdout, stderr := testMain("down", "Budget", "--output", path)
-	if code != 0 {
-		t.Fatalf("Main() code = %d, want 0", code)
-	}
-	if stdout != "" {
-		t.Fatalf("stdout = %q, want empty", stdout)
-	}
+	require.Equal(t, 0, code)
+	assert.Equal(t, "", stdout)
 	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("ReadFile() error = %v", err)
-	}
-	if got, want := string(data), "name,count\nalpha,1\n"; got != want {
-		t.Fatalf("file = %q, want %q", got, want)
-	}
-	if stderr != "" {
-		t.Fatalf("stderr = %q, want empty", stderr)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "name,count\nalpha,1\n", string(data))
+	assert.Contains(t, stderr, "saving")
 }
 
-func stubDownload(t *testing.T, fn func(spreadsheetName, sheetName string) ([][]string, error)) func() {
+func newDownAPIHandler(t *testing.T) http.HandlerFunc {
 	t.Helper()
 
-	origDownload := downloadSheet
-	downloadSheet = func(_ context.Context, _ *google.Client, spreadsheetName, sheetName string) ([][]string, error) {
-		return fn(spreadsheetName, sheetName)
-	}
-	return func() {
-		downloadSheet = origDownload
+	return func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/drive/v3/files":
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"files": []map[string]string{
+					{"id": "sheet-1", "name": "Budget", "modifiedTime": "2026-05-07T12:00:00Z"},
+				},
+			})
+		case r.URL.Path == "/v4/spreadsheets/sheet-1":
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"sheets": []map[string]any{
+					{"properties": map[string]any{"sheetId": 0, "title": "Sheet1"}},
+				},
+			})
+		case strings.HasPrefix(r.URL.Path, "/v4/spreadsheets/sheet-1/values/"):
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"values": [][]string{{"name", "count"}, {"alpha", "1"}},
+			})
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
 	}
 }
