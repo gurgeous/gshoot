@@ -1,11 +1,58 @@
 package main
 
 import (
+	"fmt"
 	"os"
+	"runtime/debug"
 
-	"github.com/gurgeous/gshoot/cli"
+	"github.com/alecthomas/kong"
+	"github.com/gurgeous/gshoot/commands"
+	"github.com/gurgeous/gshoot/ux"
 )
 
+var (
+	Version   = ""
+	CommitSHA = ""
+)
+
+type CLI struct {
+	Version kong.VersionFlag `short:"v" help:"Print the version number"`
+	// Auth    commands.AuthCmd `cmd:"" help:"Login or logout from Google Sheets."`
+	List commands.ListCmd `cmd:"" help:"List your Google Sheets."`
+	// Down    commands.DownCmd `cmd:"" help:"Download a Google Sheet as CSV."`
+}
+
 func main() {
-	os.Exit(cli.Main(os.Args[1:], os.Stdout, os.Stderr))
+	// Version
+	if Version == "" {
+		if info, ok := debug.ReadBuildInfo(); ok && info.Main.Sum != "" {
+			Version = info.Main.Version
+		} else {
+			Version = "built from source"
+		}
+	}
+	version := fmt.Sprintf("gshoot: %s", Version)
+	if len(CommitSHA) >= 7 {
+		version += " (" + CommitSHA[:7] + ")"
+	}
+
+	// init
+	ux.Init()
+
+	cli := &CLI{}
+	ctx := kong.Parse(
+		cli,
+		kong.Name("gshoot"),
+		kong.Description(fmt.Sprintf("Magically %s from Google Sheets.", ux.Brand.Render("import/export CSVs"))),
+		kong.UsageOnError(),
+		kong.ConfigureHelp(kong.HelpOptions{Compact: true}),
+		kong.Vars{
+			"version":       version,
+			"versionNumber": Version,
+		},
+	)
+	if err := ctx.Run(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 }
