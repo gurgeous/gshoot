@@ -43,7 +43,7 @@ func main() {
 	ctx := kong.Parse(
 		cli,
 		kong.Name("gshoot"),
-		kong.Description(fmt.Sprintf("Magically %s from Google Sheets.", ux.Brand.Render("import/export CSVs"))),
+		kong.Description(fmt.Sprintf("Magically %s from Google Sheets.", ux.Brand.Render("upload/download CSVs"))),
 		kong.UsageOnError(),
 		kong.ConfigureHelp(kong.HelpOptions{Compact: true}),
 		kong.Vars{
