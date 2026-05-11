@@ -8,16 +8,13 @@ import (
 
 	"github.com/gurgeous/gshoot/internal/down"
 	"github.com/gurgeous/gshoot/internal/google"
+	"github.com/gurgeous/gshoot/internal/ux"
 	"github.com/spf13/cobra"
 )
 
 var (
 	downloadSheet = down.Download
-	outputPath    string
-)
-
-func init() {
-	cmd := &cobra.Command{
+	downCommand   = &cobra.Command{
 		Use:   "down <spreadsheet> [sheet]",
 		Short: "Download a Google Sheet as CSV",
 		Example: strings.Join([]string{
@@ -32,31 +29,49 @@ func init() {
 		},
 		RunE: DownHandler,
 	}
-	cmd.Flags().StringVarP(&outputPath, "output", "o", "", "where to write the CSV")
-	rootCmd.AddCommand(cmd)
+	outputPath string
+)
+
+func init() {
+	downCommand.Flags().StringVarP(&outputPath, "output", "o", "", "where to write the CSV")
+	rootCmd.AddCommand(downCommand)
 }
 
 func DownHandler(cmd *cobra.Command, args []string) error {
+	ctx := context.Background()
+	stdout := cmd.OutOrStdout()
+	stderr := cmd.ErrOrStderr()
+
+	// parse args
 	sheetName := ""
 	if len(args) == 2 {
 		sheetName = args[1]
 	}
 
-	ctx := context.Background()
+	// auth
+	dots := ux.StartDots(stderr, "opening Google Sheets...")
 	client, err := google.NewClient(ctx, google.ReadOnlyScopes())
 	if err != nil {
 		return err
 	}
+
+	// fetch
+	dots.SetDescription("fetching")
 	values, err := downloadSheet(ctx, client, args[0], sheetName)
 	if err != nil {
 		return err
 	}
+	if outputPath != "" {
+		dots.SetDescription(fmt.Sprintf("saving %s", outputPath))
+	}
+	dots.Stop()
 
-	writer := cmd.OutOrStdout()
+	// write to stdout or file
+	writer := stdout
 	if outputPath != "" {
 		file, err := os.Create(outputPath)
 		if err != nil {
-			return fmt.Errorf("create output file: %w", err)
+			return err
 		}
 		defer file.Close()
 		writer = file

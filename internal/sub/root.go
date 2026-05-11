@@ -29,9 +29,7 @@ var (
 
 func init() {
 	rootCmd.Flags().BoolVarP(&showVersion, "version", "v", false, "print version number")
-	rootCmd.SetHelpFunc(func(command *cobra.Command, _ []string) {
-		WriteHelp(command)
-	})
+	rootCmd.SetHelpFunc(func(command *cobra.Command, _ []string) { WriteHelp(command) })
 }
 
 func RootHandler(cmd *cobra.Command, _ []string) error {
@@ -63,6 +61,19 @@ func Main(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
+//
+// helpers
+//
+
+func noArgs(usage string) cobra.PositionalArgs {
+	return func(_ *cobra.Command, args []string) error {
+		if len(args) == 0 {
+			return nil
+		}
+		return fmt.Errorf("expected `%s`", usage)
+	}
+}
+
 func resetCommand(cmd *cobra.Command) {
 	cmd.Flags().VisitAll(func(flag *pflag.Flag) {
 		_ = flag.Value.Set(flag.DefValue)
@@ -74,18 +85,5 @@ func resetCommand(cmd *cobra.Command) {
 	})
 	for _, sub := range cmd.Commands() {
 		resetCommand(sub)
-	}
-}
-
-//
-// helpers
-//
-
-func noArgs(usage string) cobra.PositionalArgs {
-	return func(_ *cobra.Command, args []string) error {
-		if len(args) == 0 {
-			return nil
-		}
-		return fmt.Errorf("expected `%s`", usage)
 	}
 }
