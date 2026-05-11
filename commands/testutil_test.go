@@ -11,7 +11,7 @@ import (
 )
 
 //
-// mock google apis inside TestMain
+// TestMain - mock google apis using httptest
 //
 
 // tests can mess with this
@@ -54,7 +54,7 @@ func TestMain(m *testing.M) {
 }
 
 //
-// giant command helper
+// test a kong command (run in tmp dir, capture stdout, etc)
 //
 
 // kong commands look like this
@@ -80,6 +80,9 @@ func testCommand(t *testing.T, cmd runnable, handler http.HandlerFunc) (error, s
 	t.Cleanup(func() { stdoutFile.Close() })
 	t.Cleanup(func() { stderrFile.Close() })
 
+	// fake token
+	t.Setenv("GSHOOT_TOKEN", "bogus")
+
 	// REMIND: AUTH
 	// REMIND: HOME
 
@@ -91,9 +94,8 @@ func testCommand(t *testing.T, cmd runnable, handler http.HandlerFunc) (error, s
 	// }, envVars())
 
 	// stub google api
-	origGoogleAPIHandler := googleAPIHandler
 	googleAPIHandler = handler
-	defer func() { googleAPIHandler = origGoogleAPIHandler }()
+	defer func() { googleAPIHandler = invalid }()
 
 	// run
 	runErr := cmd.Run()

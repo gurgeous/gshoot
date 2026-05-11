@@ -7,12 +7,6 @@ import (
 	"github.com/adrg/xdg"
 )
 
-// type TestingT interface {
-// 	Cleanup(func())
-// 	Fatalf(string, ...any)
-// 	Helper()
-// }
-
 // WithEnv applies process env overrides and mirrored env package vars for a test.
 func WithEnv(t *testing.T, overrides map[string]string, vars map[string]*string) {
 	t.Helper()
