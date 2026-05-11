@@ -29,8 +29,11 @@ lint:
 test:
   go test ./...
 
-test-watch:
-  watchexec --clear=reset just test
+run-watch *ARGS:
+  GSHOOT_THEME=1 watchexec -q --clear=reset just run {{ARGS}}
+
+test-watch *ARGS:
+  GSHOOT_THEME=1 watchexec -q --clear=reset just test {{ARGS}}
 
 #
 # banner and friends
