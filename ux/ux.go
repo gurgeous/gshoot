@@ -4,7 +4,7 @@ import (
 	"os"
 
 	lipgloss "charm.land/lipgloss/v2"
-	"github.com/gurgeous/gshoot/internal/env"
+	"github.com/gurgeous/gshoot/env"
 )
 
 var (

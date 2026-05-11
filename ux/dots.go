@@ -5,7 +5,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/gurgeous/gshoot/internal/util"
+	"github.com/gurgeous/gshoot/util"
 	"github.com/schollz/progressbar/v3"
 )
 
