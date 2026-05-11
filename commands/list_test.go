@@ -10,8 +10,7 @@ import (
 
 func TestListCommand(t *testing.T) {
 	// good
-	withRawTokenAuth(t)
-	withAPI(t, func(w http.ResponseWriter, r *http.Request) {
+	err, stdout, _ := testCommand(t, &ListCmd{}, func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, r.URL.Path, "/drive/v3/files")
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"files": []map[string]string{
@@ -20,13 +19,13 @@ func TestListCommand(t *testing.T) {
 			},
 		})
 	})
-	code, stdout, _ := testMain("list")
-	assert.Equal(t, 0, code)
+	assert.NoError(t, err)
 	assert.Contains(t, stdout, "Alpha")
 	assert.Contains(t, stdout, "Beta")
 
 	// bad
-	withAPI(t, func(w http.ResponseWriter, r *http.Request) { http.Error(w, "nope", 500) })
-	code, _, _ = testMain("list")
-	assert.Equal(t, 1, code)
+	err, _, _ = testCommand(t, &ListCmd{}, func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "nope", 500)
+	})
+	assert.Error(t, err)
 }

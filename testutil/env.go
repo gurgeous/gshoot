@@ -2,18 +2,19 @@ package testutil
 
 import (
 	"os"
+	"testing"
 
 	"github.com/adrg/xdg"
 )
 
-type TestingT interface {
-	Cleanup(func())
-	Fatalf(string, ...any)
-	Helper()
-}
+// type TestingT interface {
+// 	Cleanup(func())
+// 	Fatalf(string, ...any)
+// 	Helper()
+// }
 
 // WithEnv applies process env overrides and mirrored env package vars for a test.
-func WithEnv(t TestingT, overrides map[string]string, vars map[string]*string) {
+func WithEnv(t *testing.T, overrides map[string]string, vars map[string]*string) {
 	t.Helper()
 
 	names := make(map[string]struct{}, len(vars)+len(overrides))

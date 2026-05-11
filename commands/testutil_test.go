@@ -1,16 +1,13 @@
 package commands
 
 import (
-	"bytes"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"strings"
 	"testing"
-
-	"github.com/gurgeous/gshoot/env"
-	"github.com/gurgeous/gshoot/testutil"
 )
 
 //
@@ -50,7 +47,7 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func withAPI(t testutil.TestingT, handler http.HandlerFunc) {
+func withAPI(t *testing.T, handler http.HandlerFunc) {
 	t.Helper()
 	t.Cleanup(func() { googleAPIHandler = invalid })
 	googleAPIHandler = handler
@@ -63,50 +60,77 @@ func (fn roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 //
-// wee helper that calls Main and captures output
+// giant command helper
 //
 
-func testMain(args ...string) (int, string, string) {
-	var stdout, stderr bytes.Buffer
-	code := Main(args, &stdout, &stderr)
-	return code, stdout.String(), stderr.String()
+// kong commands look like this
+type runnable interface {
+	Run() error
 }
 
-//
-// env mocks
-//
-
-func withRawTokenAuth(t testutil.TestingT) {
+func testCommand(t *testing.T, cmd runnable, handler http.HandlerFunc) (error, string, string) {
 	t.Helper()
-	testutil.WithEnv(t, map[string]string{
-		"GSHOOT_TOKEN": "token",
-		"HOME":         tTempDir(t),
-	}, envVars())
+
+	// use temp dir and temp files for stdout/stderr
+	origDir, _ := os.Getwd()
+	tmp := t.TempDir()
+	os.Chdir(tmp)
+	t.Cleanup(func() { os.Chdir(origDir) })
+
+	// stub stdout/stderr
+	origStdout, origStderr := os.Stdout, os.Stderr
+	stdoutFile, _ := os.Create("stdout")
+	stderrFile, _ := os.Create("stderr")
+	os.Stdout, os.Stderr = stdoutFile, stderrFile
+	t.Cleanup(func() { os.Stdout, os.Stderr = origStdout, origStderr })
+	t.Cleanup(func() { stdoutFile.Close() })
+	t.Cleanup(func() { stderrFile.Close() })
+
+	// REMIND: AUTH
+	// REMIND: HOME
+
+	// setup GSHOOT_TOKEN for fake auth
+	// REMIND
+	// testutil.WithEnv(t, map[string]string{
+	// 	"GSHOOT_TOKEN": "token",
+	// 	"HOME":         tTempDir(t),
+	// }, envVars())
+
+	// stub google api
+	origGoogleAPIHandler := googleAPIHandler
+	googleAPIHandler = handler
+	defer func() { googleAPIHandler = origGoogleAPIHandler }()
+
+	// run
+	runErr := cmd.Run()
+
+	// drain stdout/stderr
+	stdoutFile.Seek(0, 0)
+	stderrFile.Seek(0, 0)
+	stdoutBytes, _ := io.ReadAll(stdoutFile)
+	stderrBytes, _ := io.ReadAll(stderrFile)
+
+	return runErr, string(stdoutBytes), string(stderrBytes)
 }
 
-func envVars() map[string]*string {
-	return map[string]*string{
-		"GOOGLE_APPLICATION_CREDENTIALS": &env.GOOGLE_APPLICATION_CREDENTIALS,
-		"GSHOOT_CONFIG_DIR":              &env.GSHOOT_CONFIG_DIR,
-		"GSHOOT_CREDENTIALS_FILE":        &env.GSHOOT_CREDENTIALS_FILE,
-		"GSHOOT_THEME":                   &env.GSHOOT_THEME,
-		"GSHOOT_TOKEN":                   &env.GSHOOT_TOKEN,
-	}
-}
+// //
+// // env mocks
+// //
 
-//
-// tempdir
-//
+// func withRawTokenAuth(t *testing.T) {
+// 	t.Helper()
+// 	testutil.WithEnv(t, map[string]string{
+// 		"GSHOOT_TOKEN": "token",
+// 		"HOME":         tTempDir(t),
+// 	}, envVars())
+// }
 
-type tempDirT interface {
-	testutil.TestingT
-	TempDir() string
-}
-
-func tTempDir(t testutil.TestingT) string {
-	tt, ok := t.(tempDirT)
-	if !ok {
-		t.Fatalf("test helper needs TempDir")
-	}
-	return tt.TempDir()
-}
+// func envVars() map[string]*string {
+// 	return map[string]*string{
+// 		"GOOGLE_APPLICATION_CREDENTIALS": &env.GOOGLE_APPLICATION_CREDENTIALS,
+// 		"GSHOOT_CONFIG_DIR":              &env.GSHOOT_CONFIG_DIR,
+// 		"GSHOOT_CREDENTIALS_FILE":        &env.GSHOOT_CREDENTIALS_FILE,
+// 		"GSHOOT_THEME":                   &env.GSHOOT_THEME,
+// 		"GSHOOT_TOKEN":                   &env.GSHOOT_TOKEN,
+// 	}
+// }

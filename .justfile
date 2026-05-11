@@ -3,18 +3,13 @@ default:
 
 build:
   go build -o bin/gshoot
-
-run *ARGS: build
-  gshoot {{ARGS}}
+  just banner "✓ build ✓"
 
 #
 # hygiene
 #
 
-check:
-  just lint && just banner "✓ lint ✓"
-  just test && just banner "✓ test ✓"
-  just build && just banner "✓ build ✓"
+check: lint test build
   just banner "✓ check ✓"
 
 ci: check
@@ -25,12 +20,17 @@ format:
 
 lint:
   golangci-lint run
+  just banner "✓ lint ✓"
 
-test:
-  go test ./...
+run *ARGS: build
+  gshoot {{ARGS}}
 
 run-watch *ARGS:
   GSHOOT_THEME=1 watchexec -q --clear=reset just run {{ARGS}}
+
+test *ARGS:
+  go test ./... {{ARGS}}
+  just banner "✓ test ✓"
 
 test-watch *ARGS:
   GSHOOT_THEME=1 watchexec -q --clear=reset just test {{ARGS}}
