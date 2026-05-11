@@ -10,17 +10,18 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// writeHelp renders either root help or subcommand help.
-func writeHelp(w io.Writer, cmd *cobra.Command) {
-	if isRootCmd(cmd) {
-		writeRootHelp(w, cmd)
+// WriteHelp renders either root help or subcommand help.
+func WriteHelp(cmd *cobra.Command) {
+	if cmd.HasParent() {
+		writeCommandHelp(cmd)
 	} else {
-		writeCommandHelp(w, cmd)
+		writeRootHelp(cmd)
 	}
 }
 
 // writeRootHelp renders the root command help text.
-func writeRootHelp(w io.Writer, cmd *cobra.Command) {
+func writeRootHelp(cmd *cobra.Command) {
+	w := cmd.OutOrStdout()
 	fmt.Fprintf(w, "Usage: %s <command> [flags]\n", cmd.Name())
 
 	if text := commandSummary(cmd); text != "" {
@@ -38,22 +39,20 @@ func writeRootHelp(w io.Writer, cmd *cobra.Command) {
 		writeFlags(w, flags, padding)
 	}
 
-	if len(commands) == 0 {
-		return
+	if len(commands) > 0 {
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "Commands:")
+		for _, sub := range commands {
+			fmt.Fprintf(w, "  %s%s\n", util.PadRight(sub.Name(), padding+2), sub.Short)
+		}
+		fmt.Fprintln(w)
+		fmt.Fprintf(w, "Run %q for more information on a command.\n", "gshoot <command> --help")
 	}
-
-	fmt.Fprintln(w)
-	fmt.Fprintln(w, "Commands:")
-	for _, sub := range commands {
-		fmt.Fprintf(w, "  %s%s\n", util.PadRight(sub.Name(), padding+2), sub.Short)
-	}
-
-	fmt.Fprintln(w)
-	fmt.Fprintf(w, "Run %q for more information on a command.\n", "gshoot <command> --help")
 }
 
 // writeCommandHelp renders help text for a non-root command.
-func writeCommandHelp(w io.Writer, cmd *cobra.Command) {
+func writeCommandHelp(cmd *cobra.Command) {
+	w := cmd.OutOrStdout()
 	if text := commandSummary(cmd); text != "" {
 		fmt.Fprintln(w, text)
 		fmt.Fprintln(w)
@@ -155,25 +154,4 @@ func writeFlags(w io.Writer, flags []helpFlag, minPadding int) {
 	for _, flag := range flags {
 		fmt.Fprintf(w, "  %s%s\n", util.PadRight(flag.name, padding+2), flag.help)
 	}
-}
-
-//
-// misc
-//
-
-//
-// helpers
-//
-
-func noArgs(usage string) cobra.PositionalArgs {
-	return func(_ *cobra.Command, args []string) error {
-		if len(args) == 0 {
-			return nil
-		}
-		return fmt.Errorf("expected `%s`", usage)
-	}
-}
-
-func isRootCmd(cmd *cobra.Command) bool {
-	return cmd != nil && !cmd.HasParent()
 }

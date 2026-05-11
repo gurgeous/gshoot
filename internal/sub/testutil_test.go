@@ -19,8 +19,8 @@ import (
 
 // tests cna mess with this
 var (
-	googleAPIHandler http.Handler = invalid
-	invalid          http.Handler = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	googleAPIHandler http.HandlerFunc = invalid
+	invalid          http.HandlerFunc = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, "google api test handler not installed", http.StatusInternalServerError)
 	})
 )
@@ -50,7 +50,7 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func withGoogleAPI(t testutil.TestingT, handler http.Handler) {
+func withAPI(t testutil.TestingT, handler http.HandlerFunc) {
 	t.Helper()
 	t.Cleanup(func() { googleAPIHandler = invalid })
 	googleAPIHandler = handler

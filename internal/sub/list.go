@@ -37,13 +37,15 @@ func ListHandler(cmd *cobra.Command, _ []string) error {
 	stderr := cmd.ErrOrStderr()
 
 	// auth
-	dots := ux.StartDots(stderr, "gshoot: opening Google Sheets...")
+	dots := ux.StartDots(stderr, "opening Google Sheets...")
 	client, err := google.NewClient(ctx, google.ReadOnlyScopes())
 	if err != nil {
 		return err
 	}
 
-	// list
+	// fetch
+	dots.SetDescription("fetching spreadsheets")
+
 	res, err := client.Drive.Files.List().
 		Context(ctx).
 		Q("mimeType='application/vnd.google-apps.spreadsheet' and trashed=false").
@@ -57,6 +59,7 @@ func ListHandler(cmd *cobra.Command, _ []string) error {
 	dots.SetDescription(fmt.Sprintf("%d recent spreadsheets", len(res.Files)))
 	dots.Stop()
 
+	// print
 	for i, file := range res.Files {
 		const width = 30
 		num := ux.Dim.Render(fmt.Sprintf("%2d.", i+1))

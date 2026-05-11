@@ -13,8 +13,7 @@ import (
 const helpHint = "gshoot: try 'gshoot --help' for more information"
 
 func writeError(w io.Writer, err error) {
-	var noAuth *auth.NoAuthError
-	if errors.As(err, &noAuth) {
+	if _, ok := errors.AsType[*auth.NoAuthError](err); ok {
 		fmt.Fprintln(w, ux.Error.Render("You will need to authenticate first."))
 		fmt.Fprintln(w)
 		fmt.Fprintln(w, ux.Subtle.Render("I apologize in advance, setting up auth with Google Sheets is"))
