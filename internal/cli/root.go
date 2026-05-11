@@ -26,21 +26,9 @@ type CLI struct {
 type app struct {
 	stdout io.Writer
 	stderr io.Writer
-	ctx    *kong.Context
 }
 
 type exitCode int
-
-func (c *CLI) Run(app *app) error {
-	if c.Version {
-		fmt.Fprintf(app.stdout, "gshoot %s\n", version)
-		return nil
-	}
-	if app.ctx.Command() != "" {
-		return nil
-	}
-	return app.ctx.PrintUsage(false)
-}
 
 func Main(args []string, stdout, stderr io.Writer) (code int) {
 	ux.Init()
@@ -76,7 +64,19 @@ func Main(args []string, stdout, stderr io.Writer) (code int) {
 		return 1
 	}
 
-	if err := ctx.Run(&app{stdout: stdout, stderr: stderr, ctx: ctx}); err != nil {
+	if cli.Version {
+		fmt.Fprintf(stdout, "gshoot %s\n", version)
+		return 0
+	}
+	if ctx.Command() == "" || ctx.Command() == "auth" {
+		if err := ctx.PrintUsage(false); err != nil {
+			writeError(stderr, err)
+			return 1
+		}
+		return 0
+	}
+
+	if err := ctx.Run(&app{stdout: stdout, stderr: stderr}); err != nil {
 		writeError(stderr, err)
 		return 1
 	}
@@ -88,13 +88,6 @@ type AuthCmd struct {
 	Login  AuthLoginCmd  `cmd:"" help:"Run browser OAuth login."`
 	Logout AuthLogoutCmd `cmd:"" help:"Clear cached OAuth token."`
 	Status AuthStatusCmd `cmd:"" help:"Show auth status."`
-}
-
-func (c *AuthCmd) Run(app *app) error {
-	if app.ctx.Command() != "auth" {
-		return nil
-	}
-	return app.ctx.PrintUsage(false)
 }
 
 type AuthLoginCmd struct {
@@ -162,7 +155,6 @@ type DownCmd struct {
 func (c *DownCmd) Run(app *app) error {
 	ctx := context.Background()
 	dots := ux.StartDots(app.stderr, "connecting to Google Sheets...")
-	defer dots.Stop()
 
 	client, err := google.NewClient(ctx, google.ReadOnlyScopes())
 	if err != nil {
@@ -172,7 +164,7 @@ func (c *DownCmd) Run(app *app) error {
 	dots.SetDescription("finding spreadsheet...")
 	spreadsheet, err := client.FindSpreadsheet(ctx, c.Spreadsheet)
 	if err != nil {
-		return fmt.Errorf("could not find spreadsheet '%s'", c.Spreadsheet)
+		return fmt.Errorf("could not find spreadsheet '%s': %w", c.Spreadsheet, err)
 	}
 	if spreadsheet == nil {
 		return fmt.Errorf("could not find spreadsheet '%s'", c.Spreadsheet)
@@ -195,6 +187,7 @@ func (c *DownCmd) Run(app *app) error {
 	if c.Output != "" {
 		dots.SetDescription(fmt.Sprintf("saving %s", c.Output))
 	}
+	dots.Stop()
 
 	return writeRows(app.stdout, rows, c.Output)
 }

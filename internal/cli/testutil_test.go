@@ -17,7 +17,7 @@ import (
 // mock google apis inside TestMain
 //
 
-// tests cna mess with this
+// tests can mess with this
 var (
 	googleAPIHandler http.HandlerFunc = invalid
 	invalid          http.HandlerFunc = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
