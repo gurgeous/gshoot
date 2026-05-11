@@ -22,11 +22,11 @@ func (c *ListCmd) Run() error {
 	}
 
 	dots.SetDescription("getting list of spreadsheets...")
-	files, err := client.ListSpreadsheets(ctx, 10)
+	files, err := client.ListSpreadsheets(ctx, 20)
 	if err != nil {
 		return err
 	}
-	dots.SetDescription(fmt.Sprintf("%d recent spreadsheets", len(files)))
+	dots.SetDescription(fmt.Sprintf("%d most recent spreadsheets", len(files)))
 	dots.Stop()
 
 	// print
@@ -36,7 +36,7 @@ func (c *ListCmd) Run() error {
 		name := fmt.Sprintf("%-"+strconv.Itoa(width)+"s", util.Truncate(file.Name, width))
 		date := ux.Dim.Render(util.DateAndTimeStr(file.ModifiedByMeTime))
 		fmt.Printf(
-			" %s %s   %s\n",
+			" %s %s     %s\n",
 			num,
 			util.Hyperlink(os.Stdout, util.SpreadsheetURL(file.Id), name),
 			date,

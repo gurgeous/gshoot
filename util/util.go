@@ -104,7 +104,7 @@ func DateAndTimeStr(s string) string {
 	if err != nil {
 		return s
 	}
-	return t.Local().Format("Mon Jan 2 2006 15:04 MST")
+	return t.Local().Format("Mon Jan _2 2006 15:04 MST")
 }
 
 // DisplayWidth reports the rendered terminal width of a string.

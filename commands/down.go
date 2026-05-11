@@ -11,7 +11,7 @@ import (
 )
 
 type DownCmd struct {
-	Output      string `short:"o" help:"Where to write the CSV."`
+	Output      string `short:"o" type:"path" help:"Where to write the CSV."`
 	Spreadsheet string `arg:"" name:"spreadsheet" help:"Spreadsheet name."`
 	Sheet       string `arg:"" optional:"" name:"sheet" help:"Sheet name."`
 }
@@ -64,7 +64,8 @@ func (c *DownCmd) Run() error {
 	if err != nil {
 		return err
 	}
-	if c.Output != "" {
+	isStdout := c.Output == "" || c.Output == "-"
+	if !isStdout {
 		dots.SetDescription(fmt.Sprintf("saving %s", c.Output))
 	}
 	dots.Stop()
@@ -74,7 +75,7 @@ func (c *DownCmd) Run() error {
 	//
 
 	writer := os.Stdout
-	if c.Output != "" {
+	if !isStdout {
 		file, err := os.Create(c.Output)
 		if err != nil {
 			return err
