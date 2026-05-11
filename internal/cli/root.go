@@ -54,15 +54,6 @@ func Main(args []string, stdout, stderr io.Writer) (code int) {
 	}
 
 	// parse args
-	if len(args) == 0 {
-		if err := parser.PrintUsage(false); err != nil {
-			writeError(stderr, err)
-			return 1
-		}
-		return 0
-	}
-
-	// parse args
 	pp.Print(args)
 	ctx, err := parser.Parse(args)
 	pp.Print(ctx)

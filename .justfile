@@ -2,7 +2,7 @@ default:
   just --list
 
 build:
-  go build -o bin/gshoot ./cmd/gshoot
+  go build -o bin/gshoot
 
 run *ARGS: build
   gshoot {{ARGS}}
