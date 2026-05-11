@@ -51,7 +51,7 @@ func (e *NoAuthError) Error() string {
 
 // ConfigDir returns the config directory for gshoot.
 func ConfigDir() string {
-	if dir := env.GSHOOT_CONFIG_DIR; dir != "" {
+	if dir := env.GSHOOT_CONFIG_DIR(); dir != "" {
 		return dir
 	}
 	return filepath.Join(xdg.ConfigHome, "gshoot")
@@ -63,7 +63,7 @@ func Resolve() (Resolved, error) {
 	oauthClientPath := filepath.Join(configDir, oauthClientFileName)
 	oauthTokenPath := filepath.Join(configDir, oauthTokenFileName)
 
-	if token := env.GSHOOT_TOKEN; token != "" {
+	if token := env.GSHOOT_TOKEN(); token != "" {
 		return Resolved{
 			ConfigDir:       configDir,
 			OAuthClientPath: oauthClientPath,
@@ -75,7 +75,7 @@ func Resolve() (Resolved, error) {
 		}, nil
 	}
 
-	if path := env.GSHOOT_CREDENTIALS_FILE; path != "" {
+	if path := env.GSHOOT_CREDENTIALS_FILE(); path != "" {
 		cred, err := LoadCredentialFile(path)
 		if err != nil {
 			return Resolved{}, fmt.Errorf("load $GSHOOT_CREDENTIALS_FILE: %w", err)
@@ -109,7 +109,7 @@ func Resolve() (Resolved, error) {
 		return Resolved{}, fmt.Errorf("load cached oauth token: %w", err)
 	}
 
-	if path := env.GOOGLE_APPLICATION_CREDENTIALS; path != "" {
+	if path := env.GOOGLE_APPLICATION_CREDENTIALS(); path != "" {
 		cred, loadErr := LoadCredentialFile(path)
 		if loadErr != nil {
 			return Resolved{}, fmt.Errorf("load $GOOGLE_APPLICATION_CREDENTIALS: %w", loadErr)

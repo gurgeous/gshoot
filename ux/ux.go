@@ -28,11 +28,11 @@ func init() {
 
 // Init from term (or GSHOOT_THEME for testing)
 func Init() {
-	if env.GSHOOT_THEME == "" {
+	if env.GSHOOT_THEME() == "" {
 		setStyles(lipgloss.LightDark(lipgloss.HasDarkBackground(os.Stdin, os.Stdout)))
 		return
 	}
-	setStyles(lipgloss.LightDark(env.GSHOOT_THEME != "light"))
+	setStyles(lipgloss.LightDark(env.GSHOOT_THEME() != "light"))
 }
 
 func setStyles(fn lipgloss.LightDarkFunc) {

@@ -11,7 +11,7 @@ import (
 )
 
 //
-// TestMain - mock google apis using httptest
+// TestMain
 //
 
 // tests can mess with this
@@ -80,18 +80,11 @@ func testCommand(t *testing.T, cmd runnable, handler http.HandlerFunc) (error, s
 	t.Cleanup(func() { stdoutFile.Close() })
 	t.Cleanup(func() { stderrFile.Close() })
 
-	// fake token
-	t.Setenv("GSHOOT_TOKEN", "bogus")
-
-	// REMIND: AUTH
-	// REMIND: HOME
-
-	// setup GSHOOT_TOKEN for fake auth
-	// REMIND
-	// testutil.WithEnv(t, map[string]string{
-	// 	"GSHOOT_TOKEN": "token",
-	// 	"HOME":         tTempDir(t),
-	// }, envVars())
+	// fake env
+	home := "home"
+	os.MkdirAll(home, 0o700)
+	t.Setenv("GSHOOT_TOKEN", "bogus_token")
+	t.Setenv("HOME", home)
 
 	// stub google api
 	googleAPIHandler = handler
