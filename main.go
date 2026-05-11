@@ -8,6 +8,7 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/gurgeous/gshoot/commands"
 	"github.com/gurgeous/gshoot/ux"
+	// "github.com/k0kubun/pp/v3"
 )
 
 var (
@@ -23,7 +24,10 @@ type CLI struct {
 }
 
 func main() {
+	//
 	// Version
+	//
+
 	if Version == "" {
 		if info, ok := debug.ReadBuildInfo(); ok && info.Main.Sum != "" {
 			Version = info.Main.Version
@@ -36,8 +40,20 @@ func main() {
 		version += " (" + CommitSHA[:7] + ")"
 	}
 
+	//
 	// init
+	//
+
 	ux.Init()
+
+	//
+	// Kong (note that kong handles --help and --version internally)
+	//
+
+	// hack - no args becomes --help
+	if len(os.Args) < 2 {
+		os.Args = append(os.Args, "--help")
+	}
 
 	cli := &CLI{}
 	ctx := kong.Parse(
@@ -51,6 +67,7 @@ func main() {
 			"versionNumber": Version,
 		},
 	)
+
 	if err := ctx.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
