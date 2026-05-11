@@ -11,13 +11,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var downloadSheet = down.Download
+var (
+	downloadSheet = down.Download
 
-func init() { rootCmd.AddCommand(newDownCommand()) }
+	outputPath string
+)
 
-func newDownCommand() *cobra.Command {
-	var outputPath string
-
+func init() {
 	cmd := &cobra.Command{
 		Use:   "down <spreadsheet> [sheet]",
 		Short: "Download a Google Sheet as CSV",
@@ -25,44 +25,43 @@ func newDownCommand() *cobra.Command {
 			"gshoot down Budget",
 			"  gshoot down Budget Q1 --output q1.csv",
 		}, "\n"),
-		Args: args,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			ctx := context.Background()
-			client, err := google.NewClient(ctx, google.ReadOnlyScopes())
-			if err != nil {
-				return err
+		Args: func(_ *cobra.Command, args []string) error {
+			if len(args) >= 1 && len(args) <= 2 {
+				return nil
 			}
-
-			sheetName := ""
-			if len(args) == 2 {
-				sheetName = args[1]
-			}
-
-			values, err := downloadSheet(ctx, client, args[0], sheetName)
-			if err != nil {
-				return err
-			}
-
-			writer := cmd.OutOrStdout()
-			if outputPath != "" {
-				file, err := os.Create(outputPath)
-				if err != nil {
-					return fmt.Errorf("create output file: %w", err)
-				}
-				defer file.Close()
-				writer = file
-			}
-
-			return down.WriteCSV(writer, values)
+			return fmt.Errorf("expected `gshoot down <spreadsheet> [sheet]`")
 		},
+		RunE: DownHandler,
 	}
 	cmd.Flags().StringVarP(&outputPath, "output", "o", "", "where to write the CSV")
-	return cmd
+	rootCmd.AddCommand(cmd)
 }
 
-func args(_ *cobra.Command, args []string) error {
-	if len(args) >= 1 && len(args) <= 2 {
-		return nil
+func DownHandler(cmd *cobra.Command, args []string) error {
+	sheetName := ""
+	if len(args) == 2 {
+		sheetName = args[1]
 	}
-	return fmt.Errorf("expected `gshoot down <spreadsheet> [sheet]`")
+
+	ctx := context.Background()
+	client, err := google.NewClient(ctx, google.ReadOnlyScopes())
+	if err != nil {
+		return err
+	}
+	values, err := downloadSheet(ctx, client, args[0], sheetName)
+	if err != nil {
+		return err
+	}
+
+	writer := cmd.OutOrStdout()
+	if outputPath != "" {
+		file, err := os.Create(outputPath)
+		if err != nil {
+			return fmt.Errorf("create output file: %w", err)
+		}
+		defer file.Close()
+		writer = file
+	}
+
+	return down.WriteCSV(writer, values)
 }

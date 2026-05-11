@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/pflag"
 )
 
+// writeHelp renders either root help or subcommand help.
 func writeHelp(w io.Writer, cmd *cobra.Command) {
 	if isRootCmd(cmd) {
 		writeRootHelp(w, cmd)
@@ -18,6 +19,7 @@ func writeHelp(w io.Writer, cmd *cobra.Command) {
 	}
 }
 
+// writeRootHelp renders the root command help text.
 func writeRootHelp(w io.Writer, cmd *cobra.Command) {
 	fmt.Fprintf(w, "Usage: %s <command> [flags]\n", cmd.Name())
 
@@ -50,6 +52,7 @@ func writeRootHelp(w io.Writer, cmd *cobra.Command) {
 	fmt.Fprintf(w, "Run %q for more information on a command.\n", "gshoot <command> --help")
 }
 
+// writeCommandHelp renders help text for a non-root command.
 func writeCommandHelp(w io.Writer, cmd *cobra.Command) {
 	if text := commandSummary(cmd); text != "" {
 		fmt.Fprintln(w, text)
@@ -84,6 +87,7 @@ func writeCommandHelp(w io.Writer, cmd *cobra.Command) {
 	}
 }
 
+// commandSummary returns the preferred summary text for a command.
 func commandSummary(cmd *cobra.Command) string {
 	if cmd.Long != "" {
 		return strings.TrimSpace(cmd.Long)
@@ -91,6 +95,7 @@ func commandSummary(cmd *cobra.Command) string {
 	return strings.TrimSpace(cmd.Short)
 }
 
+// availableCommands returns visible child commands in display order.
 func availableCommands(cmd *cobra.Command) []*cobra.Command {
 	var commands []*cobra.Command
 	for _, sub := range cmd.Commands() {
@@ -102,6 +107,7 @@ func availableCommands(cmd *cobra.Command) []*cobra.Command {
 	return commands
 }
 
+// rootHelpPadding computes column width for root help sections.
 func rootHelpPadding(cmd *cobra.Command, flags []helpFlag, commands []*cobra.Command) int {
 	padding := cmd.NamePadding()
 	for _, flag := range flags {
@@ -118,6 +124,7 @@ type helpFlag struct {
 	help string
 }
 
+// visibleFlags returns non-hidden, non-deprecated flags for help output.
 func visibleFlags(flags *pflag.FlagSet) []helpFlag {
 	if flags == nil {
 		return nil
@@ -139,6 +146,7 @@ func visibleFlags(flags *pflag.FlagSet) []helpFlag {
 	return out
 }
 
+// writeFlags renders aligned flag help rows.
 func writeFlags(w io.Writer, flags []helpFlag, minPadding int) {
 	padding := minPadding
 	for _, flag := range flags {
@@ -147,4 +155,25 @@ func writeFlags(w io.Writer, flags []helpFlag, minPadding int) {
 	for _, flag := range flags {
 		fmt.Fprintf(w, "  %s%s\n", util.PadRight(flag.name, padding+2), flag.help)
 	}
+}
+
+//
+// misc
+//
+
+//
+// helpers
+//
+
+func noArgs(usage string) cobra.PositionalArgs {
+	return func(_ *cobra.Command, args []string) error {
+		if len(args) == 0 {
+			return nil
+		}
+		return fmt.Errorf("expected `%s`", usage)
+	}
+}
+
+func isRootCmd(cmd *cobra.Command) bool {
+	return cmd != nil && !cmd.HasParent()
 }

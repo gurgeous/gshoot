@@ -12,7 +12,7 @@ import (
 	"github.com/gurgeous/gshoot/internal/testutil"
 )
 
-func TestNewCommandStdout(t *testing.T) {
+func TestDownCommandStdout(t *testing.T) {
 	restore := stubDownload(t, func(spreadsheetName, sheetName string) ([][]string, error) {
 		if spreadsheetName != "Budget" || sheetName != "" {
 			t.Fatalf("Download() args = (%q, %q)", spreadsheetName, sheetName)
@@ -40,7 +40,7 @@ func TestNewCommandStdout(t *testing.T) {
 	}
 }
 
-func TestNewCommandOutputFile(t *testing.T) {
+func TestDownCommandOutputFile(t *testing.T) {
 	restore := stubDownload(t, func(_, _ string) ([][]string, error) {
 		return [][]string{{"name", "count"}, {"alpha", "1"}}, nil
 	})

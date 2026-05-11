@@ -13,7 +13,7 @@ import (
 	"github.com/gurgeous/gshoot/internal/util"
 )
 
-func TestNewLoginCommand(t *testing.T) {
+func TestLoginCommand(t *testing.T) {
 	orig := runLogin
 	runLogin = func(_ context.Context, opts auth.LoginOptions) error {
 		if opts.ClientSecretPath != "/tmp/client.json" {
@@ -40,7 +40,7 @@ func TestNewLoginCommand(t *testing.T) {
 	}
 }
 
-func TestNewLogoutCommand(t *testing.T) {
+func TestLogoutCommand(t *testing.T) {
 	orig := runLogout
 	runLogout = func() (bool, error) { return true, nil }
 	t.Cleanup(func() {
@@ -61,7 +61,7 @@ func TestNewLogoutCommand(t *testing.T) {
 	}
 }
 
-func TestNewStatusCommand(t *testing.T) {
+func TestStatusCommand(t *testing.T) {
 	origResolve := resolveAuth
 	resolveAuth = func() (auth.Resolved, error) {
 		return auth.Resolved{}, errors.New("no auth")
