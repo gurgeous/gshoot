@@ -1,7 +1,6 @@
 package down
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"testing"
@@ -150,24 +149,6 @@ func TestDownloadNoSheets(t *testing.T) {
 	var noSheets *NoSheetsError
 	if !errors.As(err, &noSheets) {
 		t.Fatalf("Download() error = %T, want NoSheetsError", err)
-	}
-}
-
-func TestWriteCSV(t *testing.T) {
-	var out bytes.Buffer
-	rows := [][]string{
-		{"name", "count"},
-		{"alpha", "1"},
-		{"beta", "2,3"},
-	}
-
-	if err := WriteCSV(&out, rows); err != nil {
-		t.Fatalf("WriteCSV() error = %v", err)
-	}
-
-	want := "name,count\nalpha,1\nbeta,\"2,3\"\n"
-	if out.String() != want {
-		t.Fatalf("WriteCSV() = %q, want %q", out.String(), want)
 	}
 }
 

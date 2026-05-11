@@ -1,4 +1,4 @@
-package cli
+package sub
 
 import (
 	"fmt"
@@ -10,15 +10,18 @@ import (
 	"github.com/spf13/pflag"
 )
 
-func writeHelp(w io.Writer, cmd *cobra.Command) {
-	if isRootCmd(cmd) {
-		writeRootHelp(w, cmd)
+// WriteHelp renders either root help or subcommand help.
+func WriteHelp(cmd *cobra.Command) {
+	if cmd.HasParent() {
+		writeCommandHelp(cmd)
 	} else {
-		writeCommandHelp(w, cmd)
+		writeRootHelp(cmd)
 	}
 }
 
-func writeRootHelp(w io.Writer, cmd *cobra.Command) {
+// writeRootHelp renders the root command help text.
+func writeRootHelp(cmd *cobra.Command) {
+	w := cmd.OutOrStdout()
 	fmt.Fprintf(w, "Usage: %s <command> [flags]\n", cmd.Name())
 
 	if text := commandSummary(cmd); text != "" {
@@ -36,21 +39,20 @@ func writeRootHelp(w io.Writer, cmd *cobra.Command) {
 		writeFlags(w, flags, padding)
 	}
 
-	if len(commands) == 0 {
-		return
+	if len(commands) > 0 {
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "Commands:")
+		for _, sub := range commands {
+			fmt.Fprintf(w, "  %s%s\n", util.PadRight(sub.Name(), padding+2), sub.Short)
+		}
+		fmt.Fprintln(w)
+		fmt.Fprintf(w, "Run %q for more information on a command.\n", "gshoot <command> --help")
 	}
-
-	fmt.Fprintln(w)
-	fmt.Fprintln(w, "Commands:")
-	for _, sub := range commands {
-		fmt.Fprintf(w, "  %s%s\n", util.PadRight(sub.Name(), padding+2), sub.Short)
-	}
-
-	fmt.Fprintln(w)
-	fmt.Fprintf(w, "Run %q for more information on a command.\n", "gshoot <command> --help")
 }
 
-func writeCommandHelp(w io.Writer, cmd *cobra.Command) {
+// writeCommandHelp renders help text for a non-root command.
+func writeCommandHelp(cmd *cobra.Command) {
+	w := cmd.OutOrStdout()
 	if text := commandSummary(cmd); text != "" {
 		fmt.Fprintln(w, text)
 		fmt.Fprintln(w)
@@ -84,6 +86,7 @@ func writeCommandHelp(w io.Writer, cmd *cobra.Command) {
 	}
 }
 
+// commandSummary returns the preferred summary text for a command.
 func commandSummary(cmd *cobra.Command) string {
 	if cmd.Long != "" {
 		return strings.TrimSpace(cmd.Long)
@@ -91,6 +94,7 @@ func commandSummary(cmd *cobra.Command) string {
 	return strings.TrimSpace(cmd.Short)
 }
 
+// availableCommands returns visible child commands in display order.
 func availableCommands(cmd *cobra.Command) []*cobra.Command {
 	var commands []*cobra.Command
 	for _, sub := range cmd.Commands() {
@@ -102,6 +106,7 @@ func availableCommands(cmd *cobra.Command) []*cobra.Command {
 	return commands
 }
 
+// rootHelpPadding computes column width for root help sections.
 func rootHelpPadding(cmd *cobra.Command, flags []helpFlag, commands []*cobra.Command) int {
 	padding := cmd.NamePadding()
 	for _, flag := range flags {
@@ -118,6 +123,7 @@ type helpFlag struct {
 	help string
 }
 
+// visibleFlags returns non-hidden, non-deprecated flags for help output.
 func visibleFlags(flags *pflag.FlagSet) []helpFlag {
 	if flags == nil {
 		return nil
@@ -139,6 +145,7 @@ func visibleFlags(flags *pflag.FlagSet) []helpFlag {
 	return out
 }
 
+// writeFlags renders aligned flag help rows.
 func writeFlags(w io.Writer, flags []helpFlag, minPadding int) {
 	padding := minPadding
 	for _, flag := range flags {

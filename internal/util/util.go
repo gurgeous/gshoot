@@ -2,6 +2,7 @@ package util
 
 import (
 	"crypto/rand"
+	"encoding/csv"
 	"encoding/hex"
 	"io"
 	"os"
@@ -133,6 +134,21 @@ func SpreadsheetURL(id string) string {
 // Truncate trims s to the requested display width with an ellipsis.
 func Truncate(s string, length int) string {
 	return ansi.Truncate(s, length, ellipsis)
+}
+
+//
+// csv
+//
+
+func CSVWrite(w io.Writer, rows [][]string) error {
+	writer := csv.NewWriter(w)
+	for _, row := range rows {
+		if err := writer.Write(row); err != nil {
+			return err
+		}
+	}
+	writer.Flush()
+	return nil
 }
 
 //

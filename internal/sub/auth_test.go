@@ -1,7 +1,8 @@
-package status
+package sub
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"path/filepath"
 	"strings"
@@ -12,7 +13,55 @@ import (
 	"github.com/gurgeous/gshoot/internal/util"
 )
 
-func TestNewStatusCommand(t *testing.T) {
+func TestLoginCommand(t *testing.T) {
+	orig := runLogin
+	runLogin = func(_ context.Context, opts auth.LoginOptions) error {
+		if opts.ClientSecretPath != "/tmp/client.json" {
+			t.Fatalf("Login() client secret = %q, want /tmp/client.json", opts.ClientSecretPath)
+		}
+		if opts.Stdout == nil || opts.Stderr == nil {
+			t.Fatal("Login() missing stdio")
+		}
+		return nil
+	}
+	t.Cleanup(func() {
+		runLogin = orig
+	})
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd := newLoginCommand()
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{"--client-secret", "/tmp/client.json"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+}
+
+func TestLogoutCommand(t *testing.T) {
+	orig := runLogout
+	runLogout = func() (bool, error) { return true, nil }
+	t.Cleanup(func() {
+		runLogout = orig
+	})
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd := newLogoutCommand()
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if !strings.Contains(stdout.String(), "Removed cached OAuth token") {
+		t.Fatalf("stdout = %q, want logout message", stdout.String())
+	}
+}
+
+func TestStatusCommand(t *testing.T) {
 	origResolve := resolveAuth
 	resolveAuth = func() (auth.Resolved, error) {
 		return auth.Resolved{}, errors.New("no auth")
@@ -29,7 +78,7 @@ func TestNewStatusCommand(t *testing.T) {
 	}
 
 	var stdout bytes.Buffer
-	cmd := NewStatusCommand()
+	cmd := newStatusCommand()
 	cmd.SetOut(&stdout)
 	cmd.SetArgs(nil)
 
