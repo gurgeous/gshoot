@@ -112,20 +112,14 @@ func (c *Client) FindSpreadsheet(ctx context.Context, name string) (*drive.File,
 	return nil, nil // failure
 }
 
-// FirstSheet returns the first sheet
-func (c *Client) FirstSheet(ctx context.Context, spreadsheetID string) (*sheets.Sheet, error) {
-	items, err := c.ListSheets(ctx, spreadsheetID)
-	if err != nil {
-		return nil, err
-	}
-	return items[0], nil
-}
-
 // FindSheet returns the sheet with this name, or the first sheet when name is empty (case insensitive)
 func (c *Client) FindSheet(ctx context.Context, spreadsheetID, name string) (*sheets.Sheet, error) {
 	items, err := c.ListSheets(ctx, spreadsheetID)
 	if err != nil {
 		return nil, err
+	}
+	if name == "" {
+		return items[0], nil
 	}
 	for _, item := range items {
 		if strings.EqualFold(item.Properties.Title, name) {
@@ -156,26 +150,23 @@ func (c *Client) GetRows(ctx context.Context, spreadsheetID string, sheet *sheet
 		}
 		rows = append(rows, cells)
 	}
-	return rows, nil
+
+	return Rectangularize(rows), nil
 }
 
-//
-// misc
-//
-
 func Rectangularize(rows Rows) Rows {
-	width := 0
+	cols := 0
 	for _, row := range rows {
-		width = max(width, len(row))
+		cols = max(cols, len(row))
 	}
 
 	out := make([][]string, 0, len(rows))
 	for _, row := range rows {
-		copyRow := append([]string(nil), row...)
-		if len(copyRow) < width {
-			copyRow = append(copyRow, make([]string, width-len(copyRow))...)
+		copy := append([]string(nil), row...)
+		if len(copy) < cols {
+			copy = append(copy, make([]string, cols-len(copy))...)
 		}
-		out = append(out, copyRow)
+		out = append(out, copy)
 	}
 	return out
 }

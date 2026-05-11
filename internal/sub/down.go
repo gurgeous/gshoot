@@ -11,7 +11,6 @@ import (
 	"github.com/gurgeous/gshoot/internal/util"
 	"github.com/gurgeous/gshoot/internal/ux"
 	"github.com/spf13/cobra"
-	"google.golang.org/api/sheets/v4"
 )
 
 //
@@ -73,26 +72,20 @@ func downHandler(cmd *cobra.Command, args []string) error {
 
 		// now find sheet
 		dots.SetDescription("finding that sheet...")
-		var sheet *sheets.Sheet
-		if sheetName == "" {
-			sheet, err = client.FirstSheet(ctx, spreadsheet.Id)
-		} else {
-			sheet, err = client.FindSheet(ctx, spreadsheet.Id, sheetName)
-			if sheet == nil {
-				return fmt.Errorf("in spreadsheet '%s', could not find sheet '%s'", spreadsheetName, sheetName)
-			}
-		}
+		sheet, err := client.FindSheet(ctx, spreadsheet.Id, sheetName)
 		if err != nil {
 			return err
+		}
+		if sheet == nil {
+			return fmt.Errorf("in spreadsheet '%s', could not find sheet '%s'", spreadsheetName, sheetName)
 		}
 
 		// download
 		dots.SetDescription("downloading rows...")
-		raw, err := client.GetRows(ctx, spreadsheet.Id, sheet)
+		rows, err = client.GetRows(ctx, spreadsheet.Id, sheet)
 		if err != nil {
 			return err
 		}
-		rows = google.Rectangularize(raw)
 		if outputPath != "" {
 			dots.SetDescription(fmt.Sprintf("saving %s", outputPath))
 		}
