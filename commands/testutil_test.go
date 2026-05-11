@@ -73,18 +73,16 @@ func testCommand(t *testing.T, cmd runnable, handler http.HandlerFunc) (error, s
 
 	// stub stdout/stderr
 	origStdout, origStderr := os.Stdout, os.Stderr
-	stdoutFile, _ := os.Create("stdout")
-	stderrFile, _ := os.Create("stderr")
+	stdoutFile, _ := os.Create("test-stdout")
+	stderrFile, _ := os.Create("test-stderr")
 	os.Stdout, os.Stderr = stdoutFile, stderrFile
 	t.Cleanup(func() { os.Stdout, os.Stderr = origStdout, origStderr })
 	t.Cleanup(func() { stdoutFile.Close() })
 	t.Cleanup(func() { stderrFile.Close() })
 
 	// fake env
-	home := "home"
-	os.MkdirAll(home, 0o700)
 	t.Setenv("GSHOOT_TOKEN", "bogus_token")
-	t.Setenv("HOME", home)
+	t.Setenv("HOME", tmp)
 
 	// stub google api
 	googleAPIHandler = handler
@@ -92,6 +90,8 @@ func testCommand(t *testing.T, cmd runnable, handler http.HandlerFunc) (error, s
 
 	// run
 	runErr := cmd.Run()
+
+	//
 
 	// drain stdout/stderr
 	stdoutFile.Seek(0, 0)
