@@ -9,10 +9,11 @@ import (
 	"golang.org/x/oauth2"
 	"google.golang.org/api/drive/v3"
 	"google.golang.org/api/option"
+	"google.golang.org/api/sheets/v4"
 )
 
-// NewDriveClient creates a Google client with a Drive service pointed at serverURL.
-func NewDriveClient(t testutil.TestingT, serverURL string) *google.Client {
+// NewClient creates a Google client with Drive and Sheets services pointed at serverURL.
+func NewClient(t testutil.TestingT, serverURL string) *google.Client {
 	t.Helper()
 
 	httpClient := &http.Client{
@@ -29,5 +30,13 @@ func NewDriveClient(t testutil.TestingT, serverURL string) *google.Client {
 	if err != nil {
 		t.Fatalf("drive.NewService() error = %v", err)
 	}
-	return &google.Client{Drive: driveService}
+	sheetsService, err := sheets.NewService(
+		context.Background(),
+		option.WithHTTPClient(httpClient),
+		option.WithEndpoint(serverURL+"/"),
+	)
+	if err != nil {
+		t.Fatalf("sheets.NewService() error = %v", err)
+	}
+	return &google.Client{Drive: driveService, Sheets: sheetsService}
 }

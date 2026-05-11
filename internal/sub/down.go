@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/gurgeous/gshoot/internal/down"
 	"github.com/gurgeous/gshoot/internal/google"
 	"github.com/gurgeous/gshoot/internal/util"
 	"github.com/gurgeous/gshoot/internal/ux"
@@ -14,9 +13,9 @@ import (
 )
 
 var (
-	downloadSheet = down.Download
-	outputPath    string
-	downCommand   = &cobra.Command{
+	// downloadSheet = down.Download
+	outputPath  string
+	downCommand = &cobra.Command{
 		Use:   "down <spreadsheet> [sheet]",
 		Short: "Download a Google Sheet as CSV",
 		Example: strings.Join([]string{
@@ -52,6 +51,7 @@ func DownHandler(cmd *cobra.Command, args []string) error {
 	stderr := cmd.ErrOrStderr()
 
 	// parse args
+	spreadsheetName := args[0]
 	sheetName := ""
 	if len(args) == 2 {
 		sheetName = args[1]
@@ -65,11 +65,25 @@ func DownHandler(cmd *cobra.Command, args []string) error {
 	}
 
 	// fetch
-	dots.SetDescription("fetching")
-	rows, err := downloadSheet(ctx, client, args[0], sheetName)
+	dots.SetDescription("finding spreadsheet...")
+	spreadsheet, err := client.FindSpreadsheet(ctx, spreadsheetName)
+	if err != nil {
+		return fmt.Errorf("could not find spreadsheet '%s'", spreadsheetName)
+	}
+	// now find sheet
+	dots.SetDescription("finding that sheet...")
+	sheet, err := client.FindSheet(ctx, spreadsheet.Id, sheetName)
+	if err != nil {
+		return fmt.Errorf("in spreadsheet '%s', could not find sheet '%s'", spreadsheetName, sheetName)
+	}
+
+	// download
+	dots.SetDescription("downloading rows...")
+	raw, err := client.GetRows(ctx, spreadsheet.Id, sheet)
 	if err != nil {
 		return err
 	}
+	rows := google.Rectangularize(raw)
 	if outputPath != "" {
 		dots.SetDescription(fmt.Sprintf("saving %s", outputPath))
 	}
@@ -85,10 +99,5 @@ func DownHandler(cmd *cobra.Command, args []string) error {
 		defer file.Close()
 		writer = file
 	}
-
 	return util.CSVWrite(writer, rows)
 }
-
-//
-// helpers
-//

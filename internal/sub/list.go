@@ -45,21 +45,15 @@ func ListHandler(cmd *cobra.Command, _ []string) error {
 
 	// fetch
 	dots.SetDescription("fetching spreadsheets")
-	res, err := client.Drive.Files.List().
-		Context(ctx).
-		Q("mimeType='application/vnd.google-apps.spreadsheet' and trashed=false").
-		OrderBy("modifiedTime desc,name").
-		PageSize(int64(10)).
-		Fields("files(id,name,modifiedTime)").
-		Do()
+	files, err := client.ListSpreadsheets(ctx, 10)
 	if err != nil {
 		return err
 	}
-	dots.SetDescription(fmt.Sprintf("%d recent spreadsheets", len(res.Files)))
+	dots.SetDescription(fmt.Sprintf("%d recent spreadsheets", len(files)))
 	dots.Stop()
 
 	// print
-	for i, file := range res.Files {
+	for i, file := range files {
 		const width = 30
 		num := ux.Dim.Render(fmt.Sprintf("%2d.", i+1))
 		name := fmt.Sprintf("%-"+strconv.Itoa(width)+"s", util.Truncate(file.Name, width))

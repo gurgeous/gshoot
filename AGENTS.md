@@ -15,7 +15,7 @@
 - Be succinct, especially in Markdown
 - Prefer `mise run` tasks when they exist
 - Run small relevant checks while working; run the full check before commits
-- Keep commit messages under 80 chars
+- Keep commit/PR messages under 80 chars
 
 ## Layout
 
