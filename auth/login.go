@@ -20,24 +20,12 @@ var openBrowser = util.OpenBrowserURL
 
 // LoginOptions configures interactive browser login.
 type LoginOptions struct {
-	ClientSecretPath string
-	Stdout           io.Writer
-	Stderr           io.Writer
+	Stdout io.Writer
+	Stderr io.Writer
 }
 
 // Login runs an interactive OAuth login and persists the token.
 func (c *Client) Login(ctx context.Context, opts LoginOptions) error {
-	if err := os.MkdirAll(c.ConfigDir, 0o700); err != nil {
-		return fmt.Errorf("create config dir: %w", err)
-	}
-
-	if opts.ClientSecretPath != "" {
-		if err := importOClient(opts.ClientSecretPath, c.ClientPath()); err != nil {
-			return err
-		}
-		fmt.Fprintln(opts.Stdout, ux.Success.Render("Saved OAuth client config to "+c.ClientPath()))
-	}
-
 	client, err := c.LoadOClient()
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -97,25 +85,6 @@ func oauthConfigForLogin(client *OClient) (*oauth2.Config, error) {
 			"https://www.googleapis.com/auth/spreadsheets",
 		},
 	}, nil
-}
-
-// importOClient validates and saves a downloaded client JSON file.
-func importOClient(srcPath, dstPath string) error {
-	data, err := os.ReadFile(srcPath)
-	if err != nil {
-		return fmt.Errorf("read client secret file: %w", err)
-	}
-	client, err := loadOClient(srcPath)
-	if err != nil {
-		return fmt.Errorf("load client secret file: %w", err)
-	}
-	if client == nil {
-		return errors.New("client secret file must be a Desktop app OAuth client JSON")
-	}
-	if err := util.WritePrivateFile(dstPath, data); err != nil {
-		return fmt.Errorf("save oauth client config: %w", err)
-	}
-	return nil
 }
 
 // friendlyLoginError adds actionable hints to common Google OAuth failures.

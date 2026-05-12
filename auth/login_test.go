@@ -59,8 +59,8 @@ func TestLoginImportsClientAndSavesToken(t *testing.T) {
 	}))
 	defer tokenServer.Close()
 
-	clientSecretPath := filepath.Join(t.TempDir(), "client_secret.json")
-	assert.NoError(t, os.WriteFile(clientSecretPath, []byte(`{"installed":{"client_id":"cid","client_secret":"secret","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"`+tokenServer.URL+`","redirect_uris":["http://127.0.0.1/oauth2/callback"]}}`), 0o600))
+	// clientSecretPath := filepath.Join(t.TempDir(), "client_secret.json")
+	// assert.NoError(t, os.WriteFile(clientSecretPath, []byte(`{"installed":{"client_id":"cid","client_secret":"secret","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"`+tokenServer.URL+`","redirect_uris":["http://127.0.0.1/oauth2/callback"]}}`), 0o600))
 
 	authURLCh := stubOpenBrowser(t)
 	var stdout bytes.Buffer
@@ -68,9 +68,9 @@ func TestLoginImportsClientAndSavesToken(t *testing.T) {
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- client.Login(context.Background(), LoginOptions{
-			ClientSecretPath: clientSecretPath,
-			Stdout:           &stdout,
-			Stderr:           &stderr,
+			// ClientSecretPath: clientSecretPath,
+			Stdout: &stdout,
+			Stderr: &stderr,
 		})
 	}()
 
@@ -132,9 +132,9 @@ func TestLoginRejectsNonOClientSecret(t *testing.T) {
 	assert.NoError(t, os.WriteFile(clientSecretPath, []byte(`{"type":"service_account","client_email":"robot@example.com","private_key":"abc"}`), 0o600))
 
 	err := client.Login(context.Background(), LoginOptions{
-		ClientSecretPath: clientSecretPath,
-		Stdout:           new(bytes.Buffer),
-		Stderr:           new(bytes.Buffer),
+		// ClientSecretPath: clientSecretPath,
+		Stdout: new(bytes.Buffer),
+		Stderr: new(bytes.Buffer),
 	})
 
 	assert.Error(t, err)

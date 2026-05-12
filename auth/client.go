@@ -22,7 +22,9 @@ type Client struct {
 
 // NewClient builds an auth client for the default config directory.
 func NewClient() *Client {
-	return &Client{ConfigDir: util.ConfigDir()}
+	c := Client{ConfigDir: util.ConfigDir()}
+	os.MkdirAll(c.ConfigDir, 0o700)
+	return &c
 }
 
 //
@@ -82,6 +84,25 @@ func (c *Client) SaveOAuthToken(token OAuthToken) error {
 	}
 	if err := util.WritePrivateFile(c.TokenPath(), append(data, '\n')); err != nil {
 		return fmt.Errorf("save oauth token: %w", err)
+	}
+	return nil
+}
+
+// ImportOClient validates and saves a downloaded client JSON file.
+func (c *Client) ImportOClient(srcPath string) error {
+	data, err := os.ReadFile(srcPath)
+	if err != nil {
+		return fmt.Errorf("read client secret file: %w", err)
+	}
+	oclient, err := loadOClient(srcPath)
+	if err != nil {
+		return fmt.Errorf("load client secret file: %w", err)
+	}
+	if oclient == nil {
+		return errors.New("client secret file must be a Desktop app OAuth client JSON")
+	}
+	if err := util.WritePrivateFile(c.ClientPath(), data); err != nil {
+		return fmt.Errorf("save oauth client config: %w", err)
 	}
 	return nil
 }

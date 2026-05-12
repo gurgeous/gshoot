@@ -2,9 +2,11 @@ package commands
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	"github.com/gurgeous/gshoot/auth"
+	"github.com/gurgeous/gshoot/ux"
 )
 
 // commands/auth.go wires the auth subcommands to Client methods.
@@ -23,10 +25,17 @@ type AuthLoginCmd struct {
 
 // Run executes the auth login command.
 func (c *AuthLoginCmd) Run() error {
+	client := auth.NewClient()
+	if c.ClientSecretPath != "" {
+		if err := client.ImportOClient(c.ClientSecretPath); err != nil {
+			return err
+		}
+		fmt.Println(ux.Success.Render("Imported client config to " + client.ClientPath()))
+	}
+
 	return auth.NewClient().Login(context.Background(), auth.LoginOptions{
-		ClientSecretPath: c.ClientSecretPath,
-		Stdout:           os.Stdout,
-		Stderr:           os.Stderr,
+		Stdout: os.Stdout,
+		Stderr: os.Stderr,
 	})
 }
 
