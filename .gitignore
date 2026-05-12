@@ -1,5 +1,6 @@
-tmp/
-PLAN.md
-TODO.md
-AUTH.md
 .zed/
+AUTH.md
+bin/gshoot
+PLAN.md
+tmp/
+TODO.md

@@ -2,8 +2,7 @@ name: ci
 
 on:
   pull_request:
-  push:
-    branches: [main]
+  push: { branches: [main] }
   workflow_dispatch:
 
 concurrency:
@@ -18,4 +17,4 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: jdx/mise-action@v4
-      - run: mise run ci
+      - run: just ci
