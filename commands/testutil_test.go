@@ -1,13 +1,19 @@
 package commands
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/adrg/xdg"
+	"github.com/gurgeous/gshoot/util"
 )
 
 //
@@ -80,9 +86,11 @@ func testCommand(t *testing.T, cmd runnable, handler http.HandlerFunc) (error, s
 	t.Cleanup(func() { stdoutFile.Close() })
 	t.Cleanup(func() { stderrFile.Close() })
 
-	// fake env
-	t.Setenv("GSHOOT_TOKEN", "bogus_token")
+	// fake browser auth under HOME
 	t.Setenv("HOME", tmp)
+	xdg.Reload()
+	t.Cleanup(xdg.Reload)
+	writeAuthFiles(t, tmp)
 
 	// stub google api
 	googleAPIHandler = handler
@@ -102,24 +110,19 @@ func testCommand(t *testing.T, cmd runnable, handler http.HandlerFunc) (error, s
 	return runErr, string(stdoutBytes), string(stderrBytes)
 }
 
-// //
-// // env mocks
-// //
+func writeAuthFiles(t *testing.T, home string) {
+	t.Helper()
 
-// func withRawTokenAuth(t *testing.T) {
-// 	t.Helper()
-// 	testutil.WithEnv(t, map[string]string{
-// 		"GSHOOT_TOKEN": "token",
-// 		"HOME":         tTempDir(t),
-// 	}, envVars())
-// }
-
-// func envVars() map[string]*string {
-// 	return map[string]*string{
-// 		"GOOGLE_APPLICATION_CREDENTIALS": &env.GOOGLE_APPLICATION_CREDENTIALS,
-// 		"GSHOOT_CONFIG_DIR":              &env.GSHOOT_CONFIG_DIR,
-// 		"GSHOOT_CREDENTIALS_FILE":        &env.GSHOOT_CREDENTIALS_FILE,
-// 		"GSHOOT_THEME":                   &env.GSHOOT_THEME,
-// 		"GSHOOT_TOKEN":                   &env.GSHOOT_TOKEN,
-// 	}
-// }
+	configDir := filepath.Join(home, ".config", "gshoot")
+	clientJSON := `{"installed":{"client_id":"cid","client_secret":"secret","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","redirect_uris":["http://127.0.0.1/oauth2/callback"]}}`
+	tokenJSON := fmt.Sprintf(
+		`{"access_token":"token","refresh_token":"refresh","token_type":"Bearer","expiry":"%s"}`,
+		time.Now().Add(time.Hour).UTC().Format(time.RFC3339),
+	)
+	if err := util.WritePrivateFile(filepath.Join(configDir, "oauth-client.json"), []byte(clientJSON)); err != nil {
+		t.Fatalf("write oauth-client.json: %v", err)
+	}
+	if err := util.WritePrivateFile(filepath.Join(configDir, "oauth-token.json"), []byte(tokenJSON)); err != nil {
+		t.Fatalf("write oauth-token.json: %v", err)
+	}
+}

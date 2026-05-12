@@ -7,7 +7,6 @@ require (
 	github.com/adrg/xdg v0.5.3
 	github.com/alecthomas/kong v1.15.0
 	github.com/charmbracelet/x/ansi v0.11.7
-	github.com/k0kubun/pp/v3 v3.5.1
 	github.com/schollz/progressbar/v3 v3.19.0
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/oauth2 v0.36.0
@@ -36,8 +35,6 @@ require (
 	github.com/googleapis/enterprise-certificate-proxy v0.3.15 // indirect
 	github.com/googleapis/gax-go/v2 v2.22.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.4.0 // indirect
-	github.com/mattn/go-colorable v0.1.14 // indirect
-	github.com/mattn/go-isatty v0.0.22 // indirect
 	github.com/mattn/go-runewidth v0.0.23 // indirect
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect

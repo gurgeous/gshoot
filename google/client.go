@@ -40,12 +40,7 @@ type Client struct {
 
 // NewClient creates a Google API client with auth for the requested scopes.
 func NewClient(ctx context.Context, scopes []string) (*Client, error) {
-	// auth
-	resolved, err := auth.Resolve()
-	if err != nil {
-		return nil, err
-	}
-	tokenSource, err := auth.NewTokenSource(ctx, resolved, scopes)
+	tokenSource, err := auth.NewTokenSource(ctx, scopes)
 	if err != nil {
 		return nil, err
 	}

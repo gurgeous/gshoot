@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"charm.land/lipgloss/v2"
+	"github.com/adrg/xdg"
 	"github.com/charmbracelet/x/ansi"
 	"golang.org/x/term"
 )
@@ -61,6 +62,11 @@ func WritePrivateFile(path string, data []byte) error {
 		return err
 	}
 	return os.Rename(tmpPath, path)
+}
+
+// ConfigDir returns the gshoot config directory under XDG config home.
+func ConfigDir() string {
+	return filepath.Join(xdg.ConfigHome, "gshoot")
 }
 
 // RandomHex returns n random bytes encoded as lowercase hex.

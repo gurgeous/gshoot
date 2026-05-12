@@ -16,6 +16,11 @@ import (
 	"golang.org/x/oauth2"
 )
 
+const (
+	oauthClientFileName = "oauth-client.json"
+	oauthTokenFileName  = "oauth-token.json"
+)
+
 var openBrowser = util.OpenBrowserURL
 
 // LoginOptions configures interactive browser login.
@@ -27,7 +32,7 @@ type LoginOptions struct {
 
 // Login runs an interactive OAuth login and persists the token.
 func Login(ctx context.Context, opts LoginOptions) error {
-	configDir := ConfigDir()
+	configDir := util.ConfigDir()
 	clientPath := filepath.Join(configDir, oauthClientFileName)
 	tokenPath := filepath.Join(configDir, oauthTokenFileName)
 
@@ -42,18 +47,25 @@ func Login(ctx context.Context, opts LoginOptions) error {
 		fmt.Fprintln(opts.Stdout, ux.Success.Render("Saved OAuth client config to "+clientPath))
 	}
 
-	cred, err := LoadCredentialFile(clientPath)
+	client, err := LoadOAuthClient(clientPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return missingClientSecretError(clientPath)
+			return fmt.Errorf(
+				"no OAuth client config found at %s\n"+
+					"setup:\n"+
+					"1. Open https://console.cloud.google.com/apis/credentials\n"+
+					"2. Configure the OAuth consent screen if prompted\n"+
+					"3. Add yourself under Test users\n"+
+					"4. Create an OAuth client of type Desktop app\n"+
+					"5. Download the JSON and run `gshoot auth login --client-secret /path/to/client_secret.json`\n"+
+					"without Test users, Google often fails with a vague \"Access blocked\" error",
+				clientPath,
+			)
 		}
 		return fmt.Errorf("load oauth client config: %w", err)
 	}
-	if cred.Kind != CredentialKindOAuthClient || cred.OAuthClient == nil {
-		return fmt.Errorf("oauth client config at %s is not a desktop OAuth client", clientPath)
-	}
 
-	config, err := oauthConfigForLogin(cred.OAuthClient)
+	config, err := oauthConfigForLogin(client)
 	if err != nil {
 		return err
 	}
@@ -63,8 +75,17 @@ func Login(ctx context.Context, opts LoginOptions) error {
 		return friendlyLoginError(err)
 	}
 
-	if err := saveOAuthToken(tokenPath, token); err != nil {
-		return err
+	data, err := json.MarshalIndent(OAuthToken{
+		AccessToken:  token.AccessToken,
+		RefreshToken: token.RefreshToken,
+		TokenType:    token.TokenType,
+		Expiry:       token.Expiry,
+	}, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal oauth token: %w", err)
+	}
+	if err := util.WritePrivateFile(tokenPath, append(data, '\n')); err != nil {
+		return fmt.Errorf("save oauth token: %w", err)
 	}
 
 	fmt.Fprintln(opts.Stdout, ux.Success.Render("Login complete. Token saved to "+tokenPath))
@@ -94,47 +115,17 @@ func importOAuthClient(srcPath, dstPath string) error {
 	if err != nil {
 		return fmt.Errorf("read client secret file: %w", err)
 	}
-	cred, err := parseCredentialFile(srcPath, data)
+	client, err := LoadOAuthClient(srcPath)
 	if err != nil {
 		return fmt.Errorf("load client secret file: %w", err)
 	}
-	if cred.Kind != CredentialKindOAuthClient || cred.OAuthClient == nil {
+	if client == nil {
 		return errors.New("client secret file must be a Desktop app OAuth client JSON")
 	}
 	if err := util.WritePrivateFile(dstPath, data); err != nil {
 		return fmt.Errorf("save oauth client config: %w", err)
 	}
 	return nil
-}
-
-func saveOAuthToken(path string, token *oauth2.Token) error {
-	data, err := json.MarshalIndent(OAuthToken{
-		AccessToken:  token.AccessToken,
-		RefreshToken: token.RefreshToken,
-		TokenType:    token.TokenType,
-		Expiry:       token.Expiry,
-	}, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshal oauth token: %w", err)
-	}
-	if err := util.WritePrivateFile(path, append(data, '\n')); err != nil {
-		return fmt.Errorf("save oauth token: %w", err)
-	}
-	return nil
-}
-
-func missingClientSecretError(clientPath string) error {
-	return fmt.Errorf(
-		"no OAuth client config found at %s\n"+
-			"setup:\n"+
-			"1. Open https://console.cloud.google.com/apis/credentials\n"+
-			"2. Configure the OAuth consent screen if prompted\n"+
-			"3. Add yourself under Test users\n"+
-			"4. Create an OAuth client of type Desktop app\n"+
-			"5. Download the JSON and run `gshoot auth login --client-secret /path/to/client_secret.json`\n"+
-			"without Test users, Google often fails with a vague \"Access blocked\" error",
-		clientPath,
-	)
 }
 
 func friendlyLoginError(err error) error {
@@ -161,7 +152,9 @@ func browserLoginFlow(ctx context.Context, config *oauth2.Config, stdout, stderr
 	if err != nil {
 		return nil, err
 	}
-	config = cloneConfig(config)
+	cloned := *config
+	cloned.Scopes = append([]string(nil), config.Scopes...)
+	config = &cloned
 	config.RedirectURL = redirectURL
 
 	authURL := config.AuthCodeURL(state, oauth2.AccessTypeOffline, oauth2.SetAuthURLParam("prompt", "consent"))
@@ -182,12 +175,6 @@ func browserLoginFlow(ctx context.Context, config *oauth2.Config, stdout, stderr
 		return nil, fmt.Errorf("exchange authorization code: %w", err)
 	}
 	return token, nil
-}
-
-func cloneConfig(config *oauth2.Config) *oauth2.Config {
-	cloned := *config
-	cloned.Scopes = append([]string(nil), config.Scopes...)
-	return &cloned
 }
 
 func selectLoopbackRedirect(redirectURIs []string) (*url.URL, error) {

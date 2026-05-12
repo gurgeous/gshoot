@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/gurgeous/gshoot/util"
 )
 
 // Logout clears the cached OAuth session while keeping the client config.
 func Logout() (bool, error) {
-	tokenPath := filepath.Join(ConfigDir(), oauthTokenFileName)
+	tokenPath := filepath.Join(util.ConfigDir(), oauthTokenFileName)
 	err := os.Remove(tokenPath)
 	if err == nil {
 		return true, nil

@@ -5,10 +5,6 @@ build:
   go build -o bin/gshoot
   just banner "✓ build ✓"
 
-#
-# hygiene
-#
-
 check: lint test build
   just banner "✓ check ✓"
 
