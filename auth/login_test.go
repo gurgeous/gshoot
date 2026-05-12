@@ -69,8 +69,8 @@ func TestLoginImportsClientAndSavesToken(t *testing.T) {
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- client.Login(context.Background(), LoginOptions{
-			Stdout:           &stdout,
-			Stderr:           &stderr,
+			Stdout: &stdout,
+			Stderr: &stderr,
 		})
 	}()
 
