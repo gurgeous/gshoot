@@ -18,9 +18,9 @@ var (
 
 type CLI struct {
 	Version kong.VersionFlag `short:"v" help:"Print the version number"`
-	// Auth    commands.AuthCmd `cmd:"" help:"Login or logout from Google Sheets."`
-	List commands.ListCmd `cmd:"" help:"List your Google Sheets."`
-	Down commands.DownCmd `cmd:"" help:"Download a Google Sheet as CSV."`
+	Auth    commands.AuthCmd `cmd:"" help:"Login or logout from Google Sheets."`
+	List    commands.ListCmd `cmd:"" help:"List your Google Sheets."`
+	Down    commands.DownCmd `cmd:"" help:"Download a Google Sheet as CSV."`
 }
 
 func main() {

@@ -1,311 +1,264 @@
 package auth
 
-// import (
-// 	"bytes"
-// 	"context"
-// 	"errors"
-// 	"net/http"
-// 	"net/http/httptest"
-// 	"net/url"
-// 	"os"
-// 	"path/filepath"
-// 	"strings"
-// 	"testing"
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
 
-// 	"github.com/gurgeous/gshoot/util"
-// )
+	"github.com/adrg/xdg"
+	"github.com/gurgeous/gshoot/util"
+	"github.com/stretchr/testify/assert"
+)
 
-// func TestResolveMissingAuthGuidesLogin(t *testing.T) {
-// 	home := t.TempDir()
-// 	withAuthEnv(t, map[string]string{"HOME": home})
-// 	_, err := Resolve()
-// 	if err == nil {
-// 		t.Fatal("Resolve() error = nil, want error")
-// 	}
+func TestLoginMissingClientSecretGuidance(t *testing.T) {
+	withAuthHome(t)
 
-// 	var noAuth *NoAuthError
-// 	if !errors.As(err, &noAuth) {
-// 		t.Fatalf("Resolve() error = %T, want NoAuthError", err)
-// 	}
-// 	if got, want := noAuth.Error(), "gshoot [no auth found]\n"; got != want {
-// 		t.Fatalf("Resolve() error = %q, want %q", got, want)
-// 	}
-// }
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := Login(context.Background(), LoginOptions{
+		Stdout: &stdout,
+		Stderr: &stderr,
+	})
 
-// func TestLoginMissingClientSecretGuidance(t *testing.T) {
-// 	withAuthEnv(t, map[string]string{"HOME": t.TempDir()})
+	assert.Error(t, err)
+	if err != nil {
+		assert.Contains(t, err.Error(), "oauth-client.json")
+		assert.Contains(t, err.Error(), "Desktop app")
+		assert.Contains(t, err.Error(), "Test users")
+		assert.Contains(t, err.Error(), "gshoot auth login --client-secret")
+	}
+}
 
-// 	var stdout bytes.Buffer
-// 	var stderr bytes.Buffer
+func TestLoginImportsClientAndSavesToken(t *testing.T) {
+	withAuthHome(t)
 
-// 	err := Login(context.Background(), LoginOptions{
-// 		Stdout: &stdout,
-// 		Stderr: &stderr,
-// 	})
-// 	if err == nil {
-// 		t.Fatal("Login() error = nil, want error")
-// 	}
+	var tokenEndpointHit bool
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tokenEndpointHit = true
+		assert.NoError(t, r.ParseForm())
+		assert.Equal(t, "test-code", r.Form.Get("code"))
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"access_token":  "access",
+			"refresh_token": "refresh",
+			"token_type":    "Bearer",
+			"expires_in":    3600,
+		})
+	}))
+	defer tokenServer.Close()
 
-// 	msg := err.Error()
-// 	for _, want := range []string{
-// 		"oauth-client.json",
-// 		"Desktop app",
-// 		"Test users",
-// 		"gshoot auth login --client-secret",
-// 	} {
-// 		if !strings.Contains(msg, want) {
-// 			t.Fatalf("Login() error = %q, want %q", msg, want)
-// 		}
-// 	}
-// }
+	clientSecretPath := filepath.Join(t.TempDir(), "client_secret.json")
+	assert.NoError(t, os.WriteFile(clientSecretPath, []byte(`{"installed":{"client_id":"cid","client_secret":"secret","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"`+tokenServer.URL+`","redirect_uris":["http://127.0.0.1/oauth2/callback"]}}`), 0o600))
 
-// func TestLoginImportsClientAndSavesToken(t *testing.T) {
-// 	home := t.TempDir()
-// 	var tokenEndpointHit bool
-// 	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-// 		tokenEndpointHit = true
-// 		if err := r.ParseForm(); err != nil {
-// 			t.Fatalf("ParseForm() error = %v", err)
-// 		}
-// 		if got, want := r.Form.Get("code"), "test-code"; got != want {
-// 			t.Fatalf("token exchange code = %q, want %q", got, want)
-// 		}
-// 		w.Header().Set("Content-Type", "application/json")
-// 		_, _ = w.Write([]byte(`{"access_token":"access","refresh_token":"refresh","token_type":"Bearer","expires_in":3600}`))
-// 	}))
-// 	defer tokenServer.Close()
+	authURLCh := stubOpenBrowser(t)
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- Login(context.Background(), LoginOptions{
+			ClientSecretPath: clientSecretPath,
+			Stdout:           &stdout,
+			Stderr:           &stderr,
+		})
+	}()
 
-// 	clientSecret := writeFile(t, filepath.Join(t.TempDir(), "client_secret.json"), `{"installed":{"client_id":"cid","client_secret":"secret","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"`+tokenServer.URL+`","redirect_uris":["http://127.0.0.1/oauth2/callback"]}}`)
+	sendOAuthCallback(t, <-authURLCh, "test-code")
+	err := <-errCh
+	assert.NoError(t, err)
+	assert.True(t, tokenEndpointHit)
+	assert.Contains(t, stdout.String(), "Login complete")
+	assert.Empty(t, stderr.String())
 
-// 	var stdout bytes.Buffer
-// 	var stderr bytes.Buffer
-// 	authURLCh := stubOpenBrowser(t)
-// 	withAuthEnv(t, map[string]string{"HOME": home})
-// 	errCh := make(chan error, 1)
-// 	go func() {
-// 		errCh <- Login(context.Background(), LoginOptions{
-// 			ClientSecretPath: clientSecret,
-// 			Stdout:           &stdout,
-// 			Stderr:           &stderr,
-// 		})
-// 	}()
+	clientData, readErr := os.ReadFile(filepath.Join(util.ConfigDir(), oauthClientFileName))
+	assert.NoError(t, readErr)
+	assert.Contains(t, string(clientData), `"client_id":"cid"`)
 
-// 	sendOAuthCallback(t, <-authURLCh, "test-code")
+	token, loadErr := LoadOAuthToken(filepath.Join(util.ConfigDir(), oauthTokenFileName))
+	assert.NoError(t, loadErr)
+	assert.Equal(t, "access", token.AccessToken)
+	assert.Equal(t, "refresh", token.RefreshToken)
+}
 
-// 	if err := <-errCh; err != nil {
-// 		t.Fatalf("Login() error = %v", err)
-// 	}
+func TestLoginFlowErrorAddsGoogleGuidance(t *testing.T) {
+	withAuthHome(t)
 
-// 	configDir := ConfigDir()
-// 	clientData, err := os.ReadFile(filepath.Join(configDir, oauthClientFileName))
-// 	if err != nil {
-// 		t.Fatalf("ReadFile(client) error = %v", err)
-// 	}
-// 	if !strings.Contains(string(clientData), `"client_id":"cid"`) {
-// 		t.Fatalf("oauth-client.json = %q, want imported client", string(clientData))
-// 	}
-// 	if !tokenEndpointHit {
-// 		t.Fatal("token endpoint was not called")
-// 	}
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"error":"access_denied","error_description":"Access blocked"}`))
+	}))
+	defer tokenServer.Close()
 
-// 	token, err := LoadOAuthToken(filepath.Join(configDir, oauthTokenFileName))
-// 	if err != nil {
-// 		t.Fatalf("LoadOAuthToken() error = %v", err)
-// 	}
-// 	if token.AccessToken != "access" || token.RefreshToken != "refresh" {
-// 		t.Fatalf("saved token = %#v, want oauth token", token)
-// 	}
-// 	if !strings.Contains(stdout.String(), "Login complete") {
-// 		t.Fatalf("stdout = %q, want success message", stdout.String())
-// 	}
-// 	if stderr.Len() != 0 {
-// 		t.Fatalf("stderr = %q, want empty", stderr.String())
-// 	}
-// }
+	writeAuthClient(t, `{"installed":{"client_id":"cid","client_secret":"secret","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"`+tokenServer.URL+`","redirect_uris":["http://127.0.0.1/oauth2/callback"]}}`)
+	authURLCh := stubOpenBrowser(t)
 
-// func TestLoginFlowErrorAddsGoogleGuidance(t *testing.T) {
-// 	home := t.TempDir()
-// 	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-// 		w.Header().Set("Content-Type", "application/json")
-// 		w.WriteHeader(http.StatusBadRequest)
-// 		_, _ = w.Write([]byte(`{"error":"access_denied","error_description":"Access blocked"}`))
-// 	}))
-// 	defer tokenServer.Close()
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- Login(context.Background(), LoginOptions{
+			Stdout: new(bytes.Buffer),
+			Stderr: new(bytes.Buffer),
+		})
+	}()
 
-// 	withAuthEnv(t, map[string]string{"HOME": home})
-// 	writeFile(t, filepath.Join(ConfigDir(), oauthClientFileName), `{"installed":{"client_id":"cid","client_secret":"secret","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"`+tokenServer.URL+`","redirect_uris":["http://127.0.0.1/oauth2/callback"]}}`)
-// 	authURLCh := stubOpenBrowser(t)
-// 	errCh := make(chan error, 1)
-// 	go func() {
-// 		errCh <- Login(context.Background(), LoginOptions{
-// 			Stdout: new(bytes.Buffer),
-// 			Stderr: new(bytes.Buffer),
-// 		})
-// 	}()
+	sendOAuthCallback(t, <-authURLCh, "denied-code")
+	err := <-errCh
+	assert.Error(t, err)
+	if err != nil {
+		assert.Contains(t, err.Error(), "Access blocked")
+		assert.Contains(t, err.Error(), "Test users")
+		assert.Contains(t, err.Error(), "OAuth consent screen")
+	}
+	assert.False(t, util.FileExists(filepath.Join(util.ConfigDir(), oauthTokenFileName)))
+}
 
-// 	sendOAuthCallback(t, <-authURLCh, "denied-code")
+func TestLoginRejectsNonOAuthClientSecret(t *testing.T) {
+	withAuthHome(t)
 
-// 	err := <-errCh
-// 	if err == nil {
-// 		t.Fatal("Login() error = nil, want error")
-// 	}
+	clientSecretPath := filepath.Join(t.TempDir(), "service-account.json")
+	assert.NoError(t, os.WriteFile(clientSecretPath, []byte(`{"type":"service_account","client_email":"robot@example.com","private_key":"abc"}`), 0o600))
 
-// 	msg := err.Error()
-// 	for _, want := range []string{
-// 		"Access blocked",
-// 		"Test users",
-// 		"OAuth consent screen",
-// 	} {
-// 		if !strings.Contains(msg, want) {
-// 			t.Fatalf("Login() error = %q, want %q", msg, want)
-// 		}
-// 	}
-// 	if util.FileExists(filepath.Join(ConfigDir(), oauthTokenFileName)) {
-// 		t.Fatal("Login() should not save a token on exchange failure")
-// 	}
-// }
+	err := Login(context.Background(), LoginOptions{
+		ClientSecretPath: clientSecretPath,
+		Stdout:           new(bytes.Buffer),
+		Stderr:           new(bytes.Buffer),
+	})
 
-// func TestLoginRejectsNonOAuthClientSecret(t *testing.T) {
-// 	home := t.TempDir()
-// 	clientSecret := writeFile(t, filepath.Join(t.TempDir(), "service-account.json"), `{"type":"service_account","client_email":"robot@example.com","private_key":"abc"}`)
+	assert.Error(t, err)
+	if err != nil {
+		assert.Contains(t, err.Error(), "unsupported credential file")
+	}
+}
 
-// 	withAuthEnv(t, map[string]string{"HOME": home})
-// 	err := Login(context.Background(), LoginOptions{
-// 		ClientSecretPath: clientSecret,
-// 		Stdout:           new(bytes.Buffer),
-// 		Stderr:           new(bytes.Buffer),
-// 	})
-// 	if err == nil {
-// 		t.Fatal("Login() error = nil, want error")
-// 	}
-// 	if !strings.Contains(err.Error(), "Desktop app OAuth client") {
-// 		t.Fatalf("Login() error = %q, want oauth client error", err.Error())
-// 	}
-// }
+func TestSelectLoopbackRedirect(t *testing.T) {
+	redirect, err := selectLoopbackRedirect([]string{
+		"https://example.com/callback",
+		"http://127.0.0.1/oauth2/callback",
+	})
 
-// func TestSelectLoopbackRedirect(t *testing.T) {
-// 	got, err := selectLoopbackRedirect([]string{
-// 		"https://example.com/callback",
-// 		"http://127.0.0.1/oauth2/callback",
-// 	})
-// 	if err != nil {
-// 		t.Fatalf("selectLoopbackRedirect() error = %v", err)
-// 	}
-// 	if got.String() != "http://127.0.0.1/oauth2/callback" {
-// 		t.Fatalf("selectLoopbackRedirect() = %q, want loopback redirect", got.String())
-// 	}
-// }
+	assert.NoError(t, err)
+	if err == nil {
+		assert.Equal(t, "http://127.0.0.1/oauth2/callback", redirect.String())
+	}
+}
 
-// func TestSelectLoopbackRedirectMissing(t *testing.T) {
-// 	_, err := selectLoopbackRedirect([]string{"https://example.com/callback"})
-// 	if err == nil {
-// 		t.Fatal("selectLoopbackRedirect() error = nil, want error")
-// 	}
-// }
+func TestSelectLoopbackRedirectMissing(t *testing.T) {
+	_, err := selectLoopbackRedirect([]string{"https://example.com/callback"})
+	assert.Error(t, err)
+}
 
-// func TestFriendlyLoginErrorInvalidClient(t *testing.T) {
-// 	base := errors.New("invalid_client")
-// 	err := friendlyLoginError(base)
-// 	if !strings.Contains(err.Error(), "re-download") {
-// 		t.Fatalf("friendlyLoginError() = %q, want invalid-client hint", err.Error())
-// 	}
-// 	if !errors.Is(err, base) {
-// 		t.Fatalf("friendlyLoginError() should wrap the original error")
-// 	}
-// }
+func TestFriendlyLoginErrorInvalidClient(t *testing.T) {
+	base := errors.New("invalid_client")
+	err := friendlyLoginError(base)
 
-// func TestOAuthConfigForLoginDefaultsToGoogleEndpoints(t *testing.T) {
-// 	config, err := oauthConfigForLogin(&OAuthClient{
-// 		ClientID:     "cid",
-// 		ClientSecret: "secret",
-// 		RedirectURIs: []string{"http://127.0.0.1/oauth2/callback"},
-// 	})
-// 	if err != nil {
-// 		t.Fatalf("oauthConfigForLogin() error = %v", err)
-// 	}
-// 	if got, want := config.Endpoint.AuthURL, "https://accounts.google.com/o/oauth2/auth"; got != want {
-// 		t.Fatalf("config.Endpoint.AuthURL = %q, want %q", got, want)
-// 	}
-// 	if got, want := config.Endpoint.TokenURL, "https://oauth2.googleapis.com/token"; got != want {
-// 		t.Fatalf("config.Endpoint.TokenURL = %q, want %q", got, want)
-// 	}
-// }
+	assert.ErrorIs(t, err, base)
+	assert.Contains(t, err.Error(), "re-download")
+}
 
-// func TestLogout(t *testing.T) {
-// 	home := t.TempDir()
-// 	withAuthEnv(t, map[string]string{"HOME": home})
-// 	writeFile(t, filepath.Join(ConfigDir(), oauthTokenFileName), `{"access_token":"a","token_type":"Bearer","expiry":"3026-05-07T22:00:00Z"}`)
-// 	removed, err := Logout()
-// 	if err != nil {
-// 		t.Fatalf("Logout() error = %v", err)
-// 	}
-// 	if !removed {
-// 		t.Fatal("Logout() removed = false, want true")
-// 	}
-// 	if util.FileExists(filepath.Join(ConfigDir(), oauthTokenFileName)) {
-// 		t.Fatal("Logout() should remove the cached token")
-// 	}
-// }
+func TestOAuthConfigForLoginDefaultsToGoogleEndpoints(t *testing.T) {
+	config, err := oauthConfigForLogin(&OAuthClient{
+		ClientID:     "cid",
+		ClientSecret: "secret",
+		RedirectURIs: []string{"http://127.0.0.1/oauth2/callback"},
+	})
 
-// func TestLogoutMissingToken(t *testing.T) {
-// 	withAuthEnv(t, map[string]string{"HOME": t.TempDir()})
-// 	removed, err := Logout()
-// 	if err != nil {
-// 		t.Fatalf("Logout() error = %v", err)
-// 	}
-// 	if removed {
-// 		t.Fatal("Logout() removed = true, want false")
-// 	}
-// }
+	assert.NoError(t, err)
+	if err == nil {
+		assert.Equal(t, "https://accounts.google.com/o/oauth2/auth", config.Endpoint.AuthURL)
+		assert.Equal(t, "https://oauth2.googleapis.com/token", config.Endpoint.TokenURL)
+	}
+}
 
-// func stubOpenBrowser(t *testing.T) <-chan string {
-// 	t.Helper()
+func stubOpenBrowser(t *testing.T) <-chan string {
+	t.Helper()
 
-// 	// This swaps a package-global test seam, so callers must not run in parallel.
-// 	authURLCh := make(chan string, 1)
-// 	orig := openBrowser
-// 	openBrowser = func(rawURL string) error {
-// 		authURLCh <- rawURL
-// 		return nil
-// 	}
-// 	t.Cleanup(func() {
-// 		openBrowser = orig
-// 	})
-// 	return authURLCh
-// }
+	authURLCh := make(chan string, 1)
+	orig := openBrowser
+	openBrowser = func(rawURL string) error {
+		authURLCh <- rawURL
+		return nil
+	}
+	t.Cleanup(func() {
+		openBrowser = orig
+	})
+	return authURLCh
+}
 
-// func sendOAuthCallback(t *testing.T, authURL, code string) {
-// 	t.Helper()
+func sendOAuthCallback(t *testing.T, authURL, code string) {
+	t.Helper()
 
-// 	u, err := url.Parse(authURL)
-// 	if err != nil {
-// 		t.Fatalf("Parse(authURL) error = %v", err)
-// 	}
+	u, err := url.Parse(authURL)
+	assert.NoError(t, err)
+	if err != nil {
+		return
+	}
 
-// 	callbackURL := u.Query().Get("redirect_uri")
-// 	if callbackURL == "" {
-// 		t.Fatal("auth URL missing redirect_uri")
-// 	}
-// 	state := u.Query().Get("state")
-// 	if state == "" {
-// 		t.Fatal("auth URL missing state")
-// 	}
+	callbackURL := u.Query().Get("redirect_uri")
+	state := u.Query().Get("state")
+	assert.NotEmpty(t, callbackURL)
+	assert.NotEmpty(t, state)
+	if callbackURL == "" || state == "" {
+		return
+	}
 
-// 	callback, err := url.Parse(callbackURL)
-// 	if err != nil {
-// 		t.Fatalf("Parse(callbackURL) error = %v", err)
-// 	}
-// 	query := callback.Query()
-// 	query.Set("code", code)
-// 	query.Set("state", state)
-// 	callback.RawQuery = query.Encode()
+	callback, err := url.Parse(callbackURL)
+	assert.NoError(t, err)
+	if err != nil {
+		return
+	}
 
-// 	resp, err := http.Get(callback.String())
-// 	if err != nil {
-// 		t.Fatalf("GET(callback) error = %v", err)
-// 	}
-// 	defer resp.Body.Close()
-// 	if resp.StatusCode != http.StatusOK {
-// 		t.Fatalf("callback status = %d, want 200", resp.StatusCode)
-// 	}
-// }
+	query := callback.Query()
+	query.Set("code", code)
+	query.Set("state", state)
+	callback.RawQuery = query.Encode()
+
+	resp, err := http.Get(callback.String())
+	assert.NoError(t, err)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
+func withAuthHome(t *testing.T) string {
+	t.Helper()
+
+	home := t.TempDir()
+	t.Cleanup(xdg.Reload)
+	t.Setenv("HOME", home)
+	xdg.Reload()
+	return util.ConfigDir()
+}
+
+func writeAuthClient(t *testing.T, body string) {
+	t.Helper()
+
+	assert.NoError(t, util.WritePrivateFile(filepath.Join(util.ConfigDir(), oauthClientFileName), []byte(body)))
+}
+
+func writeAuthToken(t *testing.T, token OAuthToken) {
+	t.Helper()
+
+	data, err := json.Marshal(token)
+	assert.NoError(t, err)
+	if err == nil {
+		assert.NoError(t, util.WritePrivateFile(filepath.Join(util.ConfigDir(), oauthTokenFileName), append(data, '\n')))
+	}
+}
+
+func futureToken() OAuthToken {
+	return OAuthToken{
+		AccessToken:  "access",
+		RefreshToken: "refresh",
+		TokenType:    "Bearer",
+		Expiry:       time.Now().Add(time.Hour),
+	}
+}

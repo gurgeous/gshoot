@@ -6,14 +6,14 @@
 
 ## Project
 
-- After any non-Markdown change, run `mise check`
-- Use `mise run format` instead of `gofmt` directly
+- After any non-Markdown change, run `just check`
+- Use `just format` instead of `gofmt` directly
 - If user-facing text changes, ask before reverting it; usually fix tests instead
 - Use `mv` for file moves/renames; use patches for content edits
 - When creating a PR, write a succinct title/body from the diff vs `main`; do not use auto-filled wip text
 - Small Go CLI, not a framework or service
 - Be succinct, especially in Markdown
-- Prefer `mise run` tasks when they exist
+- Prefer `just` tasks when they exist
 - Run small relevant checks while working; run the full check before commits
 - Keep commit/PR messages under 80 chars
 

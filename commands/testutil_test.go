@@ -69,6 +69,10 @@ type runnable interface {
 }
 
 func testCommand(t *testing.T, cmd runnable, handler http.HandlerFunc) (error, string, string) {
+	return testCommandWithSetup(t, cmd, handler)
+}
+
+func testCommandWithSetup(t *testing.T, cmd runnable, handler http.HandlerFunc, setup ...func(string)) (error, string, string) {
 	t.Helper()
 
 	// use temp dir and temp files for stdout/stderr
@@ -87,13 +91,21 @@ func testCommand(t *testing.T, cmd runnable, handler http.HandlerFunc) (error, s
 	t.Cleanup(func() { stderrFile.Close() })
 
 	// fake browser auth under HOME
+	t.Cleanup(xdg.Reload)
 	t.Setenv("HOME", tmp)
 	xdg.Reload()
-	t.Cleanup(xdg.Reload)
-	writeAuthFiles(t, tmp)
+	if len(setup) > 0 && setup[0] != nil {
+		setup[0](tmp)
+	} else {
+		writeAuthFiles(t, tmp)
+	}
 
 	// stub google api
-	googleAPIHandler = handler
+	if handler == nil {
+		googleAPIHandler = invalid
+	} else {
+		googleAPIHandler = handler
+	}
 	defer func() { googleAPIHandler = invalid }()
 
 	// run

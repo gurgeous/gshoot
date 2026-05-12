@@ -1,101 +1,67 @@
 package commands
 
-// import (
-// 	"context"
-// 	"errors"
-// 	"path/filepath"
-// 	"strings"
-// 	"testing"
+import (
+	"path/filepath"
+	"testing"
+	"time"
 
-// 	"github.com/gurgeous/gshoot/auth"
-// 	"github.com/gurgeous/gshoot/testutil"
-// 	"github.com/gurgeous/gshoot/util"
-// 	"github.com/stretchr/testify/assert"
-// )
+	"github.com/gurgeous/gshoot/util"
+	"github.com/stretchr/testify/assert"
+)
 
-// func TestLoginCommand(t *testing.T) {
-// 	orig := runLogin
-// 	runLogin = func(_ context.Context, opts auth.LoginOptions) error {
-// 		if opts.ClientSecretPath != "/tmp/client.json" {
-// 			t.Fatalf("Login() client secret = %q, want /tmp/client.json", opts.ClientSecretPath)
-// 		}
-// 		if opts.Stdout == nil || opts.Stderr == nil {
-// 			t.Fatal("Login() missing stdio")
-// 		}
-// 		return nil
-// 	}
-// 	t.Cleanup(func() {
-// 		runLogin = orig
-// 	})
+func TestAuthLoginCommand(t *testing.T) {
+	err, _, _ := testCommandWithSetup(t, &AuthLoginCmd{}, nil, func(string) {})
+	assert.Error(t, err)
+	if err != nil {
+		assert.Contains(t, err.Error(), "oauth-client.json")
+	}
+}
 
-// 	code, _, _ := testMain("auth", "login", "--client-secret", "/tmp/client.json")
-// 	assert.Equal(t, 0, code)
-// }
+func TestAuthLogoutCommand(t *testing.T) {
+	err, stdout, _ := testCommandWithSetup(t, &AuthLogoutCmd{}, nil, func(home string) {
+		writeCommandAuthFiles(t, home)
+	})
 
-// func TestLogoutCommand(t *testing.T) {
-// 	orig := runLogout
-// 	runLogout = func() (bool, error) { return true, nil }
-// 	t.Cleanup(func() {
-// 		runLogout = orig
-// 	})
+	assert.NoError(t, err)
+	assert.Contains(t, stdout, "Removed cached OAuth token")
+}
 
-// 	code, stdout, _ := testMain("auth", "logout")
-// 	assert.Equal(t, 0, code)
-// 	assert.Contains(t, stdout, "Removed cached OAuth token")
-// }
+func TestAuthStatusCommandLoggedIn(t *testing.T) {
+	err, stdout, _ := testCommandWithSetup(t, &AuthStatusCmd{}, nil, func(home string) {
+		writeCommandAuthFiles(t, home)
+	})
 
-// func TestStatusCommand(t *testing.T) {
-// 	origResolve := resolveAuth
-// 	resolveAuth = func() (auth.Resolved, error) {
-// 		return auth.Resolved{}, errors.New("no auth")
-// 	}
-// 	t.Cleanup(func() {
-// 		resolveAuth = origResolve
-// 	})
+	assert.NoError(t, err)
+	assert.Contains(t, stdout, "Status: logged in")
+}
 
-// 	home := t.TempDir()
-// 	testutil.WithEnv(t, map[string]string{"HOME": home}, nil)
-// 	clientPath := filepath.Join(home, ".config", "gshoot", "oauth-client.json")
-// 	if err := util.WritePrivateFile(clientPath, []byte(`{"installed":{"client_id":"cid"}}`)); err != nil {
-// 		t.Fatalf("WritePrivateFile() error = %v", err)
-// 	}
+func TestAuthStatusCommandExpiredToken(t *testing.T) {
+	err, stdout, _ := testCommandWithSetup(t, &AuthStatusCmd{}, nil, func(home string) {
+		writeCommandAuthFiles(t, home, time.Now().Add(-time.Hour))
+	})
 
-// 	code, stdout, _ := testMain("auth", "status")
-// 	assert.Equal(t, 0, code)
-// 	assert.Contains(t, stdout, "not logged in")
-// }
+	assert.NoError(t, err)
+	assert.Contains(t, stdout, "Status: not logged in yet")
+}
 
-// func TestWriteStatusAuthenticated(t *testing.T) {
-// 	origResolve := resolveAuth
-// 	resolveAuth = func() (auth.Resolved, error) {
-// 		return auth.Resolved{
-// 			Source: auth.Source{
-// 				Kind: auth.SourceKindCachedOAuth,
-// 				Path: "/tmp/token.json",
-// 			},
-// 		}, nil
-// 	}
-// 	t.Cleanup(func() {
-// 		resolveAuth = origResolve
-// 	})
+func TestAuthStatusCommandNoAuth(t *testing.T) {
+	err, stdout, _ := testCommandWithSetup(t, &AuthStatusCmd{}, nil, func(string) {})
 
-// 	testutil.WithEnv(t, map[string]string{"HOME": t.TempDir()}, nil)
-// 	var out strings.Builder
-// 	writeStatus(&out)
-// 	assert.Contains(t, out.String(), "authenticated via cached_oauth")
-// }
+	assert.NoError(t, err)
+	assert.Contains(t, stdout, "Status: no auth configured")
+	assert.Contains(t, stdout, "auth login --client-secret")
+}
 
-// func TestWriteStatusNoAuth(t *testing.T) {
-// 	origResolve := resolveAuth
-// 	resolveAuth = func() (auth.Resolved, error) {
-// 		return auth.Resolved{}, errors.New("no auth")
-// 	}
-// 	t.Cleanup(func() {
-// 		resolveAuth = origResolve
-// 	})
+func writeCommandAuthFiles(t *testing.T, home string, expiry ...time.Time) {
+	t.Helper()
 
-// 	testutil.WithEnv(t, map[string]string{"HOME": t.TempDir()}, nil)
-// 	var out strings.Builder
-// 	writeStatus(&out)
-// 	assert.Contains(t, out.String(), "auth login --client-secret")
-// }
+	configDir := filepath.Join(home, ".config", "gshoot")
+	clientJSON := `{"installed":{"client_id":"cid","client_secret":"secret","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","redirect_uris":["http://127.0.0.1/oauth2/callback"]}}`
+	tokenExpiry := time.Now().Add(time.Hour)
+	if len(expiry) > 0 {
+		tokenExpiry = expiry[0]
+	}
+	tokenJSON := `{"access_token":"token","refresh_token":"refresh","token_type":"Bearer","expiry":"` + tokenExpiry.UTC().Format(time.RFC3339) + `"}`
+	assert.NoError(t, util.WritePrivateFile(filepath.Join(configDir, "oauth-client.json"), []byte(clientJSON)))
+	assert.NoError(t, util.WritePrivateFile(filepath.Join(configDir, "oauth-token.json"), []byte(tokenJSON)))
+}
