@@ -121,7 +121,7 @@ func browserLoginFlow(ctx context.Context, config *oauth2.Config, stdout, stderr
 	authURL := config.AuthCodeURL(state, oauth2.AccessTypeOffline, oauth2.SetAuthURLParam("prompt", "consent"))
 	fmt.Fprintln(stdout, ux.Info.Render("Open this URL if the browser does not open:"))
 	fmt.Fprintln(stdout, ux.Subtle.Render(authURL))
-	if err := util.OpenBrowserURL(authURL); err != nil {
+	if err := openBrowser(authURL); err != nil {
 		fmt.Fprintln(stderr, ux.Warn.Render("Could not open browser automatically: "+err.Error()))
 	}
 	fmt.Fprintln(stdout, ux.Info.Render("Waiting for Google login at "+callbackURL+" ..."))
