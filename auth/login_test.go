@@ -241,7 +241,7 @@ func sendOAuthCallback(t *testing.T, authURL, code string) {
 }
 
 // withAuthHome points auth at a fresh temporary HOME directory.
-func withAuthHome(t *testing.T) *Client {
+func withAuthHome(t *testing.T) *Manager {
 	t.Helper()
 
 	home := t.TempDir()

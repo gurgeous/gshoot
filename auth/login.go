@@ -25,7 +25,7 @@ type LoginOptions struct {
 }
 
 // Login runs an interactive OAuth login and persists the token.
-func (c *Client) Login(ctx context.Context, opts LoginOptions) error {
+func (c *Manager) Login(ctx context.Context, opts LoginOptions) error {
 	client, err := c.LoadOClient()
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {

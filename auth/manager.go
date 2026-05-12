@@ -15,16 +15,16 @@ import (
 
 // auth/client.go owns on-disk browser auth state and status reporting.
 
-// Client manages browser auth files under one config directory.
-type Client struct {
+// Manager manages browser auth files under one config directory.
+type Manager struct {
 	ConfigDir string
 }
 
 // NewClient builds an auth client for the default config directory.
-func NewClient() *Client {
-	c := Client{ConfigDir: util.ConfigDir()}
-	os.MkdirAll(c.ConfigDir, 0o700)
-	return &c
+func NewClient() *Manager {
+	m := Manager{ConfigDir: util.ConfigDir()}
+	os.MkdirAll(m.ConfigDir, 0o700)
+	return &m
 }
 
 //
@@ -32,13 +32,13 @@ func NewClient() *Client {
 //
 
 // ClientPath returns the oauth-client.json path.
-func (c *Client) ClientPath() string {
-	return filepath.Join(c.ConfigDir, "oauth-client.json")
+func (m *Manager) ClientPath() string {
+	return filepath.Join(m.ConfigDir, "oauth-client.json")
 }
 
 // TokenPath returns the oauth-token.json path.
-func (c *Client) TokenPath() string {
-	return filepath.Join(c.ConfigDir, "oauth-token.json")
+func (m *Manager) TokenPath() string {
+	return filepath.Join(m.ConfigDir, "oauth-token.json")
 }
 
 //
@@ -63,13 +63,13 @@ type OAuthToken struct {
 }
 
 // LoadOClient reads the saved OAuth client config.
-func (c *Client) LoadOClient() (*OClient, error) {
-	return loadOClient(c.ClientPath())
+func (m *Manager) LoadOClient() (*OClient, error) {
+	return loadOClient(m.ClientPath())
 }
 
 // LoadOAuthToken reads the saved OAuth token.
-func (c *Client) LoadOAuthToken() (OAuthToken, error) {
-	return loadOAuthToken(c.TokenPath())
+func (m *Manager) LoadOAuthToken() (OAuthToken, error) {
+	return loadOAuthToken(m.TokenPath())
 }
 
 //
@@ -77,19 +77,19 @@ func (c *Client) LoadOAuthToken() (OAuthToken, error) {
 //
 
 // SaveOAuthToken writes the saved OAuth token.
-func (c *Client) SaveOAuthToken(token OAuthToken) error {
+func (m *Manager) SaveOAuthToken(token OAuthToken) error {
 	data, err := json.MarshalIndent(token, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal oauth token: %w", err)
 	}
-	if err := util.WritePrivateFile(c.TokenPath(), append(data, '\n')); err != nil {
+	if err := util.WritePrivateFile(m.TokenPath(), append(data, '\n')); err != nil {
 		return fmt.Errorf("save oauth token: %w", err)
 	}
 	return nil
 }
 
 // ImportOClient validates and saves a downloaded client JSON file.
-func (c *Client) ImportOClient(srcPath string) error {
+func (m *Manager) ImportOClient(srcPath string) error {
 	data, err := os.ReadFile(srcPath)
 	if err != nil {
 		return fmt.Errorf("read client secret file: %w", err)
@@ -101,7 +101,7 @@ func (c *Client) ImportOClient(srcPath string) error {
 	if oclient == nil {
 		return errors.New("client secret file must be a Desktop app OAuth client JSON")
 	}
-	if err := util.WritePrivateFile(c.ClientPath(), data); err != nil {
+	if err := util.WritePrivateFile(m.ClientPath(), data); err != nil {
 		return fmt.Errorf("save oauth client config: %w", err)
 	}
 	return nil
@@ -112,8 +112,8 @@ func (c *Client) ImportOClient(srcPath string) error {
 //
 
 // Logout clears the cached OAuth token while keeping the client config.
-func (c *Client) Logout() {
-	os.Remove(c.TokenPath())
+func (m *Manager) Logout() {
+	os.Remove(m.TokenPath())
 }
 
 //
@@ -121,18 +121,18 @@ func (c *Client) Logout() {
 //
 
 // Status writes a short auth status summary.
-func (c *Client) Status(w io.Writer) error {
-	hasOClient := util.FileExists(c.ClientPath())
-	hasCachedToken := util.FileExists(c.TokenPath())
+func (m *Manager) Status(w io.Writer) error {
+	hasOClient := util.FileExists(m.ClientPath())
+	hasCachedToken := util.FileExists(m.TokenPath())
 	loggedIn := false
 	if hasCachedToken {
-		token, err := c.LoadOAuthToken()
+		token, err := m.LoadOAuthToken()
 		loggedIn = err == nil && token.AccessToken != "" && (token.Expiry.IsZero() || token.Expiry.After(time.Now()))
 	}
 
-	fmt.Fprintln(w, ux.Subtle.Render("Config dir: "+c.ConfigDir))
-	fmt.Fprintln(w, ux.Subtle.Render("OAuth client: "+presentLine(hasOClient, c.ClientPath())))
-	fmt.Fprintln(w, ux.Subtle.Render("Cached token: "+presentLine(hasCachedToken, c.TokenPath())))
+	fmt.Fprintln(w, ux.Subtle.Render("Config dir: "+m.ConfigDir))
+	fmt.Fprintln(w, ux.Subtle.Render("OAuth client: "+presentLine(hasOClient, m.ClientPath())))
+	fmt.Fprintln(w, ux.Subtle.Render("Cached token: "+presentLine(hasCachedToken, m.TokenPath())))
 
 	switch {
 	case loggedIn:
