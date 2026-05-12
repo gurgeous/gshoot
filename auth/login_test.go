@@ -102,7 +102,7 @@ func TestLoginFlowErrorAddsGoogleGuidance(t *testing.T) {
 	}))
 	defer tokenServer.Close()
 
-	writeAuthClient(t, `{"installed":{"client_id":"cid","client_secret":"secret","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"`+tokenServer.URL+`","redirect_uris":["http://127.0.0.1/oauth2/callback"]}}`)
+	writeClient(t, `{"installed":{"client_id":"cid","client_secret":"secret","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"`+tokenServer.URL+`","redirect_uris":["http://127.0.0.1/oauth2/callback"]}}`)
 	authURLCh := stubOpenBrowser(t)
 
 	errCh := make(chan error, 1)
@@ -124,8 +124,8 @@ func TestLoginFlowErrorAddsGoogleGuidance(t *testing.T) {
 	assert.False(t, util.FileExists(client.TokenPath()))
 }
 
-// TestLoginRejectsNonOAuthClientSecret rejects non-browser client JSON files.
-func TestLoginRejectsNonOAuthClientSecret(t *testing.T) {
+// TestLoginRejectsNonOClientSecret rejects non-browser client JSON files.
+func TestLoginRejectsNonOClientSecret(t *testing.T) {
 	client := withAuthHome(t)
 
 	clientSecretPath := filepath.Join(t.TempDir(), "service-account.json")
@@ -173,7 +173,7 @@ func TestFriendlyLoginErrorInvalidClient(t *testing.T) {
 
 // TestOAuthConfigForLoginDefaultsToGoogleEndpoints keeps Google's default endpoints.
 func TestOAuthConfigForLoginDefaultsToGoogleEndpoints(t *testing.T) {
-	config, err := oauthConfigForLogin(&OAuthClient{
+	config, err := oauthConfigForLogin(&OClient{
 		ClientID:     "cid",
 		ClientSecret: "secret",
 		RedirectURIs: []string{"http://127.0.0.1/oauth2/callback"},
@@ -241,28 +241,28 @@ func sendOAuthCallback(t *testing.T, authURL, code string) {
 }
 
 // withAuthHome points auth at a fresh temporary HOME directory.
-func withAuthHome(t *testing.T) *AuthClient {
+func withAuthHome(t *testing.T) *Client {
 	t.Helper()
 
 	home := t.TempDir()
 	t.Cleanup(xdg.Reload)
 	t.Setenv("HOME", home)
 	xdg.Reload()
-	return NewAuthClient()
+	return NewClient()
 }
 
-// writeAuthClient saves a test OAuth client file in the current auth config dir.
-func writeAuthClient(t *testing.T, body string) {
+// writeClient saves a test OAuth client file in the current auth config dir.
+func writeClient(t *testing.T, body string) {
 	t.Helper()
 
-	assert.NoError(t, util.WritePrivateFile(NewAuthClient().ClientPath(), []byte(body)))
+	assert.NoError(t, util.WritePrivateFile(NewClient().ClientPath(), []byte(body)))
 }
 
 // writeAuthToken saves a test OAuth token file in the current auth config dir.
 func writeAuthToken(t *testing.T, token OAuthToken) {
 	t.Helper()
 
-	assert.NoError(t, NewAuthClient().SaveOAuthToken(token))
+	assert.NoError(t, NewClient().SaveOAuthToken(token))
 }
 
 // futureToken returns a valid cached token for auth tests.

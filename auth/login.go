@@ -26,19 +26,19 @@ type LoginOptions struct {
 }
 
 // Login runs an interactive OAuth login and persists the token.
-func (c *AuthClient) Login(ctx context.Context, opts LoginOptions) error {
+func (c *Client) Login(ctx context.Context, opts LoginOptions) error {
 	if err := os.MkdirAll(c.ConfigDir, 0o700); err != nil {
 		return fmt.Errorf("create config dir: %w", err)
 	}
 
 	if opts.ClientSecretPath != "" {
-		if err := importOAuthClient(opts.ClientSecretPath, c.ClientPath()); err != nil {
+		if err := importOClient(opts.ClientSecretPath, c.ClientPath()); err != nil {
 			return err
 		}
 		fmt.Fprintln(opts.Stdout, ux.Success.Render("Saved OAuth client config to "+c.ClientPath()))
 	}
 
-	client, err := c.LoadOAuthClient()
+	client, err := c.LoadOClient()
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf(
@@ -81,7 +81,7 @@ func (c *AuthClient) Login(ctx context.Context, opts LoginOptions) error {
 }
 
 // oauthConfigForLogin builds an OAuth config for the browser login flow.
-func oauthConfigForLogin(client *OAuthClient) (*oauth2.Config, error) {
+func oauthConfigForLogin(client *OClient) (*oauth2.Config, error) {
 	redirect, err := selectLoopbackRedirect(client.RedirectURIs)
 	if err != nil {
 		return nil, err
@@ -99,13 +99,13 @@ func oauthConfigForLogin(client *OAuthClient) (*oauth2.Config, error) {
 	}, nil
 }
 
-// importOAuthClient validates and saves a downloaded client JSON file.
-func importOAuthClient(srcPath, dstPath string) error {
+// importOClient validates and saves a downloaded client JSON file.
+func importOClient(srcPath, dstPath string) error {
 	data, err := os.ReadFile(srcPath)
 	if err != nil {
 		return fmt.Errorf("read client secret file: %w", err)
 	}
-	client, err := loadOAuthClient(srcPath)
+	client, err := loadOClient(srcPath)
 	if err != nil {
 		return fmt.Errorf("load client secret file: %w", err)
 	}

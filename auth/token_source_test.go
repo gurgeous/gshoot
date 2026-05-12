@@ -16,8 +16,8 @@ import (
 
 // auth/token_source_test.go covers cached-token loading, refresh, and logout.
 
-// TestLoadOAuthClient parses installed and web OAuth client files.
-func TestLoadOAuthClient(t *testing.T) {
+// TestLoadOClient parses installed and web OAuth client files.
+func TestLoadOClient(t *testing.T) {
 	for _, body := range []string{
 		`{"installed":{"client_id":"cid"}}`,
 		`{"web":{"client_id":"cid"}}`,
@@ -25,7 +25,7 @@ func TestLoadOAuthClient(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "client.json")
 		assert.NoError(t, os.WriteFile(path, []byte(body), 0o600))
 
-		client, err := loadOAuthClient(path)
+		client, err := loadOClient(path)
 		assert.NoError(t, err)
 		if err == nil {
 			assert.Equal(t, "cid", client.ClientID)
@@ -33,12 +33,12 @@ func TestLoadOAuthClient(t *testing.T) {
 	}
 }
 
-// TestLoadOAuthClientUnsupported rejects unsupported credential JSON.
-func TestLoadOAuthClientUnsupported(t *testing.T) {
+// TestLoadOClientUnsupported rejects unsupported credential JSON.
+func TestLoadOClientUnsupported(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "client.json")
 	assert.NoError(t, os.WriteFile(path, []byte(`{"type":"service_account"}`), 0o600))
 
-	_, err := loadOAuthClient(path)
+	_, err := loadOClient(path)
 	assert.Error(t, err)
 	if err != nil {
 		assert.Contains(t, err.Error(), "unsupported credential file")
@@ -126,7 +126,7 @@ func TestNewTokenSourceRefreshesCachedOAuth(t *testing.T) {
 	}))
 	defer tokenServer.Close()
 
-	writeAuthClient(t, `{"installed":{"client_id":"cid","client_secret":"secret","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"`+tokenServer.URL+`","redirect_uris":["http://127.0.0.1/oauth2/callback"]}}`)
+	writeClient(t, `{"installed":{"client_id":"cid","client_secret":"secret","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"`+tokenServer.URL+`","redirect_uris":["http://127.0.0.1/oauth2/callback"]}}`)
 	writeAuthToken(t, OAuthToken{
 		AccessToken:  "expired",
 		RefreshToken: "refresh-token",
@@ -161,7 +161,7 @@ func TestNewTokenSourceCachedOAuthRefreshFailure(t *testing.T) {
 	}))
 	defer tokenServer.Close()
 
-	writeAuthClient(t, `{"installed":{"client_id":"cid","client_secret":"secret","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"`+tokenServer.URL+`","redirect_uris":["http://127.0.0.1/oauth2/callback"]}}`)
+	writeClient(t, `{"installed":{"client_id":"cid","client_secret":"secret","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"`+tokenServer.URL+`","redirect_uris":["http://127.0.0.1/oauth2/callback"]}}`)
 	writeAuthToken(t, OAuthToken{
 		AccessToken:  "expired",
 		RefreshToken: "refresh-token",

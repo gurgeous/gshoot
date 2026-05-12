@@ -13,7 +13,7 @@ import (
 // auth/token_source.go turns saved browser auth files into token sources.
 
 // TokenSource creates an oauth2 token source from saved auth state.
-func (c *AuthClient) TokenSource(ctx context.Context, scopes []string) (oauth2.TokenSource, error) {
+func (c *Client) TokenSource(ctx context.Context, scopes []string) (oauth2.TokenSource, error) {
 	tokenState, err := c.LoadOAuthToken()
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -29,7 +29,7 @@ func (c *AuthClient) TokenSource(ctx context.Context, scopes []string) (oauth2.T
 		Expiry:       tokenState.Expiry,
 	}
 
-	client, err := c.LoadOAuthClient()
+	client, err := c.LoadOClient()
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			if !token.Valid() {
