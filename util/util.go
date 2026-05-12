@@ -79,8 +79,8 @@ func RandomHex(n int) (string, error) {
 }
 
 // OpenBrowserURL opens rawURL in the default browser for the current OS.
-func OpenBrowserURL(rawURL string) error {
-	name, args := browserCommandArgs(runtime.GOOS, rawURL)
+func OpenBrowserURL(url string) error {
+	name, args := browserCommandArgs(runtime.GOOS, url)
 	return exec.Command(name, args...).Start()
 }
 
