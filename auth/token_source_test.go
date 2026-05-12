@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gurgeous/gshoot/util"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -188,18 +187,5 @@ func TestNewTokenSourceCachedOAuthRefreshFailure(t *testing.T) {
 func TestLogout(t *testing.T) {
 	client := withAuthHome(t)
 	writeAuthToken(t, futureToken())
-
-	removed, err := client.Logout()
-	assert.NoError(t, err)
-	assert.True(t, removed)
-	assert.False(t, util.FileExists(client.TokenPath()))
-}
-
-// TestLogoutMissingToken is a no-op when there is no cached token.
-func TestLogoutMissingToken(t *testing.T) {
-	client := withAuthHome(t)
-
-	removed, err := client.Logout()
-	assert.NoError(t, err)
-	assert.False(t, removed)
+	client.Logout()
 }

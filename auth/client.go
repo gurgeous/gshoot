@@ -13,12 +13,14 @@ import (
 	"github.com/gurgeous/gshoot/ux"
 )
 
+// auth/client.go owns on-disk browser auth state and status reporting.
+
 // Client manages browser auth files under one config directory.
 type Client struct {
 	ConfigDir string
 }
 
-// NewClient builds an auth client
+// NewClient builds an auth client for the default config directory.
 func NewClient() *Client {
 	return &Client{ConfigDir: util.ConfigDir()}
 }
@@ -50,6 +52,7 @@ type OClient struct {
 	RedirectURIs []string `json:"redirect_uris"`
 }
 
+// OAuthToken is cached OAuth token state.
 type OAuthToken struct {
 	AccessToken  string    `json:"access_token"`
 	RefreshToken string    `json:"refresh_token"`
@@ -87,7 +90,7 @@ func (c *Client) SaveOAuthToken(token OAuthToken) error {
 // logout (delete token)
 //
 
-// Logout clears the cached OAuth session while keeping the client config.
+// Logout clears the cached OAuth token while keeping the client config.
 func (c *Client) Logout() {
 	os.Remove(c.TokenPath())
 }

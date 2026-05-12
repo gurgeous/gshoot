@@ -14,11 +14,10 @@ func TestAuthLogin(t *testing.T) {
 }
 
 func TestAuthLogout(t *testing.T) {
-	err, stdout, _ := testCommandWithSetup(t, &AuthLogoutCmd{}, nil, func(home string) {
+	err, _, _ := testCommandWithSetup(t, &AuthLogoutCmd{}, nil, func(home string) {
 		writeAuthFiles(t, home)
 	})
 	assert.NoError(t, err)
-	assert.Contains(t, stdout, "Removed cached OAuth token")
 }
 
 func TestAuthStatus(t *testing.T) {

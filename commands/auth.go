@@ -2,7 +2,6 @@ package commands
 
 import (
 	"context"
-	"fmt"
 	"os"
 
 	"github.com/gurgeous/gshoot/auth"
@@ -36,15 +35,7 @@ type AuthLogoutCmd struct{}
 
 // Run executes the auth logout command.
 func (c *AuthLogoutCmd) Run() error {
-	removed, err := auth.NewClient().Logout()
-	if err != nil {
-		return err
-	}
-	if removed {
-		fmt.Fprintln(os.Stdout, "Removed cached OAuth token. OAuth client config was kept.")
-		return nil
-	}
-	fmt.Fprintln(os.Stdout, "No cached OAuth token was present.")
+	auth.NewClient().Logout()
 	return nil
 }
 
