@@ -2,13 +2,11 @@ package auth
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/gurgeous/gshoot/util"
@@ -16,10 +14,7 @@ import (
 	"golang.org/x/oauth2"
 )
 
-const (
-	oauthClientFileName = "oauth-client.json"
-	oauthTokenFileName  = "oauth-token.json"
-)
+// auth/login.go implements the interactive browser login flow.
 
 var openBrowser = util.OpenBrowserURL
 
@@ -31,23 +26,19 @@ type LoginOptions struct {
 }
 
 // Login runs an interactive OAuth login and persists the token.
-func Login(ctx context.Context, opts LoginOptions) error {
-	configDir := util.ConfigDir()
-	clientPath := filepath.Join(configDir, oauthClientFileName)
-	tokenPath := filepath.Join(configDir, oauthTokenFileName)
-
-	if err := os.MkdirAll(configDir, 0o700); err != nil {
+func (c *AuthClient) Login(ctx context.Context, opts LoginOptions) error {
+	if err := os.MkdirAll(c.ConfigDir, 0o700); err != nil {
 		return fmt.Errorf("create config dir: %w", err)
 	}
 
 	if opts.ClientSecretPath != "" {
-		if err := importOAuthClient(opts.ClientSecretPath, clientPath); err != nil {
+		if err := importOAuthClient(opts.ClientSecretPath, c.ClientPath()); err != nil {
 			return err
 		}
-		fmt.Fprintln(opts.Stdout, ux.Success.Render("Saved OAuth client config to "+clientPath))
+		fmt.Fprintln(opts.Stdout, ux.Success.Render("Saved OAuth client config to "+c.ClientPath()))
 	}
 
-	client, err := LoadOAuthClient(clientPath)
+	client, err := c.LoadOAuthClient()
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf(
@@ -59,7 +50,7 @@ func Login(ctx context.Context, opts LoginOptions) error {
 					"4. Create an OAuth client of type Desktop app\n"+
 					"5. Download the JSON and run `gshoot auth login --client-secret /path/to/client_secret.json`\n"+
 					"without Test users, Google often fails with a vague \"Access blocked\" error",
-				clientPath,
+				c.ClientPath(),
 			)
 		}
 		return fmt.Errorf("load oauth client config: %w", err)
@@ -75,23 +66,21 @@ func Login(ctx context.Context, opts LoginOptions) error {
 		return friendlyLoginError(err)
 	}
 
-	data, err := json.MarshalIndent(OAuthToken{
+	err = c.SaveOAuthToken(OAuthToken{
 		AccessToken:  token.AccessToken,
 		RefreshToken: token.RefreshToken,
 		TokenType:    token.TokenType,
 		Expiry:       token.Expiry,
-	}, "", "  ")
+	})
 	if err != nil {
-		return fmt.Errorf("marshal oauth token: %w", err)
-	}
-	if err := util.WritePrivateFile(tokenPath, append(data, '\n')); err != nil {
-		return fmt.Errorf("save oauth token: %w", err)
+		return err
 	}
 
-	fmt.Fprintln(opts.Stdout, ux.Success.Render("Login complete. Token saved to "+tokenPath))
+	fmt.Fprintln(opts.Stdout, ux.Success.Render("Login complete. Token saved to "+c.TokenPath()))
 	return nil
 }
 
+// oauthConfigForLogin builds an OAuth config for the browser login flow.
 func oauthConfigForLogin(client *OAuthClient) (*oauth2.Config, error) {
 	redirect, err := selectLoopbackRedirect(client.RedirectURIs)
 	if err != nil {
@@ -110,12 +99,13 @@ func oauthConfigForLogin(client *OAuthClient) (*oauth2.Config, error) {
 	}, nil
 }
 
+// importOAuthClient validates and saves a downloaded client JSON file.
 func importOAuthClient(srcPath, dstPath string) error {
 	data, err := os.ReadFile(srcPath)
 	if err != nil {
 		return fmt.Errorf("read client secret file: %w", err)
 	}
-	client, err := LoadOAuthClient(srcPath)
+	client, err := loadOAuthClient(srcPath)
 	if err != nil {
 		return fmt.Errorf("load client secret file: %w", err)
 	}
@@ -128,6 +118,7 @@ func importOAuthClient(srcPath, dstPath string) error {
 	return nil
 }
 
+// friendlyLoginError adds actionable hints to common Google OAuth failures.
 func friendlyLoginError(err error) error {
 	msg := err.Error()
 	switch {
@@ -142,6 +133,7 @@ func friendlyLoginError(err error) error {
 	}
 }
 
+// browserLoginFlow performs the browser round trip and code exchange.
 func browserLoginFlow(ctx context.Context, config *oauth2.Config, stdout, stderr io.Writer) (*oauth2.Token, error) {
 	state, err := util.RandomHex(16)
 	if err != nil {
@@ -177,6 +169,7 @@ func browserLoginFlow(ctx context.Context, config *oauth2.Config, stdout, stderr
 	return token, nil
 }
 
+// selectLoopbackRedirect picks the first localhost redirect URI from the client config.
 func selectLoopbackRedirect(redirectURIs []string) (*url.URL, error) {
 	for _, raw := range redirectURIs {
 		u, err := url.Parse(raw)

@@ -68,6 +68,12 @@ type runnable interface {
 	Run() error
 }
 
+type authFilesOptions struct {
+	HasClient bool
+	HasToken  bool
+	Expiry    time.Time
+}
+
 func testCommand(t *testing.T, cmd runnable, handler http.HandlerFunc) (error, string, string) {
 	return testCommandWithSetup(t, cmd, handler)
 }
@@ -101,11 +107,7 @@ func testCommandWithSetup(t *testing.T, cmd runnable, handler http.HandlerFunc, 
 	}
 
 	// stub google api
-	if handler == nil {
-		googleAPIHandler = invalid
-	} else {
-		googleAPIHandler = handler
-	}
+	googleAPIHandler = handler
 	defer func() { googleAPIHandler = invalid }()
 
 	// run
@@ -122,19 +124,35 @@ func testCommandWithSetup(t *testing.T, cmd runnable, handler http.HandlerFunc, 
 	return runErr, string(stdoutBytes), string(stderrBytes)
 }
 
-func writeAuthFiles(t *testing.T, home string) {
+func writeAuthFiles(t *testing.T, home string, opts ...authFilesOptions) {
 	t.Helper()
 
-	configDir := filepath.Join(home, ".config", "gshoot")
-	clientJSON := `{"installed":{"client_id":"cid","client_secret":"secret","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","redirect_uris":["http://127.0.0.1/oauth2/callback"]}}`
-	tokenJSON := fmt.Sprintf(
-		`{"access_token":"token","refresh_token":"refresh","token_type":"Bearer","expiry":"%s"}`,
-		time.Now().Add(time.Hour).UTC().Format(time.RFC3339),
-	)
-	if err := util.WritePrivateFile(filepath.Join(configDir, "oauth-client.json"), []byte(clientJSON)); err != nil {
-		t.Fatalf("write oauth-client.json: %v", err)
+	cfg := authFilesOptions{
+		HasClient: true,
+		HasToken:  true,
+		Expiry:    time.Now().Add(time.Hour),
 	}
-	if err := util.WritePrivateFile(filepath.Join(configDir, "oauth-token.json"), []byte(tokenJSON)); err != nil {
-		t.Fatalf("write oauth-token.json: %v", err)
+	if len(opts) > 0 {
+		cfg = opts[0]
+		if cfg.Expiry.IsZero() {
+			cfg.Expiry = time.Now().Add(time.Hour)
+		}
+	}
+
+	configDir := filepath.Join(home, ".config", "gshoot")
+	if cfg.HasClient {
+		clientJSON := `{"installed":{"client_id":"cid","client_secret":"secret","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","redirect_uris":["http://127.0.0.1/oauth2/callback"]}}`
+		if err := util.WritePrivateFile(filepath.Join(configDir, "oauth-client.json"), []byte(clientJSON)); err != nil {
+			t.Fatalf("write oauth-client.json: %v", err)
+		}
+	}
+	if cfg.HasToken {
+		tokenJSON := fmt.Sprintf(
+			`{"access_token":"token","refresh_token":"refresh","token_type":"Bearer","expiry":"%s"}`,
+			cfg.Expiry.UTC().Format(time.RFC3339),
+		)
+		if err := util.WritePrivateFile(filepath.Join(configDir, "oauth-token.json"), []byte(tokenJSON)); err != nil {
+			t.Fatalf("write oauth-token.json: %v", err)
+		}
 	}
 }

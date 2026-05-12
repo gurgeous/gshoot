@@ -10,8 +10,11 @@ import (
 	"time"
 )
 
+// auth/loopback.go runs the temporary localhost callback server for browser login.
+
 const oauthReadHeaderTimeout = 5 * time.Second
 
+// startLoopback starts a one-shot localhost callback server for OAuth login.
 func startLoopback(redirectRaw, state string) (string, string, func(context.Context) (string, error), error) {
 	redirectURL, err := url.Parse(redirectRaw)
 	if err != nil {

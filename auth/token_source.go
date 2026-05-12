@@ -5,24 +5,19 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
-
-	"github.com/gurgeous/gshoot/util"
 )
 
-// NewTokenSource creates an oauth2 token source from resolved auth state.
-func NewTokenSource(ctx context.Context, scopes []string) (oauth2.TokenSource, error) {
-	configDir := util.ConfigDir()
-	oauthClientPath := filepath.Join(configDir, oauthClientFileName)
-	oauthTokenPath := filepath.Join(configDir, oauthTokenFileName)
+// auth/token_source.go turns saved browser auth files into token sources.
 
-	tokenState, err := LoadOAuthToken(oauthTokenPath)
+// TokenSource creates an oauth2 token source from saved auth state.
+func (c *AuthClient) TokenSource(ctx context.Context, scopes []string) (oauth2.TokenSource, error) {
+	tokenState, err := c.LoadOAuthToken()
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil, fmt.Errorf("gshoot [no auth found]\nchecked files: %s, %s", oauthClientPath, oauthTokenPath)
+			return nil, fmt.Errorf("gshoot [no auth found]\nchecked files: %s, %s", c.ClientPath(), c.TokenPath())
 		}
 		return nil, fmt.Errorf("load cached oauth token: %w", err)
 	}
@@ -34,7 +29,7 @@ func NewTokenSource(ctx context.Context, scopes []string) (oauth2.TokenSource, e
 		Expiry:       tokenState.Expiry,
 	}
 
-	client, err := LoadOAuthClient(oauthClientPath)
+	client, err := c.LoadOAuthClient()
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			if !token.Valid() {
@@ -59,6 +54,7 @@ func NewTokenSource(ctx context.Context, scopes []string) (oauth2.TokenSource, e
 	return config.TokenSource(ctx, token), nil
 }
 
+// oauthEndpoint applies optional endpoint overrides on top of Google's defaults.
 func oauthEndpoint(authURL, tokenURL string) oauth2.Endpoint {
 	endpoint := google.Endpoint
 	if authURL != "" {

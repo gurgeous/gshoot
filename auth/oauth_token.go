@@ -1,10 +1,8 @@
 package auth
 
-import (
-	"encoding/json"
-	"os"
-	"time"
-)
+import "time"
+
+// auth/oauth_token.go defines the saved OAuth token JSON shape.
 
 // OAuthToken is cached OAuth token state.
 type OAuthToken struct {
@@ -12,18 +10,4 @@ type OAuthToken struct {
 	RefreshToken string    `json:"refresh_token"`
 	TokenType    string    `json:"token_type"`
 	Expiry       time.Time `json:"expiry"`
-}
-
-// LoadOAuthToken parses cached OAuth token state.
-func LoadOAuthToken(path string) (OAuthToken, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return OAuthToken{}, err
-	}
-
-	var token OAuthToken
-	if err := json.Unmarshal(data, &token); err != nil {
-		return OAuthToken{}, err
-	}
-	return token, nil
 }

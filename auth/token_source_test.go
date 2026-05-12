@@ -14,6 +14,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// auth/token_source_test.go covers cached-token loading, refresh, and logout.
+
+// TestLoadOAuthClient parses installed and web OAuth client files.
 func TestLoadOAuthClient(t *testing.T) {
 	for _, body := range []string{
 		`{"installed":{"client_id":"cid"}}`,
@@ -22,7 +25,7 @@ func TestLoadOAuthClient(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "client.json")
 		assert.NoError(t, os.WriteFile(path, []byte(body), 0o600))
 
-		client, err := LoadOAuthClient(path)
+		client, err := loadOAuthClient(path)
 		assert.NoError(t, err)
 		if err == nil {
 			assert.Equal(t, "cid", client.ClientID)
@@ -30,22 +33,24 @@ func TestLoadOAuthClient(t *testing.T) {
 	}
 }
 
+// TestLoadOAuthClientUnsupported rejects unsupported credential JSON.
 func TestLoadOAuthClientUnsupported(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "client.json")
 	assert.NoError(t, os.WriteFile(path, []byte(`{"type":"service_account"}`), 0o600))
 
-	_, err := LoadOAuthClient(path)
+	_, err := loadOAuthClient(path)
 	assert.Error(t, err)
 	if err != nil {
 		assert.Contains(t, err.Error(), "unsupported credential file")
 	}
 }
 
+// TestLoadOAuthToken parses a cached OAuth token file.
 func TestLoadOAuthToken(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "oauth-token.json")
 	assert.NoError(t, os.WriteFile(path, []byte(`{"access_token":"a","refresh_token":"r","token_type":"Bearer","expiry":"2026-05-07T22:00:00Z"}`), 0o600))
 
-	token, err := LoadOAuthToken(path)
+	token, err := loadOAuthToken(path)
 	assert.NoError(t, err)
 	if err == nil {
 		assert.Equal(t, "a", token.AccessToken)
@@ -55,21 +60,23 @@ func TestLoadOAuthToken(t *testing.T) {
 	}
 }
 
+// TestNewTokenSourceMissingAuth reports a missing auth setup clearly.
 func TestNewTokenSourceMissingAuth(t *testing.T) {
-	withAuthHome(t)
+	client := withAuthHome(t)
 
-	_, err := NewTokenSource(context.Background(), []string{"scope"})
+	_, err := client.TokenSource(context.Background(), []string{"scope"})
 	assert.Error(t, err)
 	if err != nil {
 		assert.Contains(t, err.Error(), "no auth found")
 	}
 }
 
+// TestNewTokenSourceValidCachedOAuthWithoutClientConfig uses a still-valid cached token directly.
 func TestNewTokenSourceValidCachedOAuthWithoutClientConfig(t *testing.T) {
-	withAuthHome(t)
+	client := withAuthHome(t)
 	writeAuthToken(t, futureToken())
 
-	src, err := NewTokenSource(context.Background(), []string{"scope"})
+	src, err := client.TokenSource(context.Background(), []string{"scope"})
 	assert.NoError(t, err)
 	if err != nil {
 		return
@@ -82,8 +89,9 @@ func TestNewTokenSourceValidCachedOAuthWithoutClientConfig(t *testing.T) {
 	}
 }
 
+// TestNewTokenSourceExpiredCachedOAuthWithoutClientConfig rejects expired cached tokens without a client file.
 func TestNewTokenSourceExpiredCachedOAuthWithoutClientConfig(t *testing.T) {
-	withAuthHome(t)
+	client := withAuthHome(t)
 	writeAuthToken(t, OAuthToken{
 		AccessToken:  "expired",
 		RefreshToken: "refresh",
@@ -91,7 +99,7 @@ func TestNewTokenSourceExpiredCachedOAuthWithoutClientConfig(t *testing.T) {
 		Expiry:       time.Now().Add(-time.Hour),
 	})
 
-	_, err := NewTokenSource(context.Background(), []string{"scope"})
+	_, err := client.TokenSource(context.Background(), []string{"scope"})
 	assert.Error(t, err)
 	if err != nil {
 		assert.Contains(t, err.Error(), "expired")
@@ -99,8 +107,9 @@ func TestNewTokenSourceExpiredCachedOAuthWithoutClientConfig(t *testing.T) {
 	}
 }
 
+// TestNewTokenSourceRefreshesCachedOAuth checks refresh through the token endpoint.
 func TestNewTokenSourceRefreshesCachedOAuth(t *testing.T) {
-	withAuthHome(t)
+	client := withAuthHome(t)
 
 	var tokenEndpointHit bool
 	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -125,7 +134,7 @@ func TestNewTokenSourceRefreshesCachedOAuth(t *testing.T) {
 		Expiry:       time.Now().Add(-time.Hour),
 	})
 
-	src, err := NewTokenSource(context.Background(), []string{"scope"})
+	src, err := client.TokenSource(context.Background(), []string{"scope"})
 	assert.NoError(t, err)
 	if err != nil {
 		return
@@ -139,8 +148,9 @@ func TestNewTokenSourceRefreshesCachedOAuth(t *testing.T) {
 	}
 }
 
+// TestNewTokenSourceCachedOAuthRefreshFailure surfaces token refresh failures.
 func TestNewTokenSourceCachedOAuthRefreshFailure(t *testing.T) {
-	withAuthHome(t)
+	client := withAuthHome(t)
 
 	var tokenEndpointHit bool
 	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -159,7 +169,7 @@ func TestNewTokenSourceCachedOAuthRefreshFailure(t *testing.T) {
 		Expiry:       time.Now().Add(-time.Hour),
 	})
 
-	src, err := NewTokenSource(context.Background(), []string{"scope"})
+	src, err := client.TokenSource(context.Background(), []string{"scope"})
 	assert.NoError(t, err)
 	if err != nil {
 		return
@@ -174,20 +184,22 @@ func TestNewTokenSourceCachedOAuthRefreshFailure(t *testing.T) {
 	}
 }
 
+// TestLogout removes the cached token file.
 func TestLogout(t *testing.T) {
-	withAuthHome(t)
+	client := withAuthHome(t)
 	writeAuthToken(t, futureToken())
 
-	removed, err := Logout()
+	removed, err := client.Logout()
 	assert.NoError(t, err)
 	assert.True(t, removed)
-	assert.False(t, util.FileExists(filepath.Join(util.ConfigDir(), oauthTokenFileName)))
+	assert.False(t, util.FileExists(client.TokenPath()))
 }
 
+// TestLogoutMissingToken is a no-op when there is no cached token.
 func TestLogoutMissingToken(t *testing.T) {
-	withAuthHome(t)
+	client := withAuthHome(t)
 
-	removed, err := Logout()
+	removed, err := client.Logout()
 	assert.NoError(t, err)
 	assert.False(t, removed)
 }
