@@ -9,9 +9,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/oauth2"
-	"google.golang.org/api/drive/v3"
-	"google.golang.org/api/option"
-	"google.golang.org/api/sheets/v4"
 )
 
 func TestListSpreadsheets(t *testing.T) {
@@ -51,7 +48,7 @@ func TestFindSpreadsheet(t *testing.T) {
 	file, err := client.FindSpreadsheet(context.Background(), "budget")
 	assert.NoError(t, err)
 	assert.NotNil(t, file)
-	assert.Equal(t, "2", file.Id)
+	assert.Equal(t, "2", file.ID)
 }
 
 func TestFindSheet(t *testing.T) {
@@ -70,12 +67,12 @@ func TestFindSheet(t *testing.T) {
 	sheet, err := client.FindSheet(context.Background(), "sheet-1", "summary")
 	assert.NoError(t, err)
 	assert.NotNil(t, sheet)
-	assert.Equal(t, "Summary", sheet.Properties.Title)
+	assert.Equal(t, "Summary", sheet.Title)
 }
 
 func TestGetRows(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/v4/spreadsheets/sheet-1/values/'Summary'", r.URL.Path)
+		assert.Equal(t, "/v4/spreadsheets/sheet-1/values/%27Summary%27", r.URL.EscapedPath())
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"values": []any{
 				[]any{"name", "count"},
@@ -86,13 +83,9 @@ func TestGetRows(t *testing.T) {
 	defer server.Close()
 
 	client := newTestClient(t, server.URL)
-	rows, err := client.GetRows(context.Background(), "sheet-1", newSheet("Summary"))
+	rows, err := client.GetRows(context.Background(), "sheet-1", "Summary")
 	assert.NoError(t, err)
 	assert.Equal(t, Rows{{"name", "count"}, {"alpha", "1"}}, rows)
-}
-
-func newSheet(title string) *sheets.Sheet {
-	return &sheets.Sheet{Properties: &sheets.SheetProperties{Title: title}}
 }
 
 func newTestClient(t *testing.T, serverURL string) *Client {
@@ -104,17 +97,5 @@ func newTestClient(t *testing.T, serverURL string) *Client {
 			Base:   http.DefaultTransport,
 		},
 	}
-	driveService, err := drive.NewService(
-		context.Background(),
-		option.WithHTTPClient(httpClient),
-		option.WithEndpoint(serverURL+"/drive/v3/"),
-	)
-	assert.NoError(t, err)
-	sheetsService, err := sheets.NewService(
-		context.Background(),
-		option.WithHTTPClient(httpClient),
-		option.WithEndpoint(serverURL+"/"),
-	)
-	assert.NoError(t, err)
-	return &Client{Drive: driveService, Sheets: sheetsService}
+	return &Client{httpClient: httpClient, baseURL: serverURL}
 }

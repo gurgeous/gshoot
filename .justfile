@@ -5,6 +5,9 @@ build:
   go build -o bin/gshoot
   just banner "✓ build ✓"
 
+build-release:
+  go build -ldflags "-w -s" -o bin/gshoot-release
+
 check: lint test build
   just banner "✓ check ✓"
 

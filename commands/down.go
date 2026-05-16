@@ -47,7 +47,7 @@ func (c *DownCmd) Run() error {
 	//
 
 	dots.SetDescription("finding specific sheet...")
-	sheet, err := client.FindSheet(ctx, spreadsheet.Id, c.Sheet)
+	sheet, err := client.FindSheet(ctx, spreadsheet.ID, c.Sheet)
 	if err != nil {
 		return err
 	}
@@ -60,7 +60,7 @@ func (c *DownCmd) Run() error {
 	//
 
 	dots.SetDescription("downloading cells...")
-	rows, err := client.GetRows(ctx, spreadsheet.Id, sheet)
+	rows, err := client.GetRows(ctx, spreadsheet.ID, sheet.Title)
 	if err != nil {
 		return err
 	}

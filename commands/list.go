@@ -38,7 +38,7 @@ func (c *ListCmd) Run() error {
 		fmt.Printf(
 			" %s %s     %s\n",
 			num,
-			util.Hyperlink(os.Stdout, util.SpreadsheetURL(file.Id), name),
+			util.Hyperlink(os.Stdout, util.SpreadsheetURL(file.ID), name),
 			date,
 		)
 	}
