@@ -15,7 +15,15 @@ func TestCardStyleKeepsTextStyleAfterForegroundReset(t *testing.T) {
 
 	px, ok = card.pixelAt(pt(1, 0))
 	assert.True(t, ok)
-	assert.Equal(t, "\x1b[1;31m\x1b[39m", px.Style)
+	assert.Equal(t, "\x1b[1m", px.Style)
+}
+
+func TestCardStyleDoesNotAccumulateOldForegrounds(t *testing.T) {
+	card := newCard("\x1b[31mA\x1b[32mB")
+
+	px, ok := card.pixelAt(pt(1, 0))
+	assert.True(t, ok)
+	assert.Equal(t, "\x1b[32m", px.Style)
 }
 
 func TestCardPreservesHorizontalPadding(t *testing.T) {

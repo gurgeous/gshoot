@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"image"
 	"image/color"
+	"strings"
 	"testing"
 
 	"github.com/charmbracelet/colorprofile"
@@ -74,8 +75,83 @@ func TestRenderOnlyWritesChangedPixels(t *testing.T) {
 
 	renderer.render(&out, 1, card, statsTracker{})
 
-	assert.Contains(t, out.String(), "\x1b[1;2H"+backgroundEscape(colorprofile.TrueColor, blue))
+	assert.Contains(t, out.String(), "\x1b[1;2H"+backgroundEscape(colorprofile.TrueColor, blue)+" ")
 	assert.NotContains(t, out.String(), "\x1b[1;1H")
+}
+
+func TestRenderWritesMultipleDirtySpans(t *testing.T) {
+	red := color.RGBA{R: 100, A: 255}
+	blue := color.RGBA{B: 100, A: 255}
+	green := color.RGBA{G: 100, A: 255}
+	movie := &movie{
+		Size:       sz(5, 1),
+		Frames:     2,
+		pix:        []uint8{0, 0, 0, 0, 0, 0, 1, 0, 2, 0},
+		stride:     10,
+		bounds:     image.Rect(0, 0, 10, 1),
+		palette:    []color.RGBA{red, blue, green},
+		dimPalette: []color.RGBA{red, blue, green},
+	}
+	renderer := newRenderer(movie, config{profile: colorprofile.TrueColor}, sz(5, 1))
+
+	var out bytes.Buffer
+	renderer.render(&out, 0, newCard(""), statsTracker{})
+	out.Reset()
+
+	renderer.render(&out, 1, newCard(""), statsTracker{})
+	got := out.String()
+
+	assert.Contains(t, got, "\x1b[1;2H"+backgroundEscape(colorprofile.TrueColor, blue)+" ")
+	assert.Contains(t, got, "\x1b[1;4H"+backgroundEscape(colorprofile.TrueColor, green)+" ")
+	assert.NotContains(t, got, "\x1b[1;3H")
+}
+
+func TestRenderDirtyAlphaBlendedCard(t *testing.T) {
+	normal := color.RGBA{R: 100, A: 255}
+	dimA := color.RGBA{R: 20, A: 255}
+	dimB := color.RGBA{B: 20, A: 255}
+	movie := &movie{
+		Size:       sz(1, 1),
+		Frames:     2,
+		pix:        []uint8{0, 1},
+		stride:     2,
+		bounds:     image.Rect(0, 0, 2, 1),
+		palette:    []color.RGBA{normal, normal},
+		dimPalette: []color.RGBA{dimA, dimB},
+	}
+	card := newCard("\x1b[31mX")
+	renderer := newRenderer(movie, config{profile: colorprofile.TrueColor, alphaBlend: true}, sz(1, 1))
+
+	var out bytes.Buffer
+	renderer.render(&out, 0, card, statsTracker{})
+	out.Reset()
+
+	renderer.render(&out, 1, card, statsTracker{})
+	got := out.String()
+	dimEscape := backgroundEscape(colorprofile.TrueColor, dimB)
+
+	assert.Contains(t, got, "\x1b[31m"+dimEscape+"X")
+	assert.Equal(t, 1, strings.Count(got, dimEscape))
+}
+
+func TestRenderKeyFrameCarriesBackgroundAcrossRows(t *testing.T) {
+	black := color.RGBA{A: 255}
+	movie := &movie{
+		Size:       sz(1, 2),
+		Frames:     1,
+		pix:        []uint8{0, 0},
+		stride:     1,
+		bounds:     image.Rect(0, 0, 1, 2),
+		palette:    []color.RGBA{black},
+		dimPalette: []color.RGBA{black},
+	}
+	renderer := newRenderer(movie, config{profile: colorprofile.TrueColor}, sz(1, 2))
+
+	var out bytes.Buffer
+	renderer.render(&out, 0, newCard(""), statsTracker{})
+
+	bg := backgroundEscape(colorprofile.TrueColor, black)
+	assert.Equal(t, 1, strings.Count(out.String(), bg))
 }
 
 func TestRenderDowngradesColorsToANSI256(t *testing.T) {
@@ -147,14 +223,15 @@ func TestRenderUsesFullTerminalByDefault(t *testing.T) {
 	assert.Equal(t, image.Rect(0, 0, 6, 4), renderer.layoutRect())
 }
 
-func TestPixelWriterRestoresBackgroundAfterStyleReset(t *testing.T) {
-	bg := paletteColor{Escape: "bg"}
+func TestPixelWriterWritesBackgroundOnceWhenStyleChanges(t *testing.T) {
+	bg := paletteColor{Escape: "BG"}
 	var out bytes.Buffer
 	writer := newPixelWriter(&out)
 
-	writer.write(tpixel{Ch: "X", Color: bg, Style: "\x1b[0m"})
+	writer.write(tpixel{Ch: "X", Color: bg, Style: "\x1b[31m"})
 
-	assert.Equal(t, "bg\x1b[0mbgX", out.String())
+	assert.Equal(t, "\x1b[31mBGX", out.String())
+	assert.Equal(t, 1, strings.Count(out.String(), "BG"))
 }
 
 func TestStatsRenderInLowerRight(t *testing.T) {

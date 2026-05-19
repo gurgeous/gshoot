@@ -102,12 +102,15 @@ func (r *renderer) renderKeyFrame(out *bytes.Buffer) {
 	out.Grow(area(r.draw.Size()) * 48)
 	out.WriteString(xansi.SetModeSynchronizedOutput)
 
+	writer := newPixelWriter(out)
 	for row := range r.draw.Dy() {
 		out.WriteString(xansi.CursorPosition(r.draw.Min.X+1, r.draw.Min.Y+row+1))
-		r.renderPixels(out, r.next.row(row))
-		out.WriteString(xansi.ResetStyle)
+		for _, px := range r.next.row(row) {
+			writer.write(px)
+		}
 	}
 
+	out.WriteString(xansi.ResetStyle)
 	out.WriteString(xansi.ResetModeSynchronizedOutput)
 }
 
@@ -147,14 +150,6 @@ func (r *renderer) renderDirty(out *bytes.Buffer) {
 	}
 	out.WriteString(xansi.ResetStyle)
 	out.WriteString(xansi.ResetModeSynchronizedOutput)
-}
-
-// renderPixels writes a contiguous row of composited pixels.
-func (r *renderer) renderPixels(out *bytes.Buffer, pixels []tpixel) {
-	writer := newPixelWriter(out)
-	for _, px := range pixels {
-		writer.write(px)
-	}
 }
 
 // pixelChanged decides whether a pixel needs repainting.
@@ -212,21 +207,21 @@ func newPixelWriter(out *bytes.Buffer) pixelWriter {
 
 // write writes one terminal pixel with minimal style changes.
 func (writer *pixelWriter) write(px tpixel) {
-	if px.Color.Escape != writer.bg {
-		writer.out.WriteString(px.Color.Escape)
-		writer.bg = px.Color.Escape
-	}
-
 	if px.Style != writer.style {
 		if writer.style != "" {
 			writer.out.WriteString(xansi.ResetStyle)
-			writer.out.WriteString(px.Color.Escape)
+			writer.bg = ""
 		}
 		if px.Style != "" {
 			writer.out.WriteString(px.Style)
-			writer.out.WriteString(px.Color.Escape)
+			writer.bg = ""
 		}
 		writer.style = px.Style
+	}
+
+	if px.Color.Escape != writer.bg {
+		writer.out.WriteString(px.Color.Escape)
+		writer.bg = px.Color.Escape
 	}
 
 	writer.out.WriteString(px.Ch)
