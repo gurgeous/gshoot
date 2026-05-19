@@ -17,11 +17,6 @@ func (r *renderer) drawFrame(fr int) {
 	}
 }
 
-// draw an image onto the next frame
-func (r *renderer) drawImage(img timage, origin point, blend pixelBlend) {
-	r.next.overlay(img, origin, blend)
-}
-
 //
 // compositing operators
 //

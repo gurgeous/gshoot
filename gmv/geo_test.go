@@ -28,9 +28,8 @@ func TestSizeBottomRight(t *testing.T) {
 	assert.Equal(t, pt(0, 0), bottomRight(sz(2, 2), sz(10, 8)))
 }
 
-func TestRectCenterAndLocal(t *testing.T) {
+func TestRectLocal(t *testing.T) {
 	rect := rectWithSize(pt(10, 20), sz(8, 6))
 
-	assert.Equal(t, pt(13, 22), centerIn(rect, sz(2, 2)))
 	assert.Equal(t, pt(2, 3), local(rect, pt(12, 23)))
 }

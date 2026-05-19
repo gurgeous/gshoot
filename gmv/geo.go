@@ -35,11 +35,6 @@ func center(outer, inner size) point {
 	return pt(max(0, (outer.X-inner.X)/2), max(0, (outer.Y-inner.Y)/2))
 }
 
-// centerIn returns the origin needed to center inner inside rect.
-func centerIn(r rect, inner size) point {
-	return r.Min.Add(center(r.Size(), inner))
-}
-
 // bottomRight returns the origin needed to place inner at outer's bottom right.
 func bottomRight(outer, inner size) point {
 	return pt(max(0, outer.X-inner.X), max(0, outer.Y-inner.Y))

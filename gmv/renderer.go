@@ -79,10 +79,10 @@ func (r *renderer) render(out *bytes.Buffer, fr int, card card, stats statsTrack
 	r.draw = r.layoutRect()
 	r.drawFrame(fr)
 	// draw card
-	r.drawImage(card.image, center(r.next.size(), card.image.size()), r.blender(fr))
+	r.next.overlay(card.image, center(r.next.size(), card.image.size()), r.blender(fr))
 	// draw stats
 	statsImage := stats.image(r.statsStyle, r.cardBG)
-	r.drawImage(statsImage, bottomRight(r.next.size(), statsImage.size()), sourceOver)
+	r.next.overlay(statsImage, bottomRight(r.next.size(), statsImage.size()), sourceOver)
 
 	// usually we can get away with rendering changed pixels, but sometimes we need to do a full keyframe
 	keyframe := !r.valid || r.painted != r.draw || r.prev.size() != r.next.size()
@@ -179,9 +179,9 @@ func colorDistanceSquared(a, b color.RGBA) int {
 	return (299*dr*dr + 587*dg*dg + 114*db*db) / 1000
 }
 
-// layoutRect centers the movie within terminal and config bounds.
+// layoutRect fills the terminal within configured size caps.
 func (r *renderer) layoutRect() rect {
-	s := sz(min(r.movie.Size.X, r.term.X), min(r.movie.Size.Y, r.term.Y))
+	s := r.term
 	if r.maxSize.X > 0 {
 		s.X = min(s.X, r.maxSize.X)
 	}

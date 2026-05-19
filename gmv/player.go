@@ -126,7 +126,7 @@ type Player struct {
 
 // play renders movie frames until context cancel or keypress.
 func (p *Player) play(ctx context.Context) error {
-	ticker := time.NewTicker(frameDelay(p.cfg))
+	ticker := time.NewTicker(p.cfg.frameDelay())
 	defer ticker.Stop()
 
 	for {
@@ -138,15 +138,6 @@ func (p *Player) play(ctx context.Context) error {
 		}
 		p.waitForFrame(ctx, ticker.C)
 	}
-}
-
-// frameDelay returns the configured frame duration with a safe minimum.
-func frameDelay(cfg config) time.Duration {
-	delay := time.Duration(float64(time.Second) / cfg.fps)
-	if delay <= 0 {
-		return time.Millisecond
-	}
-	return delay
 }
 
 // renderFrame renders and writes one animation frame.

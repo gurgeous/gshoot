@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/colorprofile"
 	"github.com/gurgeous/gshoot/env"
@@ -56,6 +57,11 @@ func (cfg config) colorProfile() colorprofile.Profile {
 		return colorprofile.TrueColor
 	}
 	return colorprofile.ANSI256
+}
+
+// frameDelay returns the configured frame duration.
+func (cfg config) frameDelay() time.Duration {
+	return time.Duration(float64(time.Second) / cfg.fps)
 }
 
 // envFloat reads a positive float override or keeps fallback.

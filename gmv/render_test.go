@@ -131,6 +131,22 @@ func TestRenderSkipsSmallColorChanges(t *testing.T) {
 	assert.Empty(t, out.String())
 }
 
+func TestRenderUsesFullTerminalByDefault(t *testing.T) {
+	black := color.RGBA{A: 255}
+	movie := &movie{
+		Size:       sz(2, 1),
+		Frames:     1,
+		pix:        []uint8{0, 0},
+		stride:     2,
+		bounds:     image.Rect(0, 0, 2, 1),
+		palette:    []color.RGBA{black},
+		dimPalette: []color.RGBA{black},
+	}
+	renderer := newRenderer(movie, config{profile: colorprofile.TrueColor}, sz(6, 4))
+
+	assert.Equal(t, image.Rect(0, 0, 6, 4), renderer.layoutRect())
+}
+
 func TestPixelWriterRestoresBackgroundAfterStyleReset(t *testing.T) {
 	bg := paletteColor{Escape: "bg"}
 	var out bytes.Buffer
@@ -156,7 +172,7 @@ func TestStatsRenderInLowerRight(t *testing.T) {
 
 	renderer.drawFrame(0)
 	statsImage := statsTracker{line: "18fps"}.image(renderer.statsStyle, renderer.cardBG)
-	renderer.drawImage(statsImage, bottomRight(renderer.next.size(), statsImage.size()), sourceOver)
+	renderer.next.overlay(statsImage, bottomRight(renderer.next.size(), statsImage.size()), sourceOver)
 	row := renderer.next.row(renderer.draw.Dy() - 1)
 
 	for col, char := range " 18fps " {
