@@ -4,6 +4,8 @@ import (
 	"crypto/rand"
 	"encoding/csv"
 	"encoding/hex"
+	"fmt"
+	"image"
 	"io"
 	"os"
 	"os/exec"
@@ -21,7 +23,6 @@ import (
 
 const (
 	ESC      = "\x1b"
-	BEL      = "\a"
 	CSI      = ESC + "["
 	OSC      = ESC + "]"
 	ST       = ESC + "\\"
@@ -96,6 +97,32 @@ func Hyperlink(w io.Writer, link, name string) string {
 func IsTty(w io.Writer) bool {
 	file, ok := w.(*os.File)
 	return ok && term.IsTerminal(int(file.Fd()))
+}
+
+// EnterRawMode enters stdin raw mode and switches stdout to alt screen.
+func EnterRawMode() (func(), error) {
+	oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
+	if err != nil {
+		return nil, err
+	}
+	fmt.Fprint(os.Stdout, ansi.SetModeAltScreenSaveCursor, ansi.EraseEntireScreen, ansi.HideCursor)
+
+	cleanup := func() {
+		fmt.Fprint(os.Stdout, ansi.ResetModeSynchronizedOutput)
+		fmt.Fprint(os.Stdout, ansi.ResetStyle, ansi.ShowCursor, ansi.ResetModeAltScreenSaveCursor)
+		_ = term.Restore(int(os.Stdin.Fd()), oldState)
+	}
+
+	return cleanup, nil
+}
+
+// TerminalSize returns the current stdout size or the fallback.
+func TerminalSize(fallback image.Point) image.Point {
+	termW, termH, err := term.GetSize(int(os.Stdout.Fd()))
+	if err != nil {
+		return fallback
+	}
+	return image.Pt(termW, termH)
 }
 
 //

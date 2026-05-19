@@ -1,12 +1,14 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"runtime/debug"
 
 	"github.com/alecthomas/kong"
 	"github.com/gurgeous/gshoot/commands"
+	"github.com/gurgeous/gshoot/gmv"
 	"github.com/gurgeous/gshoot/ux"
 	// "github.com/k0kubun/pp/v3"
 )
@@ -18,9 +20,21 @@ var (
 
 type CLI struct {
 	Version kong.VersionFlag `short:"v" help:"Print the version number"`
+	Demo    bool             `help:"Play the first-run GMV demo."`
+	Default defaultCmd       `cmd:"" default:"1" hidden:""`
 	Auth    commands.AuthCmd `cmd:"" help:"Login or logout from Google Sheets."`
 	List    commands.ListCmd `cmd:"" help:"List your Google Sheets."`
 	Down    commands.DownCmd `cmd:"" help:"Download a Google Sheet as CSV."`
+}
+
+type defaultCmd struct{}
+
+// Run handles top-level flags that do not select a subcommand.
+func (c *defaultCmd) Run(cli *CLI) error {
+	if cli.Demo {
+		return gmv.Demo(context.Background())
+	}
+	return nil
 }
 
 func main() {

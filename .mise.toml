@@ -5,3 +5,4 @@ _.path = ["{{config_root}}/bin"]
 golang = "latest"
 golangci-lint = "latest"
 just = "latest"
+uv = "latest"

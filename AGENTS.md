@@ -32,6 +32,21 @@
 - Keep comments brief and useful
 - Fail fast; prefer clear errors and actionable hints
 
+## Design
+
+- Put behavior on the object that owns the data
+- Avoid simple single-use methods, especially one-line wrappers
+- Avoid defensive code for impossible or unsupported cases
+- Keep state and behavior together
+- Avoid threading owned state through helper params
+- Avoid field bags with many free helpers
+- Pass call data directly
+- Hide details callers should not know
+- Match files and types to real concepts
+- Use small internal structs when they clarify ownership
+- Remove helpers that only wrap fields
+- Before finishing ask who owns this state and what can be hidden
+
 ## Dependencies
 
 - Use current, well-maintained Go libraries

@@ -44,14 +44,17 @@ func (c *Manager) TokenSource(ctx context.Context, scopes []string) (oauth2.Toke
 		ClientSecret: client.ClientSecret,
 		Endpoint:     oauthEndpoint(client.AuthURI, client.TokenURI),
 		Scopes:       scopes,
-		RedirectURL: func() string {
-			if len(client.RedirectURIs) == 0 {
-				return ""
-			}
-			return client.RedirectURIs[0]
-		}(),
+		RedirectURL:  firstRedirectURI(client),
 	}
 	return config.TokenSource(ctx, token), nil
+}
+
+// firstRedirectURI returns the first configured redirect URI.
+func firstRedirectURI(client *OClient) string {
+	if len(client.RedirectURIs) == 0 {
+		return ""
+	}
+	return client.RedirectURIs[0]
 }
 
 // oauthEndpoint applies optional endpoint overrides on top of Google's defaults.
