@@ -9,7 +9,7 @@ import (
 	"github.com/gurgeous/gshoot/ux"
 )
 
-// commands/auth.go wires the auth subcommands to Client methods.
+// commands/auth.go wires the auth subcommands to Manager methods.
 
 // AuthCmd groups the auth-related subcommands.
 type AuthCmd struct {
@@ -25,7 +25,7 @@ type AuthLoginCmd struct {
 
 // Run executes the auth login command.
 func (c *AuthLoginCmd) Run() error {
-	client := auth.NewClient()
+	client := auth.NewManager()
 	if c.ClientSecretPath != "" {
 		if err := client.ImportOClient(c.ClientSecretPath); err != nil {
 			return err
@@ -33,7 +33,7 @@ func (c *AuthLoginCmd) Run() error {
 		fmt.Println(ux.Success.Render("Imported client config to " + client.ClientPath()))
 	}
 
-	return auth.NewClient().Login(context.Background(), auth.LoginOptions{
+	return client.Login(context.Background(), auth.LoginOptions{
 		Stdout: os.Stdout,
 		Stderr: os.Stderr,
 	})
@@ -44,7 +44,7 @@ type AuthLogoutCmd struct{}
 
 // Run executes the auth logout command.
 func (c *AuthLogoutCmd) Run() error {
-	auth.NewClient().Logout()
+	auth.NewManager().Logout()
 	return nil
 }
 
@@ -53,5 +53,5 @@ type AuthStatusCmd struct{}
 
 // Run executes the auth status command.
 func (c *AuthStatusCmd) Run() error {
-	return auth.NewClient().Status(os.Stdout)
+	return auth.NewManager().Status(os.Stdout)
 }

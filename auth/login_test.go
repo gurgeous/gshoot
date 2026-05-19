@@ -244,21 +244,21 @@ func withAuthHome(t *testing.T) *Manager {
 	t.Cleanup(xdg.Reload)
 	t.Setenv("HOME", home)
 	xdg.Reload()
-	return NewClient()
+	return NewManager()
 }
 
 // writeClient saves a test OAuth client file in the current auth config dir.
 func writeClient(t *testing.T, body string) {
 	t.Helper()
 
-	assert.NoError(t, util.WritePrivateFile(NewClient().ClientPath(), []byte(body)))
+	assert.NoError(t, util.WritePrivateFile(NewManager().ClientPath(), []byte(body)))
 }
 
 // writeAuthToken saves a test OAuth token file in the current auth config dir.
 func writeAuthToken(t *testing.T, token OAuthToken) {
 	t.Helper()
 
-	assert.NoError(t, NewClient().SaveOAuthToken(token))
+	assert.NoError(t, NewManager().SaveOAuthToken(token))
 }
 
 // futureToken returns a valid cached token for auth tests.

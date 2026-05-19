@@ -39,6 +39,19 @@ test-watch *ARGS:
   GSHOOT_THEME=1 watchexec -q --clear=reset just test {{ARGS}}
 
 #
+# gmv
+#
+
+demo:
+  go run . --demo
+
+demo-256:
+  TERM=xterm-256color COLORTERM= TMUX= go run . --demo
+
+demo-true:
+  COLORTERM=truecolor go run . --demo
+
+#
 # banner and friends
 #
 

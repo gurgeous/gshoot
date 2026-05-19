@@ -18,7 +18,10 @@ import (
 //
 
 func ReadOnlyScopes() []string {
-	return []string{}
+	return []string{
+		"https://www.googleapis.com/auth/drive.readonly",
+		"https://www.googleapis.com/auth/spreadsheets.readonly",
+	}
 }
 
 func ReadWriteScopes() []string {
@@ -64,7 +67,7 @@ type Rows [][]string
 
 // NewClient creates a Google API client with auth for the requested scopes.
 func NewClient(ctx context.Context, scopes []string) (*Client, error) {
-	tokenSource, err := auth.NewClient().TokenSource(ctx, scopes)
+	tokenSource, err := auth.NewManager().TokenSource(ctx, scopes)
 	if err != nil {
 		return nil, err
 	}
@@ -173,10 +176,14 @@ func (c *Client) FindSpreadsheet(ctx context.Context, name string) (*File, error
 }
 
 // FindSheet returns the sheet with this name, or the first sheet when name is empty.
+// Real spreadsheets always have sheets; an empty list is treated as malformed API data.
 func (c *Client) FindSheet(ctx context.Context, spreadsheetID, name string) (*Sheet, error) {
 	items, err := c.GetSheets(ctx, spreadsheetID)
 	if err != nil {
 		return nil, err
+	}
+	if len(items) == 0 {
+		return nil, nil
 	}
 	if name == "" {
 		return items[0], nil

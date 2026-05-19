@@ -1,0 +1,325 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# dependencies = [
+#   "numpy",
+#   "opencv-python",
+#   "pillow",
+# ]
+# ///
+"""
+Export a small terminal movie as a .gmv file.
+
+GMV is a pngquant-compressed PNG sprite sheet with a tiny tEXt metadata
+chunk. The file extension is .gmv, but the bytes are still a regular PNG.
+
+Layout:
+  - frames are arranged left-to-right, top-to-bottom in a fixed grid
+  - columns are inferred by loaders as image_width / frame_width
+  - the final row may contain unused cells
+
+Metadata:
+  - PNG tEXt chunk keyword: gmv
+  - JSON value: {"w":160,"h":90,"n":150}
+
+Fields:
+  - w: frame width in pixels
+  - h: frame height in pixels
+  - n: frame count
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import math
+import re
+import shutil
+import struct
+import subprocess
+import tempfile
+import zlib
+from pathlib import Path
+
+import cv2  # pyright: ignore[reportMissingImports]
+from PIL import Image
+
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+TEXT_KEYWORD = b"gmv"
+DEFAULT_TRIM = "0-5"
+DEFAULT_WIDTH = 160
+DEFAULT_QUALITY = "70"
+GRID_COLUMNS = 10
+MAX_SHEET_PIXELS = 10_000_000
+
+
+# parse_args builds the exporter CLI.
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Export a .gmv terminal movie from a video file.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+GMV format:
+  .gmv is a PNG sprite sheet with one tEXt chunk:
+    keyword: gmv
+    value:   {"w":160,"h":90,"n":150}
+
+Examples:
+  bin/gmv-export ../scratch/bluelight.mp4
+  bin/gmv-export clip.mp4 --width 120 --trim 2.5-7.5 --force
+  bin/gmv-export clip.mp4 --height 88 --output tmp/clip.gmv
+""".strip(),
+    )
+    parser.add_argument("input", type=Path, help="Input video file.")
+    parser.add_argument("--width", type=int, default=DEFAULT_WIDTH, help="Frame width in pixels.")
+    parser.add_argument("--height", type=int, help="Frame height in pixels. Inferred when omitted.")
+    parser.add_argument("--trim", default=DEFAULT_TRIM, help="Trim range in seconds, START-END.")
+    parser.add_argument("--quality", default=DEFAULT_QUALITY, help="pngquant quality, e.g. 70 or 60-80.")
+    parser.add_argument("--output", "-o", type=Path, help="Output .gmv file. Defaults beside input.")
+    parser.add_argument("--force", action="store_true", help="Overwrite output if it exists.")
+    return parser.parse_args()
+
+
+# human_size formats byte counts for status output.
+def human_size(n: int) -> str:
+    value = float(n)
+    for unit in ("B", "KB", "MB", "GB"):
+        if value < 1024 or unit == "GB":
+            return f"{value:.1f}{unit}"
+        value /= 1024
+    return ""
+
+
+# parse_trim parses START-END seconds.
+def parse_trim(value: str) -> tuple[float, float]:
+    match = re.fullmatch(r"\s*([0-9]+(?:\.[0-9]+)?)\s*-\s*([0-9]+(?:\.[0-9]+)?)\s*", value)
+    if match is None:
+        raise SystemExit("trim must look like START-END, for example 0-5 or 2.5-7.5")
+    return float(match.group(1)), float(match.group(2))
+
+
+# default_output swaps the input suffix for .gmv.
+def default_output(input_path: Path) -> Path:
+    return input_path.with_suffix(".gmv")
+
+
+# even_height rounds to the nearest positive even height.
+def even_height(value: float) -> int:
+    return max(2, round(value / 2) * 2)
+
+
+# read_video_info reads source dimensions and timing.
+def read_video_info(input_path: Path) -> tuple[int, int, float, int]:
+    cap = cv2.VideoCapture(str(input_path))
+    try:
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0)
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
+        fps = float(cap.get(cv2.CAP_PROP_FPS) or 0)
+        frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+        return width, height, fps, frames
+    finally:
+        cap.release()
+
+
+# frame_range converts trim seconds into frame indexes.
+def frame_range(start: float, end: float, fps: float, total_frames: int) -> tuple[int, int]:
+    start_frame = max(0, int(math.ceil(start * fps)))
+    end_frame = int(math.floor(end * fps))
+
+    if total_frames > 0:
+        end_frame = min(end_frame, total_frames)
+
+    return start_frame, end_frame
+
+
+# check_sheet_size validates the sprite sheet budget.
+def check_sheet_size(frame_width: int, frame_height: int, frame_count: int) -> tuple[int, int]:
+    columns = min(GRID_COLUMNS, frame_count)
+    rows = math.ceil(frame_count / columns)
+    sheet_width = frame_width * columns
+    sheet_height = frame_height * rows
+    pixels = sheet_width * sheet_height
+
+    if pixels > MAX_SHEET_PIXELS:
+        raise SystemExit(
+            "output sheet would be too large "
+            f"({sheet_width}x{sheet_height}, {pixels:,} pixels; max {MAX_SHEET_PIXELS:,})"
+        )
+    return sheet_width, sheet_height
+
+
+# load_frames decodes, resizes, and converts frames to RGB.
+def load_frames(
+    input_path: Path,
+    start_frame: int,
+    end_frame: int,
+    width: int,
+    height: int,
+) -> list[Image.Image]:
+    cap = cv2.VideoCapture(str(input_path))
+    try:
+        if not cap.isOpened():
+            raise SystemExit(f"could not open video: {input_path}")
+
+        cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
+        frames: list[Image.Image] = []
+
+        for _ in range(start_frame, end_frame):
+            ok, frame = cap.read()
+            if not ok:
+                break
+
+            interpolation = cv2.INTER_AREA
+            if frame.shape[1] < width or frame.shape[0] < height:
+                interpolation = cv2.INTER_LINEAR
+
+            frame = cv2.resize(frame, (width, height), interpolation=interpolation)
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            frames.append(Image.fromarray(frame))
+
+        if not frames:
+            raise SystemExit("no frames were exported")
+        return frames
+    finally:
+        cap.release()
+
+
+# make_sheet packs frames into a fixed-column sprite sheet.
+def make_sheet(frames: list[Image.Image], width: int, height: int) -> Image.Image:
+    columns = min(GRID_COLUMNS, len(frames))
+    rows = math.ceil(len(frames) / columns)
+    sheet = Image.new("RGB", (width * columns, height * rows))
+
+    for i, frame in enumerate(frames):
+        x = (i % columns) * width
+        y = (i // columns) * height
+        sheet.paste(frame, (x, y))
+
+    return sheet
+
+
+# run_pngquant compresses the raw sprite sheet.
+def run_pngquant(input_path: Path, output_path: Path, quality: str) -> None:
+    if shutil.which("pngquant") is None:
+        raise SystemExit("pngquant is required; install it and retry")
+
+    try:
+        subprocess.run(
+            [
+                "pngquant",
+                "--force",
+                "--quality",
+                quality,
+                "--output",
+                str(output_path),
+                str(input_path),
+            ],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+    except subprocess.CalledProcessError as err:
+        detail = err.stderr.strip() or "pngquant failed"
+        raise SystemExit(detail)
+
+
+# png_chunk builds a PNG chunk with CRC.
+def png_chunk(chunk_type: bytes, data: bytes) -> bytes:
+    crc = zlib.crc32(chunk_type)
+    crc = zlib.crc32(data, crc) & 0xFFFFFFFF
+    return struct.pack(">I", len(data)) + chunk_type + data + struct.pack(">I", crc)
+
+
+# is_gmv_text_chunk identifies existing GMV metadata chunks.
+def is_gmv_text_chunk(chunk_type: bytes, data: bytes) -> bool:
+    return chunk_type == b"tEXt" and data.startswith(TEXT_KEYWORD + b"\x00")
+
+
+# add_metadata inserts the GMV tEXt chunk.
+def add_metadata(path: Path, metadata: dict[str, int]) -> None:
+    data = path.read_bytes()
+    text = json.dumps(metadata, separators=(",", ":")).encode("ascii")
+    text_chunk = png_chunk(b"tEXt", TEXT_KEYWORD + b"\x00" + text)
+
+    out = bytearray(PNG_SIGNATURE)
+    pos = len(PNG_SIGNATURE)
+    inserted = False
+
+    while pos + 8 <= len(data):
+        length = struct.unpack(">I", data[pos : pos + 4])[0]
+        chunk_type = data[pos + 4 : pos + 8]
+        chunk_data_start = pos + 8
+        chunk_data_end = chunk_data_start + length
+        chunk_end = chunk_data_end + 4
+        chunk_data = data[chunk_data_start:chunk_data_end]
+
+        if chunk_type == b"IEND" and not inserted:
+            out.extend(text_chunk)
+            inserted = True
+
+        if not is_gmv_text_chunk(chunk_type, chunk_data):
+            out.extend(data[pos:chunk_end])
+
+        pos = chunk_end
+
+        if chunk_type == b"IEND":
+            break
+
+    path.write_bytes(out)
+
+
+# main orchestrates export, quantization, and metadata injection.
+def main() -> int:
+    args = parse_args()
+    input_path = args.input
+
+    if not input_path.is_file():
+        raise SystemExit(f"input is not a file: {input_path}")
+    output_path = args.output or default_output(input_path)
+    if output_path.exists() and not args.force:
+        raise SystemExit(f"output exists: {output_path} (use --force to overwrite)")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    trim_start, trim_end = parse_trim(args.trim)
+    source_width, source_height, source_fps, total_frames = read_video_info(input_path)
+
+    frame_width = args.width
+    frame_height = args.height
+    if frame_height is None:
+        frame_height = even_height(frame_width * source_height / source_width)
+
+    start_frame, end_frame = frame_range(trim_start, trim_end, source_fps, total_frames)
+    frame_count = end_frame - start_frame
+    sheet_width, sheet_height = check_sheet_size(frame_width, frame_height, frame_count)
+
+    print(f"input      {input_path}")
+    print(f"output     {output_path}")
+    print(f"source     {source_width}x{source_height}, {source_fps:.3f} fps, {total_frames or '?'} frames")
+    print(f"trim       {trim_start:g}-{trim_end:g}s")
+    print(f"frames     {frame_count} ({start_frame}..{end_frame - 1})")
+    print(f"frame      {frame_width}x{frame_height}")
+    print(f"sheet      {sheet_width}x{sheet_height}")
+    print(f"quality    pngquant {args.quality}")
+    print()
+
+    with tempfile.TemporaryDirectory(prefix="gmv-export-") as tmp:
+        tmpdir = Path(tmp)
+        raw_path = tmpdir / "sheet.png"
+        quantized_path = tmpdir / "sheet-q.png"
+
+        frames = load_frames(input_path, start_frame, end_frame, frame_width, frame_height)
+        sheet = make_sheet(frames, frame_width, frame_height)
+        sheet.save(raw_path, optimize=True)
+        run_pngquant(raw_path, quantized_path, args.quality)
+
+        metadata = {"w": frame_width, "h": frame_height, "n": len(frames)}
+        add_metadata(quantized_path, metadata)
+
+        shutil.move(str(quantized_path), output_path)
+
+    print(f"wrote      {human_size(output_path.stat().st_size)}")
+    return 0
+
+
+if __name__ == "__main__":
+    main()

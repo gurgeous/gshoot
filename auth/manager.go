@@ -13,18 +13,16 @@ import (
 	"github.com/gurgeous/gshoot/ux"
 )
 
-// auth/client.go owns on-disk browser auth state and status reporting.
+// auth/manager.go owns on-disk browser auth state and status reporting.
 
 // Manager manages browser auth files under one config directory.
 type Manager struct {
 	ConfigDir string
 }
 
-// NewClient builds an auth client for the default config directory.
-func NewClient() *Manager {
-	m := Manager{ConfigDir: util.ConfigDir()}
-	os.MkdirAll(m.ConfigDir, 0o700)
-	return &m
+// NewManager builds an auth manager for the default config directory.
+func NewManager() *Manager {
+	return &Manager{ConfigDir: util.ConfigDir()}
 }
 
 //
@@ -94,12 +92,9 @@ func (m *Manager) ImportOClient(srcPath string) error {
 	if err != nil {
 		return fmt.Errorf("read client secret file: %w", err)
 	}
-	oclient, err := loadOClient(srcPath)
+	_, err = loadOClient(srcPath)
 	if err != nil {
 		return fmt.Errorf("load client secret file: %w", err)
-	}
-	if oclient == nil {
-		return errors.New("client secret file must be a Desktop app OAuth client JSON")
 	}
 	if err := util.WritePrivateFile(m.ClientPath(), data); err != nil {
 		return fmt.Errorf("save oauth client config: %w", err)
