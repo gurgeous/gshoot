@@ -43,13 +43,13 @@ test-watch *ARGS:
 #
 
 demo:
-  go run . --demo
+  go run . demo
 
 demo-256:
-  TERM=xterm-256color COLORTERM= TMUX= go run . --demo
+  TERM=xterm-256color COLORTERM= TMUX= go run . demo
 
 demo-true:
-  COLORTERM=truecolor go run . --demo
+  COLORTERM=truecolor go run . demo
 
 #
 # banner and friends
