@@ -20,21 +20,17 @@ var (
 
 type CLI struct {
 	Version kong.VersionFlag `short:"v" help:"Print the version number"`
-	Demo    bool             `help:"Play the first-run GMV demo."`
-	Default defaultCmd       `cmd:"" default:"1" hidden:""`
 	Auth    commands.AuthCmd `cmd:"" help:"Login or logout from Google Sheets."`
+	Demo    demoCmd          `cmd:"" help:"Play the first-run GMV demo."`
 	List    commands.ListCmd `cmd:"" help:"List your Google Sheets."`
 	Down    commands.DownCmd `cmd:"" help:"Download a Google Sheet as CSV."`
 }
 
-type defaultCmd struct{}
+type demoCmd struct{}
 
-// Run handles top-level flags that do not select a subcommand.
-func (c *defaultCmd) Run(cli *CLI) error {
-	if cli.Demo {
-		return gmv.Demo(context.Background())
-	}
-	return nil
+// Run plays the first-run GMV demo.
+func (c *demoCmd) Run() error {
+	return gmv.Demo(context.Background())
 }
 
 func main() {

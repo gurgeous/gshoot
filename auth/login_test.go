@@ -243,6 +243,7 @@ func withAuthHome(t *testing.T) *Manager {
 	home := t.TempDir()
 	t.Cleanup(xdg.Reload)
 	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
 	xdg.Reload()
 	return NewManager()
 }

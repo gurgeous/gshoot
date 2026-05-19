@@ -2,6 +2,7 @@ package auth
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/adrg/xdg"
@@ -12,6 +13,7 @@ func TestNewManagerDoesNotCreateConfigDir(t *testing.T) {
 	home := t.TempDir()
 	t.Cleanup(xdg.Reload)
 	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
 	xdg.Reload()
 
 	manager := NewManager()

@@ -99,6 +99,7 @@ func testCommandWithSetup(t *testing.T, cmd runnable, handler http.HandlerFunc, 
 	// fake browser auth under HOME
 	t.Cleanup(xdg.Reload)
 	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 	xdg.Reload()
 	if len(setup) > 0 && setup[0] != nil {
 		setup[0](tmp)
@@ -124,7 +125,7 @@ func testCommandWithSetup(t *testing.T, cmd runnable, handler http.HandlerFunc, 
 	return runErr, string(stdoutBytes), string(stderrBytes)
 }
 
-func writeAuthFiles(t *testing.T, home string, opts ...authFilesOptions) {
+func writeAuthFiles(t *testing.T, _ string, opts ...authFilesOptions) {
 	t.Helper()
 
 	cfg := authFilesOptions{
@@ -139,7 +140,7 @@ func writeAuthFiles(t *testing.T, home string, opts ...authFilesOptions) {
 		}
 	}
 
-	configDir := filepath.Join(home, ".config", "gshoot")
+	configDir := util.ConfigDir()
 	if cfg.HasClient {
 		clientJSON := `{"installed":{"client_id":"cid","client_secret":"secret","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","redirect_uris":["http://127.0.0.1/oauth2/callback"]}}`
 		if err := util.WritePrivateFile(filepath.Join(configDir, "oauth-client.json"), []byte(clientJSON)); err != nil {
