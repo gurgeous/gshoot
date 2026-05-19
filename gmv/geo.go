@@ -1,6 +1,7 @@
 package gmv
 
-// Geo keeps tiny terminal layout helpers around Go's image geometry types.
+// Geo aliases Go image geometry for terminal-space math.
+// GMV uses points, sizes, and rectangles to place images without custom coordinate types.
 
 import "image"
 

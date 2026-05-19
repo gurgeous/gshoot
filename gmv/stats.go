@@ -1,6 +1,7 @@
 package gmv
 
-// Stats tracks compact demo playback metrics for the GMV overlay.
+// Stats tracks compact demo playback metrics.
+// The renderer treats stats as a tiny overlay image, so demo instrumentation stays out of the render path.
 
 import (
 	"fmt"

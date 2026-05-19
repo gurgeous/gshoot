@@ -1,7 +1,7 @@
 package gmv
 
-// Config reads GMV playback knobs from environment variables. It keeps invalid
-// values out of the renderer.
+// Config is the small environment surface for GMV playback.
+// It resolves fps, color profile, draw caps, alpha blending, and diff tolerance before rendering starts.
 
 import (
 	"os"

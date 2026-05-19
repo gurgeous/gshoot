@@ -1,7 +1,7 @@
 package gmv
 
-// Player owns the user-facing GMV playback loop.
-// It handles raw mode, key exit, resize, and demo stats.
+// Player is the outer GMV playback loop.
+// It owns raw mode, key exit, resize handling, pingpong timing, and stdout writes.
 
 import (
 	"bytes"

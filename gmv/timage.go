@@ -1,16 +1,16 @@
 package gmv
 
-// Timage models drawable terminal images as rectangular pixel grids.
-// A transparent pixel has an empty Ch; a blank pixel has Ch set to " ".
+// Timage is GMV's terminal image primitive.
+// It is a rectangular grid of one-column pixels; empty Ch means transparent, while " " is an opaque blank.
 
-// tpixel is one terminal ch in an image
+// tpixel is one terminal cell in an image.
 type tpixel struct {
 	Ch    string
 	Color paletteColor
 	Style string
 }
 
-// 2D terminal image
+// timage is a two-dimensional terminal image.
 type timage struct {
 	pixels [][]tpixel
 }

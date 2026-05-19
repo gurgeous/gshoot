@@ -1,7 +1,7 @@
 package gmv
 
-// Card stores ANSI-styled overlay text. Card backgrounds are unsupported
-// because the renderer owns all GMV background compositing.
+// Card turns lipgloss-rendered ANSI text into a transparent terminal image.
+// It owns glyphs and foreground styles only; renderer supplies movie-derived backgrounds.
 
 import (
 	"strings"

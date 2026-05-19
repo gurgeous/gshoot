@@ -1,6 +1,7 @@
 package gmv
 
-// ANSI keeps tiny color helpers for GMV terminal rendering.
+// ANSI centralizes terminal color conversion for GMV rendering.
+// It caches emitted color escapes so the renderer can compare pixels and send fewer SGR bytes.
 
 import (
 	"bytes"
@@ -18,9 +19,9 @@ const (
 )
 
 var (
-	// opaque card fill for non-alpha mode
+	// cardBackgroundColor is the opaque card fill for non-alpha mode.
 	cardBackgroundColor = color.RGBA{R: 31, G: 34, B: 38, A: 255}
-	// foreground color for demo stats
+	// statsColor is the foreground color for demo stats.
 	statsColor = color.RGBA{R: 229, G: 231, B: 235, A: 255}
 )
 
@@ -28,7 +29,7 @@ var (
 // writing colors to buffers
 //
 
-// ansiTruecolor writes a ansiTruecolor foreground or background SGR sequence.
+// ansiTruecolor writes a truecolor foreground or background SGR sequence.
 func ansiTruecolor(out *bytes.Buffer, fg bool, c color.RGBA) {
 	if fg {
 		out.WriteString(FG)

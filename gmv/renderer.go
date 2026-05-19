@@ -1,7 +1,7 @@
 package gmv
 
-// Renderer turns composited GMV images into minimal terminal bytes.
-// It owns full redraws, dirty spans, and terminal style emission.
+// Renderer converts composited terminal images into ANSI output.
+// It keeps previous and next images, writes keyframes after invalidation, and otherwise emits dirty spans to reduce bytes.
 
 import (
 	"bytes"
