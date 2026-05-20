@@ -184,9 +184,62 @@ func CSVWrite(w io.Writer, rows [][]string) error {
 	return nil
 }
 
+// CSVString renders rows as CSV text.
+func CSVString(rows [][]string) string {
+	var buf strings.Builder
+	_ = CSVWrite(&buf, rows)
+	return buf.String()
+}
+
 //
 // helpers
 //
+
+// AllMatch reports whether every value matches re.
+func AllMatch(values []string, re *regexp.Regexp) bool {
+	for _, value := range values {
+		if !re.MatchString(value) {
+			return false
+		}
+	}
+	return true
+}
+
+// AnyContains reports whether any value contains needle.
+func AnyContains(values []string, needle string) bool {
+	for _, value := range values {
+		if strings.Contains(value, needle) {
+			return true
+		}
+	}
+	return false
+}
+
+// ContainsString reports whether values contains target.
+func ContainsString(values []string, target string) bool {
+	return IndexOfString(values, target) >= 0
+}
+
+// DecimalPrecision returns the max decimal precision, clamped to four places.
+func DecimalPrecision(values []string) int {
+	precision := 1
+	for _, value := range values {
+		if parts := strings.SplitN(value, ".", 2); len(parts) == 2 {
+			precision = max(precision, len(parts[1]))
+		}
+	}
+	return min(precision, 4)
+}
+
+// IndexOfString returns the first index of target, or -1 when missing.
+func IndexOfString(values []string, target string) int {
+	for i, value := range values {
+		if value == target {
+			return i
+		}
+	}
+	return -1
+}
 
 func browserCommandArgs(goos, rawURL string) (string, []string) {
 	switch goos {

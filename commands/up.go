@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"bytes"
 	"context"
 	"encoding/csv"
 	"errors"
@@ -79,6 +78,7 @@ func (c *UpCmd) Run() error {
 	return nil
 }
 
+// REVIEW: add a suffix comment for each ivar
 type upRunner struct {
 	cmd               *UpCmd
 	ctx               context.Context
@@ -94,6 +94,7 @@ type upRunner struct {
 	targetSheetID     int64
 }
 
+// upload runs the complete upload workflow.
 func (u *upRunner) upload(dots *ux.Dots) error {
 	if err := u.findOrCreateFile(dots); err != nil {
 		return err
@@ -139,6 +140,8 @@ func (u *upRunner) upload(dots *ux.Dots) error {
 	return nil
 }
 
+// REVIEW: move this to google client
+// findOrCreateFile finds the target spreadsheet or creates it.
 func (u *upRunner) findOrCreateFile(dots *ux.Dots) error {
 	dots.SetDescription("finding spreadsheet...")
 	file, err := u.client.FindSpreadsheet(u.ctx, u.cmd.Spreadsheet)
@@ -155,6 +158,8 @@ func (u *upRunner) findOrCreateFile(dots *ux.Dots) error {
 	return err
 }
 
+// REVIEW: why dos this exist?
+// loadSpreadsheet fetches sheet metadata for the selected file.
 func (u *upRunner) loadSpreadsheet() error {
 	spreadsheet, err := u.client.GetSpreadsheet(u.ctx, u.file.ID)
 	if err != nil {
@@ -164,6 +169,7 @@ func (u *upRunner) loadSpreadsheet() error {
 	return nil
 }
 
+// ensureSheet selects, creates, or renames the target sheet.
 func (u *upRunner) ensureSheet() error {
 	if existing := u.existingSheetID(); existing != nil {
 		u.targetSheetID = *existing
@@ -182,6 +188,7 @@ func (u *upRunner) ensureSheet() error {
 	return u.renameSheet(u.spreadsheet.Sheets[0].ID)
 }
 
+// renameOrAddSheet reuses a blank default sheet or creates a new one.
 func (u *upRunner) renameOrAddSheet(blankDefault bool) error {
 	if blankDefault {
 		return u.renameSheet(u.spreadsheet.Sheets[0].ID)
@@ -189,6 +196,7 @@ func (u *upRunner) renameOrAddSheet(blankDefault bool) error {
 	return u.addSheet()
 }
 
+// addSheet creates the target sheet and records its ID.
 func (u *upRunner) addSheet() error {
 	res, err := u.client.BatchUpdate(u.ctx, u.file.ID, []google.Request{{
 		AddSheet: &google.AddSheetRequest{
@@ -212,6 +220,7 @@ func (u *upRunner) addSheet() error {
 	return nil
 }
 
+// renameSheet renames an existing sheet and records it as the target.
 func (u *upRunner) renameSheet(sheetID int64) error {
 	_, err := u.client.BatchUpdate(u.ctx, u.file.ID, []google.Request{{
 		UpdateSheetProperties: &google.UpdateSheetPropertiesRequest{
@@ -226,6 +235,7 @@ func (u *upRunner) renameSheet(sheetID int64) error {
 	return err
 }
 
+// clearSheet clears every cell in the target sheet.
 func (u *upRunner) clearSheet() error {
 	_, err := u.client.BatchUpdate(u.ctx, u.file.ID, []google.Request{{
 		UpdateCells: &google.UpdateCellsRequest{
@@ -236,6 +246,7 @@ func (u *upRunner) clearSheet() error {
 	return err
 }
 
+// resizeSheet expands the target grid to fit data plus padding.
 func (u *upRunner) resizeSheet() error {
 	_, err := u.client.BatchUpdate(u.ctx, u.file.ID, []google.Request{{
 		UpdateSheetProperties: &google.UpdateSheetPropertiesRequest{
@@ -252,6 +263,7 @@ func (u *upRunner) resizeSheet() error {
 	return err
 }
 
+// pasteSheet pastes CSV data into the target sheet.
 func (u *upRunner) pasteSheet() error {
 	pasteType := "PASTE_NORMAL"
 	if u.cmd.Refill {
@@ -260,7 +272,7 @@ func (u *upRunner) pasteSheet() error {
 	_, err := u.client.BatchUpdate(u.ctx, u.file.ID, []google.Request{{
 		PasteData: &google.PasteDataRequest{
 			Coordinate: google.GridCoordinate{SheetID: u.targetSheetID},
-			Data:       csvString(u.uploadRows),
+			Data:       util.CSVString(u.uploadRows),
 			Delimiter:  ",",
 			Type:       pasteType,
 		},
@@ -268,6 +280,7 @@ func (u *upRunner) pasteSheet() error {
 	return err
 }
 
+// applyOptions applies refill, filter, numeric, and layout options.
 func (u *upRunner) applyOptions() error {
 	if u.cmd.Refill {
 		if err := u.applyRefillFormats(); err != nil {
@@ -296,6 +309,7 @@ func (u *upRunner) applyOptions() error {
 	return nil
 }
 
+// applyFilter adds a standard filter over uploaded data.
 func (u *upRunner) applyFilter() error {
 	_, err := u.client.BatchUpdate(u.ctx, u.file.ID, []google.Request{{
 		SetBasicFilter: &google.SetBasicFilterRequest{
@@ -313,6 +327,7 @@ func (u *upRunner) applyFilter() error {
 	return err
 }
 
+// applyNumeric formats obvious numeric CSV columns.
 func (u *upRunner) applyNumeric() error {
 	formats := u.numericFormats()
 	requests := make([]google.Request, 0, len(formats))
@@ -342,6 +357,7 @@ func (u *upRunner) applyNumeric() error {
 	return err
 }
 
+// applyLayout auto-sizes columns and adds padding.
 func (u *upRunner) applyLayout() error {
 	_, err := u.client.BatchUpdate(u.ctx, u.file.ID, []google.Request{{
 		AutoResizeDimensions: &google.AutoResizeDimensionsRequest{
@@ -368,6 +384,7 @@ func (u *upRunner) applyLayout() error {
 	return err
 }
 
+// applyRefillFormats copies existing data-row formats across refilled columns.
 func (u *upRunner) applyRefillFormats() error {
 	if len(u.existingRows) < 2 || u.rowCount() <= 1 {
 		return nil
@@ -402,6 +419,7 @@ func (u *upRunner) applyRefillFormats() error {
 	return err
 }
 
+// applyRefillFormulas extends non-CSV formula columns during refill.
 func (u *upRunner) applyRefillFormulas() error {
 	if u.rowCount() <= u.existingDataRowCount() || u.existingDataRowCount() < 2 {
 		return nil
@@ -436,6 +454,7 @@ func (u *upRunner) applyRefillFormulas() error {
 	return err
 }
 
+// clearPaddingFormats clears formatting outside the refilled data area.
 func (u *upRunner) clearPaddingFormats() error {
 	_, err := u.client.BatchUpdate(u.ctx, u.file.ID, []google.Request{
 		{
@@ -468,6 +487,7 @@ func (u *upRunner) clearPaddingFormats() error {
 	return err
 }
 
+// layoutWidthRequests builds padding requests from autosized column widths.
 func (u *upRunner) layoutWidthRequests() ([]google.Request, error) {
 	refreshed, err := u.client.GetSpreadsheetWithGridData(u.ctx, u.file.ID, u.targetTitle)
 	if err != nil {
@@ -500,6 +520,7 @@ func (u *upRunner) layoutWidthRequests() ([]google.Request, error) {
 	return requests, nil
 }
 
+// loadExistingSheetData loads display values and user-entered grid data for refill.
 func (u *upRunner) loadExistingSheetData() error {
 	rows, err := u.client.GetRows(u.ctx, u.file.ID, u.targetTitle)
 	if err != nil {
@@ -516,6 +537,7 @@ func (u *upRunner) loadExistingSheetData() error {
 	return nil
 }
 
+// refillRows merges CSV rows into the existing sheet shape.
 func (u *upRunner) refillRows() (google.Rows, error) {
 	if len(u.existingRows) == 0 {
 		return u.rows, nil
@@ -532,7 +554,7 @@ func (u *upRunner) refillRows() (google.Rows, error) {
 
 	finalHeaders := append([]string(nil), existingHeaders...)
 	for _, header := range csvHeaders {
-		if !contains(finalHeaders, header) {
+		if !util.ContainsString(finalHeaders, header) {
 			finalHeaders = append(finalHeaders, header)
 		}
 	}
@@ -560,6 +582,7 @@ func (u *upRunner) refillRows() (google.Rows, error) {
 	return merged, nil
 }
 
+// numericFormats returns target column indexes and Sheets number patterns.
 func (u *upRunner) numericFormats() map[int]string {
 	formats := map[int]string{}
 	if len(u.rows) < 2 {
@@ -575,21 +598,22 @@ func (u *upRunner) numericFormats() map[int]string {
 				values = append(values, value)
 			}
 		}
-		if len(values) == 0 || anyContains(values, ",") {
+		if len(values) == 0 || util.AnyContains(values, ",") {
 			continue
 		}
-		if allMatch(values, integerRE) {
+		if util.AllMatch(values, integerRE) {
 			formats[targetColumns[columnIndex]] = "#,##0"
 			continue
 		}
-		if !allMatch(values, decimalRE) || !anyContains(values, ".") {
+		if !util.AllMatch(values, decimalRE) || !util.AnyContains(values, ".") {
 			continue
 		}
-		formats[targetColumns[columnIndex]] = "#,##0." + strings.Repeat("0", decimalPrecision(values))
+		formats[targetColumns[columnIndex]] = "#,##0." + strings.Repeat("0", util.DecimalPrecision(values))
 	}
 	return formats
 }
 
+// refillFormulaColumns returns non-CSV columns that contain formulas.
 func (u *upRunner) refillFormulaColumns() []int {
 	existingCSV := map[int]bool{}
 	for _, columnIndex := range u.existingCSVColumns() {
@@ -604,6 +628,7 @@ func (u *upRunner) refillFormulaColumns() []int {
 	return columns
 }
 
+// formulaColumn reports whether a non-CSV column should be formula-extended.
 func (u *upRunner) formulaColumn(columnIndex int) bool {
 	sawFormula := false
 	for rowIndex := 1; rowIndex < u.existingDataRowCount(); rowIndex++ {
@@ -623,6 +648,7 @@ func (u *upRunner) formulaColumn(columnIndex int) bool {
 	return sawFormula
 }
 
+// existingDataRowCount returns the existing rows covered by the filter or data.
 func (u *upRunner) existingDataRowCount() int {
 	count := len(u.existingRows)
 	if u.existingSheetData != nil && u.existingSheetData.BasicFilter != nil && u.existingSheetData.BasicFilter.Range.EndRowIndex > 0 {
@@ -631,6 +657,7 @@ func (u *upRunner) existingDataRowCount() int {
 	return min(count, len(u.existingRows))
 }
 
+// existingCSVColumns returns existing sheet columns that also appear in the CSV.
 func (u *upRunner) existingCSVColumns() []int {
 	csvHeaders := map[string]bool{}
 	for _, header := range u.rows[0] {
@@ -645,6 +672,7 @@ func (u *upRunner) existingCSVColumns() []int {
 	return columns
 }
 
+// csvTargetColumns maps CSV columns to upload target columns.
 func (u *upRunner) csvTargetColumns() []int {
 	headers := u.uploadRows
 	if len(headers) == 0 {
@@ -653,11 +681,12 @@ func (u *upRunner) csvTargetColumns() []int {
 	targetHeaders := headers[0]
 	targetColumns := make([]int, 0, len(u.rows[0]))
 	for _, header := range u.rows[0] {
-		targetColumns = append(targetColumns, indexOf(targetHeaders, header))
+		targetColumns = append(targetColumns, util.IndexOfString(targetHeaders, header))
 	}
 	return targetColumns
 }
 
+// targetSheetTitle returns the requested or generated destination sheet name.
 func (u *upRunner) targetSheetTitle() string {
 	if u.cmd.Sheet != "" {
 		return u.cmd.Sheet
@@ -668,6 +697,7 @@ func (u *upRunner) targetSheetTitle() string {
 	return u.nextSheetTitle()
 }
 
+// nextSheetTitle returns the next gsheet_up_N sheet title.
 func (u *upRunner) nextSheetTitle() string {
 	next := 1
 	for _, sheet := range u.spreadsheet.Sheets {
@@ -681,6 +711,7 @@ func (u *upRunner) nextSheetTitle() string {
 	return fmt.Sprintf("%s%d", sheetPrefix, next)
 }
 
+// existingSheetID returns the ID of the current target sheet, if present.
 func (u *upRunner) existingSheetID() *int64 {
 	for _, sheet := range u.spreadsheet.Sheets {
 		if strings.EqualFold(sheet.Title, u.targetTitle) {
@@ -690,6 +721,7 @@ func (u *upRunner) existingSheetID() *int64 {
 	return nil
 }
 
+// blankDefaultSheet reports whether the only existing sheet has no values.
 func (u *upRunner) blankDefaultSheet() (bool, error) {
 	if len(u.spreadsheet.Sheets) != 1 {
 		return false, nil
@@ -701,22 +733,27 @@ func (u *upRunner) blankDefaultSheet() (bool, error) {
 	return len(rows) == 0, nil
 }
 
+// rowCount returns the number of rows to upload.
 func (u *upRunner) rowCount() int {
 	return len(u.uploadRows)
 }
 
+// columnCount returns the number of columns to upload.
 func (u *upRunner) columnCount() int {
 	return len(u.uploadRows[0])
 }
 
+// targetRowCount returns upload rows plus legacy padding.
 func (u *upRunner) targetRowCount() int {
 	return u.rowCount() + 2
 }
 
+// targetColumnCount returns upload columns plus legacy padding.
 func (u *upRunner) targetColumnCount() int {
 	return u.columnCount() + 2
 }
 
+// readUploadCSV reads and rectangularizes the input CSV.
 func readUploadCSV(path string) (google.Rows, error) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -739,12 +776,7 @@ func readUploadCSV(path string) (google.Rows, error) {
 	return google.Rectangularize(rows), nil
 }
 
-func csvString(rows google.Rows) string {
-	var buf bytes.Buffer
-	_ = util.CSVWrite(&buf, rows)
-	return buf.String()
-}
-
+// userEnteredRows extracts user-entered strings from grid data.
 func userEnteredRows(data *google.SheetData) google.Rows {
 	if data == nil {
 		return nil
@@ -760,6 +792,7 @@ func userEnteredRows(data *google.SheetData) google.Rows {
 	return google.Rectangularize(rows)
 }
 
+// userEnteredCellValue stringifies the user-entered value for one cell.
 func userEnteredCellValue(cell google.CellData) string {
 	value := cell.UserEnteredValue
 	if value == nil {
@@ -781,6 +814,7 @@ func userEnteredCellValue(cell google.CellData) string {
 	}
 }
 
+// validateHeaders rejects duplicate non-empty headers.
 func validateHeaders(headers []string, label string) error {
 	counts := map[string]int{}
 	for _, header := range headers {
@@ -799,45 +833,4 @@ func validateHeaders(headers []string, label string) error {
 		return fmt.Errorf("%s has duplicate headers: %s", label, strings.Join(duplicates, ", "))
 	}
 	return nil
-}
-
-func decimalPrecision(values []string) int {
-	precision := 1
-	for _, value := range values {
-		if parts := strings.SplitN(value, ".", 2); len(parts) == 2 {
-			precision = max(precision, len(parts[1]))
-		}
-	}
-	return min(precision, 4)
-}
-
-func indexOf(values []string, target string) int {
-	for i, value := range values {
-		if value == target {
-			return i
-		}
-	}
-	return -1
-}
-
-func contains(values []string, target string) bool {
-	return indexOf(values, target) >= 0
-}
-
-func anyContains(values []string, needle string) bool {
-	for _, value := range values {
-		if strings.Contains(value, needle) {
-			return true
-		}
-	}
-	return false
-}
-
-func allMatch(values []string, re *regexp.Regexp) bool {
-	for _, value := range values {
-		if !re.MatchString(value) {
-			return false
-		}
-	}
-	return true
 }
