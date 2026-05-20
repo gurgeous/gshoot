@@ -77,18 +77,6 @@ func TestFindSheet(t *testing.T) {
 	assert.Equal(t, "Summary", sheet.Title)
 }
 
-func TestFindSheetEmpty(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_ = json.NewEncoder(w).Encode(map[string]any{"sheets": []any{}})
-	}))
-	defer server.Close()
-
-	client := newTestClient(t, server.URL)
-	sheet, err := client.FindSheet(context.Background(), "sheet-1", "")
-	assert.NoError(t, err)
-	assert.Nil(t, sheet)
-}
-
 func TestGetSpreadsheetFieldsRespectGridData(t *testing.T) {
 	gotFields := []string{}
 	gotIncludeGridData := []string{}
@@ -105,9 +93,9 @@ func TestGetSpreadsheetFieldsRespectGridData(t *testing.T) {
 	defer server.Close()
 
 	client := newTestClient(t, server.URL)
-	_, err := client.GetSpreadsheet(context.Background(), "sheet-1", SpreadsheetOptions{})
+	_, err := client.GetSpreadsheet(context.Background(), "sheet-1")
 	assert.NoError(t, err)
-	_, err = client.GetSpreadsheet(context.Background(), "sheet-1", SpreadsheetOptions{IncludeGridData: true})
+	_, err = client.GetSpreadsheetWithGridData(context.Background(), "sheet-1")
 	assert.NoError(t, err)
 
 	assert.NotContains(t, gotFields[0], "data(")

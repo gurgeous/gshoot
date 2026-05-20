@@ -156,7 +156,7 @@ func (u *upRunner) findOrCreateFile(dots *ux.Dots) error {
 }
 
 func (u *upRunner) loadSpreadsheet() error {
-	spreadsheet, err := u.client.GetSpreadsheet(u.ctx, u.file.ID, google.SpreadsheetOptions{})
+	spreadsheet, err := u.client.GetSpreadsheet(u.ctx, u.file.ID)
 	if err != nil {
 		return err
 	}
@@ -469,10 +469,7 @@ func (u *upRunner) clearPaddingFormats() error {
 }
 
 func (u *upRunner) layoutWidthRequests() ([]google.Request, error) {
-	refreshed, err := u.client.GetSpreadsheet(u.ctx, u.file.ID, google.SpreadsheetOptions{
-		IncludeGridData: true,
-		Ranges:          []string{u.targetTitle},
-	})
+	refreshed, err := u.client.GetSpreadsheetWithGridData(u.ctx, u.file.ID, u.targetTitle)
 	if err != nil {
 		return nil, err
 	}
@@ -510,10 +507,7 @@ func (u *upRunner) loadExistingSheetData() error {
 	}
 	u.existingRows = rows
 
-	refreshed, err := u.client.GetSpreadsheet(u.ctx, u.file.ID, google.SpreadsheetOptions{
-		IncludeGridData: true,
-		Ranges:          []string{u.targetTitle},
-	})
+	refreshed, err := u.client.GetSpreadsheetWithGridData(u.ctx, u.file.ID, u.targetTitle)
 	if err != nil {
 		return err
 	}

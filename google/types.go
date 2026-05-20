@@ -1,10 +1,11 @@
 package google
 
 //
-// google api payloads
+// Drive payloads
 //
 
-// REVIEW: group these logically with nice fat explanatory comments
+// These are the tiny subset of Google Drive fields needed to find or create
+// spreadsheet files. Keep these payloads narrow so the custom client stays small.
 
 // File is a Google Drive file.
 type File struct {
@@ -13,6 +14,13 @@ type File struct {
 	ModifiedByMeTime string `json:"modifiedByMeTime"`
 	MimeType         string `json:"mimeType,omitempty"`
 }
+
+//
+// Spreadsheet payloads
+//
+
+// Spreadsheet and Sheet are the domain values the rest of the app consumes.
+// spreadsheetResponse below handles the awkward API response shape.
 
 // Sheet is one tab from a Google spreadsheet.
 type Sheet struct {
@@ -26,6 +34,61 @@ type Spreadsheet struct {
 	Sheets []*Sheet
 	Data   map[int64]*SheetData
 }
+
+type spreadsheetResponse struct {
+	SpreadsheetID string          `json:"spreadsheetId"`
+	Sheets        []sheetResponse `json:"sheets"`
+}
+
+type sheetResponse struct {
+	Properties  *SheetProperties    `json:"properties"`
+	BasicFilter *BasicFilter        `json:"basicFilter"`
+	Data        []sheetDataResponse `json:"data"`
+}
+
+type sheetDataResponse struct {
+	RowData        []RowData             `json:"rowData"`
+	ColumnMetadata []DimensionProperties `json:"columnMetadata"`
+}
+
+func (r spreadsheetResponse) spreadsheet() *Spreadsheet {
+	spreadsheet := &Spreadsheet{
+		ID:   r.SpreadsheetID,
+		Data: map[int64]*SheetData{},
+	}
+	for _, item := range r.Sheets {
+		if item.Properties != nil {
+			sheet := item.Properties.sheet()
+			spreadsheet.Sheets = append(spreadsheet.Sheets, sheet)
+			spreadsheet.Data[sheet.ID] = item.sheetData()
+		}
+	}
+	return spreadsheet
+}
+
+func (p SheetProperties) sheet() *Sheet {
+	var id int64
+	if p.SheetID != nil {
+		id = *p.SheetID
+	}
+	return &Sheet{ID: id, Title: p.Title}
+}
+
+func (r sheetResponse) sheetData() *SheetData {
+	data := &SheetData{BasicFilter: r.BasicFilter}
+	if len(r.Data) > 0 {
+		data.Rows = r.Data[0].RowData
+		data.ColumnMetadata = r.Data[0].ColumnMetadata
+	}
+	return data
+}
+
+//
+// Grid data payloads
+//
+
+// These represent user-entered cell values and formatting. They are only fetched
+// for upload/refill flows that need formulas, filters, or column metadata.
 
 // SheetData is the subset of grid data needed for upload/refill.
 type SheetData struct {
@@ -60,6 +123,13 @@ type ErrorValue struct {
 	Message string `json:"message,omitempty"`
 }
 
+//
+// Format payloads
+//
+
+// Formatting payloads are intentionally partial. We only model number formats
+// and column widths because those are the only formatting mutations we send.
+
 // CellFormat is a minimal Sheets cell format.
 type CellFormat struct {
 	NumberFormat *NumberFormat `json:"numberFormat,omitempty"`
@@ -81,6 +151,13 @@ type GridProperties struct {
 	RowCount    int `json:"rowCount,omitempty"`
 	ColumnCount int `json:"columnCount,omitempty"`
 }
+
+//
+// Range payloads
+//
+
+// Sheets batchUpdate requests use grid, dimension, and coordinate ranges. These
+// structs share names with the API docs so request construction stays readable.
 
 // GridRange identifies a rectangular sheet range.
 type GridRange struct {
@@ -110,6 +187,13 @@ type GridCoordinate struct {
 type BasicFilter struct {
 	Range GridRange `json:"range"`
 }
+
+//
+// Batch update request payloads
+//
+
+// Request is a union of the Sheets batchUpdate mutations supported by gshoot.
+// Each field maps directly to one Google Sheets request type.
 
 // Request is one Sheets batchUpdate request.
 type Request struct {
@@ -188,6 +272,12 @@ type SheetProperties struct {
 	Index          *int            `json:"index,omitempty"`
 	GridProperties *GridProperties `json:"gridProperties,omitempty"`
 }
+
+//
+// Batch update response payloads
+//
+
+// Only addSheet replies are consumed today; other mutation replies are ignored.
 
 // BatchUpdateResponse contains the replies from a Sheets batchUpdate call.
 type BatchUpdateResponse struct {
