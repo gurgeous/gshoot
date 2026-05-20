@@ -24,6 +24,7 @@ type CLI struct {
 	Demo    demoCmd          `cmd:"" help:"Play the first-run GMV demo."`
 	List    commands.ListCmd `cmd:"" help:"List your Google Sheets."`
 	Down    commands.DownCmd `cmd:"" help:"Download a Google Sheet as CSV."`
+	Up      commands.UpCmd   `cmd:"" help:"Upload a CSV to Google Sheets."`
 }
 
 type demoCmd struct{}

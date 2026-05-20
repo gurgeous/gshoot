@@ -89,6 +89,33 @@ func TestFindSheetEmpty(t *testing.T) {
 	assert.Nil(t, sheet)
 }
 
+func TestGetSpreadsheetFieldsRespectGridData(t *testing.T) {
+	gotFields := []string{}
+	gotIncludeGridData := []string{}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotFields = append(gotFields, r.URL.Query().Get("fields"))
+		gotIncludeGridData = append(gotIncludeGridData, r.URL.Query().Get("includeGridData"))
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"sheets": []map[string]any{
+				{"properties": map[string]any{"sheetId": 0, "title": "Sheet1"}},
+			},
+		})
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server.URL)
+	_, err := client.GetSpreadsheet(context.Background(), "sheet-1", SpreadsheetOptions{})
+	assert.NoError(t, err)
+	_, err = client.GetSpreadsheet(context.Background(), "sheet-1", SpreadsheetOptions{IncludeGridData: true})
+	assert.NoError(t, err)
+
+	assert.NotContains(t, gotFields[0], "data(")
+	assert.Contains(t, gotFields[1], "data(")
+	assert.Equal(t, "", gotIncludeGridData[0])
+	assert.Equal(t, "true", gotIncludeGridData[1])
+}
+
 func TestGetRows(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/v4/spreadsheets/sheet-1/values/%27Summary%27", r.URL.EscapedPath())
