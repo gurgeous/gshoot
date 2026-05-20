@@ -1,5 +1,7 @@
 package google
 
+import "fmt"
+
 //
 // Drive payloads
 //
@@ -106,6 +108,28 @@ type RowData struct {
 type CellData struct {
 	UserEnteredValue  *ExtendedValue `json:"userEnteredValue,omitempty"`
 	UserEnteredFormat *CellFormat    `json:"userEnteredFormat,omitempty"`
+}
+
+// UserEnteredString returns the user-entered value as a string.
+func (c CellData) UserEnteredString() string {
+	value := c.UserEnteredValue
+	if value == nil {
+		return ""
+	}
+	switch {
+	case value.FormulaValue != nil:
+		return *value.FormulaValue
+	case value.StringValue != nil:
+		return *value.StringValue
+	case value.NumberValue != nil:
+		return fmt.Sprint(*value.NumberValue)
+	case value.BoolValue != nil:
+		return fmt.Sprint(*value.BoolValue)
+	case value.ErrorValue != nil:
+		return value.ErrorValue.Type
+	default:
+		return ""
+	}
 }
 
 // ExtendedValue is a minimal Sheets extended value.
