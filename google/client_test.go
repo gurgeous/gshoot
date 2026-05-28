@@ -40,6 +40,42 @@ func TestListSpreadsheets(t *testing.T) {
 	assert.Equal(t, "Alpha", files[0].Name)
 }
 
+func TestClientUsesDocumentedBaseURLs(t *testing.T) {
+	assert.Equal(t, "https://www.googleapis.com", driveBaseURL)
+	assert.Equal(t, "https://sheets.googleapis.com", sheetsBaseURL)
+}
+
+func TestClientRoutesRequestsByService(t *testing.T) {
+	driveHits := 0
+	sheetsHits := 0
+
+	drive := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		driveHits++
+		assert.Equal(t, "/drive/v3/files", r.URL.Path)
+		_ = json.NewEncoder(w).Encode(map[string]any{"files": []any{}})
+	}))
+	defer drive.Close()
+
+	sheets := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sheetsHits++
+		assert.Equal(t, "/v4/spreadsheets/sheet-1", r.URL.Path)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"sheets": []map[string]any{
+				{"properties": map[string]any{"sheetId": 0, "title": "Sheet1"}},
+			},
+		})
+	}))
+	defer sheets.Close()
+
+	client := newTestClientWithBaseURLs(t, drive.URL, sheets.URL)
+	_, err := client.ListSpreadsheets(context.Background(), 1)
+	assert.NoError(t, err)
+	_, err = client.GetSpreadsheet(context.Background(), "sheet-1")
+	assert.NoError(t, err)
+	assert.Equal(t, 1, driveHits)
+	assert.Equal(t, 1, sheetsHits)
+}
+
 func TestFindSpreadsheet(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{
@@ -83,7 +119,7 @@ func TestCreateSpreadsheetSendsWritableFields(t *testing.T) {
 
 func TestFindSheet(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/sheets/v4/spreadsheets/sheet-1", r.URL.Path)
+		assert.Equal(t, "/v4/spreadsheets/sheet-1", r.URL.Path)
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"sheets": []map[string]any{
 				{"properties": map[string]any{"sheetId": 0, "title": "Sheet1"}},
@@ -129,7 +165,7 @@ func TestGetSpreadsheetFieldsRespectGridData(t *testing.T) {
 
 func TestGetRows(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/sheets/v4/spreadsheets/sheet-1/values/%27Summary%27", r.URL.EscapedPath())
+		assert.Equal(t, "/v4/spreadsheets/sheet-1/values/%27Summary%27", r.URL.EscapedPath())
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"values": []any{
 				[]any{"name", "count"},
@@ -148,11 +184,21 @@ func TestGetRows(t *testing.T) {
 func newTestClient(t *testing.T, serverURL string) *Client {
 	t.Helper()
 
+	return newTestClientWithBaseURLs(t, serverURL, serverURL)
+}
+
+func newTestClientWithBaseURLs(t *testing.T, driveURL, sheetsURL string) *Client {
+	t.Helper()
+
 	httpClient := &http.Client{
 		Transport: &oauth2.Transport{
 			Source: oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "token"}),
 			Base:   http.DefaultTransport,
 		},
 	}
-	return &Client{httpClient: httpClient, baseURL: serverURL}
+	return &Client{
+		httpClient:    httpClient,
+		driveBaseURL:  driveURL,
+		sheetsBaseURL: sheetsURL,
+	}
 }

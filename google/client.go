@@ -34,13 +34,19 @@ func ReadWriteScopes() []string {
 
 const spreadsheetMimeType = "application/vnd.google-apps.spreadsheet"
 
+const (
+	driveBaseURL  = "https://www.googleapis.com"
+	sheetsBaseURL = "https://sheets.googleapis.com"
+)
+
 //
 // google api client
 //
 
 type Client struct {
-	httpClient *http.Client
-	baseURL    string
+	httpClient    *http.Client
+	driveBaseURL  string
+	sheetsBaseURL string
 }
 
 // NewClient creates a Google API client with auth for the requested scopes.
@@ -51,8 +57,9 @@ func NewClient(ctx context.Context, scopes []string) (*Client, error) {
 	}
 
 	return &Client{
-		httpClient: oauth2.NewClient(ctx, tokenSource),
-		baseURL:    "https://www.googleapis.com",
+		httpClient:    oauth2.NewClient(ctx, tokenSource),
+		driveBaseURL:  driveBaseURL,
+		sheetsBaseURL: sheetsBaseURL,
 	}, nil
 }
 
@@ -76,7 +83,7 @@ func (c *Client) ListSpreadsheets(ctx context.Context, limit int) ([]*File, erro
 	var res struct {
 		Files []*File `json:"files"`
 	}
-	if err := c.req(ctx, "/drive/v3/files", q, &res); err != nil {
+	if err := c.driveReq(ctx, "/drive/v3/files", q, &res); err != nil {
 		return nil, err
 	}
 	return res.Files, nil
@@ -93,7 +100,7 @@ func (c *Client) CreateSpreadsheet(ctx context.Context, name string) (*File, err
 		MimeType: spreadsheetMimeType,
 	}
 	var res File
-	if err := c.reqJSON(ctx, http.MethodPost, "/drive/v3/files", q, body, &res); err != nil {
+	if err := c.driveReqJSON(ctx, http.MethodPost, "/drive/v3/files", q, body, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -125,7 +132,7 @@ func (c *Client) GetSpreadsheetWithGridData(ctx context.Context, spreadsheetID s
 // https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets.values/get
 func (c *Client) GetRows(ctx context.Context, spreadsheetID string, sheetTitle string) (Rows, error) {
 	path := fmt.Sprintf(
-		"/sheets/v4/spreadsheets/%s/values/%s",
+		"/v4/spreadsheets/%s/values/%s",
 		url.PathEscape(spreadsheetID),
 		url.PathEscape(sheetRange(sheetTitle)),
 	)
@@ -133,7 +140,7 @@ func (c *Client) GetRows(ctx context.Context, spreadsheetID string, sheetTitle s
 	var res struct {
 		Values [][]any `json:"values"`
 	}
-	if err := c.req(ctx, path, nil, &res); err != nil {
+	if err := c.sheetsReq(ctx, path, nil, &res); err != nil {
 		return nil, err
 	}
 
@@ -152,10 +159,10 @@ func (c *Client) GetRows(ctx context.Context, spreadsheetID string, sheetTitle s
 // BatchUpdate sends one or more Sheets mutation requests and returns API replies.
 // https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets/batchUpdate
 func (c *Client) BatchUpdate(ctx context.Context, spreadsheetID string, requests []Request) (*BatchUpdateResponse, error) {
-	path := fmt.Sprintf("/sheets/v4/spreadsheets/%s:batchUpdate", url.PathEscape(spreadsheetID))
+	path := fmt.Sprintf("/v4/spreadsheets/%s:batchUpdate", url.PathEscape(spreadsheetID))
 	body := map[string]any{"requests": requests}
 	var res BatchUpdateResponse
-	if err := c.reqJSON(ctx, http.MethodPost, path, nil, body, &res); err != nil {
+	if err := c.sheetsReqJSON(ctx, http.MethodPost, path, nil, body, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -219,7 +226,7 @@ func Rectangularize(rows Rows) Rows {
 }
 
 func (c *Client) getSpreadsheet(ctx context.Context, spreadsheetID string, includeGridData bool, ranges ...string) (*Spreadsheet, error) {
-	path := fmt.Sprintf("/sheets/v4/spreadsheets/%s", url.PathEscape(spreadsheetID))
+	path := fmt.Sprintf("/v4/spreadsheets/%s", url.PathEscape(spreadsheetID))
 	q := url.Values{}
 	fields := "sheets(properties(sheetId,title,gridProperties))"
 	if includeGridData {
@@ -232,21 +239,36 @@ func (c *Client) getSpreadsheet(ctx context.Context, spreadsheetID string, inclu
 	}
 
 	var res spreadsheetResponse
-	if err := c.req(ctx, path, q, &res); err != nil {
+	if err := c.sheetsReq(ctx, path, q, &res); err != nil {
 		return nil, err
 	}
 	return res.spreadsheet(), nil
 }
 
-// req sends a GET request and decodes JSON.
-func (c *Client) req(ctx context.Context, path string, q url.Values, dst any) error {
-	return c.reqJSON(ctx, http.MethodGet, path, q, nil, dst)
+// driveReq sends a Drive GET request and decodes JSON.
+func (c *Client) driveReq(ctx context.Context, path string, q url.Values, dst any) error {
+	return c.driveReqJSON(ctx, http.MethodGet, path, q, nil, dst)
+}
+
+// driveReqJSON sends a Drive JSON request.
+func (c *Client) driveReqJSON(ctx context.Context, method string, path string, q url.Values, body any, dst any) error {
+	return c.reqJSON(ctx, c.driveBaseURL, method, path, q, body, dst)
+}
+
+// sheetsReq sends a Sheets GET request and decodes JSON.
+func (c *Client) sheetsReq(ctx context.Context, path string, q url.Values, dst any) error {
+	return c.sheetsReqJSON(ctx, http.MethodGet, path, q, nil, dst)
+}
+
+// sheetsReqJSON sends a Sheets JSON request.
+func (c *Client) sheetsReqJSON(ctx context.Context, method string, path string, q url.Values, body any, dst any) error {
+	return c.reqJSON(ctx, c.sheetsBaseURL, method, path, q, body, dst)
 }
 
 // reqJSON sends a JSON request, checks Google errors, and decodes JSON.
-func (c *Client) reqJSON(ctx context.Context, method string, path string, q url.Values, body any, dst any) error {
+func (c *Client) reqJSON(ctx context.Context, baseURL string, method string, path string, q url.Values, body any, dst any) error {
 	// path+q => url
-	url := strings.TrimRight(c.baseURL, "/") + path
+	url := strings.TrimRight(baseURL, "/") + path
 	if len(q) > 0 {
 		url += "?" + q.Encode()
 	}

@@ -21,11 +21,11 @@ func TestUpCommandRenamesBlankDefaultSheet(t *testing.T) {
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"files": []map[string]string{{"id": "sheet-1", "name": "Budget"}},
 			})
-		case r.URL.Path == "/sheets/v4/spreadsheets/sheet-1":
+		case r.URL.Path == "/v4/spreadsheets/sheet-1":
 			writeSpreadsheet(w, "Sheet1", 0, nil)
-		case strings.HasPrefix(r.URL.Path, "/sheets/v4/spreadsheets/sheet-1/values/"):
+		case strings.HasPrefix(r.URL.Path, "/v4/spreadsheets/sheet-1/values/"):
 			_ = json.NewEncoder(w).Encode(map[string]any{"values": []any{}})
-		case r.URL.Path == "/sheets/v4/spreadsheets/sheet-1:batchUpdate":
+		case r.URL.Path == "/v4/spreadsheets/sheet-1:batchUpdate":
 			batches = append(batches, readBatch(t, r))
 			writeBatchReply(w)
 		default:
@@ -49,14 +49,14 @@ func TestUpCommandReplaceClearsExistingSheet(t *testing.T) {
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"files": []map[string]string{{"id": "sheet-1", "name": "Budget"}},
 			})
-		case r.URL.Path == "/sheets/v4/spreadsheets/sheet-1":
+		case r.URL.Path == "/v4/spreadsheets/sheet-1":
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"sheets": []map[string]any{
 					{"properties": map[string]any{"sheetId": 0, "title": "Sheet1"}},
 					{"properties": map[string]any{"sheetId": 7, "title": "gsheet_up"}},
 				},
 			})
-		case r.URL.Path == "/sheets/v4/spreadsheets/sheet-1:batchUpdate":
+		case r.URL.Path == "/v4/spreadsheets/sheet-1:batchUpdate":
 			batches = append(batches, readBatch(t, r))
 			writeBatchReply(w)
 		default:
@@ -79,13 +79,13 @@ func TestUpCommandRefillMergesAndExtendsFormulas(t *testing.T) {
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"files": []map[string]string{{"id": "sheet-1", "name": "Budget"}},
 			})
-		case r.URL.Path == "/sheets/v4/spreadsheets/sheet-1":
+		case r.URL.Path == "/v4/spreadsheets/sheet-1":
 			if r.URL.Query().Get("includeGridData") == "true" {
 				writeSpreadsheet(w, "gsheet_up", 7, refillGridData())
 			} else {
 				writeSpreadsheet(w, "gsheet_up", 7, nil)
 			}
-		case strings.HasPrefix(r.URL.Path, "/sheets/v4/spreadsheets/sheet-1/values/"):
+		case strings.HasPrefix(r.URL.Path, "/v4/spreadsheets/sheet-1/values/"):
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"values": [][]string{
 					{"id", "calc"},
@@ -94,7 +94,7 @@ func TestUpCommandRefillMergesAndExtendsFormulas(t *testing.T) {
 					{"c", "3"},
 				},
 			})
-		case r.URL.Path == "/sheets/v4/spreadsheets/sheet-1:batchUpdate":
+		case r.URL.Path == "/v4/spreadsheets/sheet-1:batchUpdate":
 			batches = append(batches, readBatch(t, r))
 			writeBatchReply(w)
 		default:
@@ -120,11 +120,11 @@ func TestUpCommandCreatesSpreadsheet(t *testing.T) {
 			err := json.NewDecoder(r.Body).Decode(&createBody)
 			assert.NoError(t, err)
 			_ = json.NewEncoder(w).Encode(map[string]string{"id": "sheet-new", "name": "New Budget"})
-		case r.URL.Path == "/sheets/v4/spreadsheets/sheet-new":
+		case r.URL.Path == "/v4/spreadsheets/sheet-new":
 			writeSpreadsheet(w, "Sheet1", 0, nil)
-		case strings.HasPrefix(r.URL.Path, "/sheets/v4/spreadsheets/sheet-new/values/"):
+		case strings.HasPrefix(r.URL.Path, "/v4/spreadsheets/sheet-new/values/"):
 			_ = json.NewEncoder(w).Encode(map[string]any{"values": []any{}})
-		case r.URL.Path == "/sheets/v4/spreadsheets/sheet-new:batchUpdate":
+		case r.URL.Path == "/v4/spreadsheets/sheet-new:batchUpdate":
 			writeBatchReply(w)
 		default:
 			t.Fatalf("unexpected path: %s", r.URL.Path)
@@ -153,15 +153,15 @@ func TestUpCommandAppliesFilterNumericAndLayout(t *testing.T) {
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"files": []map[string]string{{"id": "sheet-1", "name": "Budget"}},
 			})
-		case r.URL.Path == "/sheets/v4/spreadsheets/sheet-1":
+		case r.URL.Path == "/v4/spreadsheets/sheet-1":
 			if r.URL.Query().Get("includeGridData") == "true" {
 				writeSpreadsheet(w, "gsheet_up_1", 0, layoutGridData())
 			} else {
 				writeSpreadsheet(w, "Sheet1", 0, nil)
 			}
-		case strings.HasPrefix(r.URL.Path, "/sheets/v4/spreadsheets/sheet-1/values/"):
+		case strings.HasPrefix(r.URL.Path, "/v4/spreadsheets/sheet-1/values/"):
 			_ = json.NewEncoder(w).Encode(map[string]any{"values": []any{}})
-		case r.URL.Path == "/sheets/v4/spreadsheets/sheet-1:batchUpdate":
+		case r.URL.Path == "/v4/spreadsheets/sheet-1:batchUpdate":
 			batches = append(batches, readBatch(t, r))
 			writeBatchReply(w)
 		default:

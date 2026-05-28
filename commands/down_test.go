@@ -20,13 +20,13 @@ func TestDownCommand(t *testing.T) {
 					{"id": "sheet-1", "name": "Budget", "modifiedByMeTime": "2026-05-07T12:00:00Z"},
 				},
 			})
-		case r.URL.Path == "/sheets/v4/spreadsheets/sheet-1":
+		case r.URL.Path == "/v4/spreadsheets/sheet-1":
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"sheets": []map[string]any{
 					{"properties": map[string]any{"sheetId": 0, "title": "Sheet1"}},
 				},
 			})
-		case strings.HasPrefix(r.URL.Path, "/sheets/v4/spreadsheets/sheet-1/values/"):
+		case strings.HasPrefix(r.URL.Path, "/v4/spreadsheets/sheet-1/values/"):
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"values": [][]string{{"name", "count"}, {"alpha", "1"}},
 			})
