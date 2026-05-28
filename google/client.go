@@ -1,6 +1,7 @@
 package google
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -31,6 +32,8 @@ func ReadWriteScopes() []string {
 	}
 }
 
+const spreadsheetMimeType = "application/vnd.google-apps.spreadsheet"
+
 //
 // google api client
 //
@@ -39,31 +42,6 @@ type Client struct {
 	httpClient *http.Client
 	baseURL    string
 }
-
-//
-// a file from google docs
-//
-
-type File struct {
-	ID               string `json:"id"`
-	Name             string `json:"name"`
-	ModifiedByMeTime string `json:"modifiedByMeTime"`
-}
-
-//
-// one sheet from a google spreadsheet file
-//
-
-type Sheet struct {
-	ID    int64  `json:"sheetId"`
-	Title string `json:"title"`
-}
-
-//
-// data from a sheet
-//
-
-type Rows [][]string
 
 // NewClient creates a Google API client with auth for the requested scopes.
 func NewClient(ctx context.Context, scopes []string) (*Client, error) {
@@ -90,7 +68,7 @@ func (c *Client) ListSpreadsheets(ctx context.Context, limit int) ([]*File, erro
 	}
 
 	q := url.Values{}
-	q.Set("q", "mimeType='application/vnd.google-apps.spreadsheet' and trashed=false")
+	q.Set("q", fmt.Sprintf("mimeType='%s' and trashed=false", spreadsheetMimeType))
 	q.Set("orderBy", "modifiedByMeTime desc, name")
 	q.Set("pageSize", fmt.Sprint(limit))
 	q.Set("fields", "files(id,name,modifiedByMeTime)")
@@ -104,29 +82,43 @@ func (c *Client) ListSpreadsheets(ctx context.Context, limit int) ([]*File, erro
 	return res.Files, nil
 }
 
+// CreateSpreadsheet creates a Google Sheets file.
+// https://developers.google.com/drive/api/reference/rest/v3/files/create
+func (c *Client) CreateSpreadsheet(ctx context.Context, name string) (*File, error) {
+	q := url.Values{}
+	q.Set("fields", "id,name")
+
+	body := File{
+		Name:     name,
+		MimeType: spreadsheetMimeType,
+	}
+	var res File
+	if err := c.reqJSON(ctx, http.MethodPost, "/drive/v3/files", q, body, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
 // GetSheets returns the sheets (tabs) in a spreadsheet.
 // https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets/get
 func (c *Client) GetSheets(ctx context.Context, spreadsheetID string) ([]*Sheet, error) {
-	path := fmt.Sprintf("/v4/spreadsheets/%s", url.PathEscape(spreadsheetID))
-	q := url.Values{}
-	q.Set("fields", "sheets(properties(sheetId,title))")
-
-	var res struct {
-		Sheets []struct {
-			Properties *Sheet `json:"properties"`
-		} `json:"sheets"`
-	}
-	if err := c.req(ctx, path, q, &res); err != nil {
+	spreadsheet, err := c.GetSpreadsheet(ctx, spreadsheetID)
+	if err != nil {
 		return nil, err
 	}
+	return spreadsheet.Sheets, nil
+}
 
-	sheets := make([]*Sheet, 0, len(res.Sheets))
-	for _, item := range res.Sheets {
-		if item.Properties != nil {
-			sheets = append(sheets, item.Properties)
-		}
-	}
-	return sheets, nil
+// GetSpreadsheet returns spreadsheet metadata.
+// https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets/get
+func (c *Client) GetSpreadsheet(ctx context.Context, spreadsheetID string) (*Spreadsheet, error) {
+	return c.getSpreadsheet(ctx, spreadsheetID, false)
+}
+
+// GetSpreadsheetWithGridData returns spreadsheet metadata plus grid data for ranges.
+// https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets/get
+func (c *Client) GetSpreadsheetWithGridData(ctx context.Context, spreadsheetID string, ranges ...string) (*Spreadsheet, error) {
+	return c.getSpreadsheet(ctx, spreadsheetID, true, ranges...)
 }
 
 // GetRows returns stringified cell values for a sheet.
@@ -157,6 +149,18 @@ func (c *Client) GetRows(ctx context.Context, spreadsheetID string, sheetTitle s
 	return Rectangularize(rows), nil
 }
 
+// BatchUpdate sends one or more Sheets mutation requests and returns API replies.
+// https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets/batchUpdate
+func (c *Client) BatchUpdate(ctx context.Context, spreadsheetID string, requests []Request) (*BatchUpdateResponse, error) {
+	path := fmt.Sprintf("/v4/spreadsheets/%s:batchUpdate", url.PathEscape(spreadsheetID))
+	body := map[string]any{"requests": requests}
+	var res BatchUpdateResponse
+	if err := c.reqJSON(ctx, http.MethodPost, path, nil, body, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
 //
 // nice wrappers
 //
@@ -176,14 +180,10 @@ func (c *Client) FindSpreadsheet(ctx context.Context, name string) (*File, error
 }
 
 // FindSheet returns the sheet with this name, or the first sheet when name is empty.
-// Real spreadsheets always have sheets; an empty list is treated as malformed API data.
 func (c *Client) FindSheet(ctx context.Context, spreadsheetID, name string) (*Sheet, error) {
 	items, err := c.GetSheets(ctx, spreadsheetID)
 	if err != nil {
 		return nil, err
-	}
-	if len(items) == 0 {
-		return nil, nil
 	}
 	if name == "" {
 		return items[0], nil
@@ -200,6 +200,7 @@ func (c *Client) FindSheet(ctx context.Context, spreadsheetID, name string) (*Sh
 // standalone stuff
 //
 
+// Rectangularize pads rows so every row has the same column count.
 func Rectangularize(rows Rows) Rows {
 	cols := 0
 	for _, row := range rows {
@@ -217,16 +218,54 @@ func Rectangularize(rows Rows) Rows {
 	return out
 }
 
+func (c *Client) getSpreadsheet(ctx context.Context, spreadsheetID string, includeGridData bool, ranges ...string) (*Spreadsheet, error) {
+	path := fmt.Sprintf("/v4/spreadsheets/%s", url.PathEscape(spreadsheetID))
+	q := url.Values{}
+	fields := "sheets(properties(sheetId,title,gridProperties))"
+	if includeGridData {
+		fields = "sheets(properties(sheetId,title,gridProperties),basicFilter,data(rowData(values(userEnteredValue)),columnMetadata(pixelSize)))"
+		q.Set("includeGridData", "true")
+	}
+	q.Set("fields", fields)
+	for _, rng := range ranges {
+		q.Add("ranges", rng)
+	}
+
+	var res spreadsheetResponse
+	if err := c.req(ctx, path, q, &res); err != nil {
+		return nil, err
+	}
+	return res.spreadsheet(), nil
+}
+
+// req sends a GET request and decodes JSON.
 func (c *Client) req(ctx context.Context, path string, q url.Values, dst any) error {
+	return c.reqJSON(ctx, http.MethodGet, path, q, nil, dst)
+}
+
+// reqJSON sends a JSON request, checks Google errors, and decodes JSON.
+func (c *Client) reqJSON(ctx context.Context, method string, path string, q url.Values, body any, dst any) error {
 	// path+q => url
 	url := strings.TrimRight(c.baseURL, "/") + path
 	if len(q) > 0 {
 		url += "?" + q.Encode()
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	var bodyReader io.Reader
+	if body != nil {
+		var buf bytes.Buffer
+		if err := json.NewEncoder(&buf).Encode(body); err != nil {
+			return fmt.Errorf("encode google api request: %w", err)
+		}
+		bodyReader = &buf
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, url, bodyReader)
 	if err != nil {
 		return err
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
 	}
 	res, err := c.httpClient.Do(req)
 	if err != nil {
@@ -243,6 +282,9 @@ func (c *Client) req(ctx context.Context, path string, q url.Values, dst any) er
 		return fmt.Errorf("google api: %s", msg)
 	}
 
+	if dst == nil {
+		return nil
+	}
 	if err := json.NewDecoder(res.Body).Decode(dst); err != nil {
 		return fmt.Errorf("decode google api response: %w", err)
 	}
