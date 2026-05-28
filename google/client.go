@@ -125,7 +125,7 @@ func (c *Client) GetSpreadsheetWithGridData(ctx context.Context, spreadsheetID s
 // https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets.values/get
 func (c *Client) GetRows(ctx context.Context, spreadsheetID string, sheetTitle string) (Rows, error) {
 	path := fmt.Sprintf(
-		"/v4/spreadsheets/%s/values/%s",
+		"/sheets/v4/spreadsheets/%s/values/%s",
 		url.PathEscape(spreadsheetID),
 		url.PathEscape(sheetRange(sheetTitle)),
 	)
@@ -152,7 +152,7 @@ func (c *Client) GetRows(ctx context.Context, spreadsheetID string, sheetTitle s
 // BatchUpdate sends one or more Sheets mutation requests and returns API replies.
 // https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets/batchUpdate
 func (c *Client) BatchUpdate(ctx context.Context, spreadsheetID string, requests []Request) (*BatchUpdateResponse, error) {
-	path := fmt.Sprintf("/v4/spreadsheets/%s:batchUpdate", url.PathEscape(spreadsheetID))
+	path := fmt.Sprintf("/sheets/v4/spreadsheets/%s:batchUpdate", url.PathEscape(spreadsheetID))
 	body := map[string]any{"requests": requests}
 	var res BatchUpdateResponse
 	if err := c.reqJSON(ctx, http.MethodPost, path, nil, body, &res); err != nil {
@@ -219,7 +219,7 @@ func Rectangularize(rows Rows) Rows {
 }
 
 func (c *Client) getSpreadsheet(ctx context.Context, spreadsheetID string, includeGridData bool, ranges ...string) (*Spreadsheet, error) {
-	path := fmt.Sprintf("/v4/spreadsheets/%s", url.PathEscape(spreadsheetID))
+	path := fmt.Sprintf("/sheets/v4/spreadsheets/%s", url.PathEscape(spreadsheetID))
 	q := url.Values{}
 	fields := "sheets(properties(sheetId,title,gridProperties))"
 	if includeGridData {

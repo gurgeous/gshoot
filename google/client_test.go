@@ -83,7 +83,7 @@ func TestCreateSpreadsheetSendsWritableFields(t *testing.T) {
 
 func TestFindSheet(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/v4/spreadsheets/sheet-1", r.URL.Path)
+		assert.Equal(t, "/sheets/v4/spreadsheets/sheet-1", r.URL.Path)
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"sheets": []map[string]any{
 				{"properties": map[string]any{"sheetId": 0, "title": "Sheet1"}},
@@ -129,7 +129,7 @@ func TestGetSpreadsheetFieldsRespectGridData(t *testing.T) {
 
 func TestGetRows(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/v4/spreadsheets/sheet-1/values/%27Summary%27", r.URL.EscapedPath())
+		assert.Equal(t, "/sheets/v4/spreadsheets/sheet-1/values/%27Summary%27", r.URL.EscapedPath())
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"values": []any{
 				[]any{"name", "count"},
