@@ -21,6 +21,9 @@ format:
   go mod tidy
   golangci-lint fmt
 
+install: build
+  cp bin/gshoot ~/.local/bin
+
 lint:
   golangci-lint run
   just banner "✓ lint ✓"
