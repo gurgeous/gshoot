@@ -11,9 +11,9 @@ import "fmt"
 
 // File is a Google Drive file.
 type File struct {
-	ID               string `json:"id"`
+	ID               string `json:"id,omitempty"`
 	Name             string `json:"name"`
-	ModifiedByMeTime string `json:"modifiedByMeTime"`
+	ModifiedByMeTime string `json:"modifiedByMeTime,omitempty"`
 	MimeType         string `json:"mimeType,omitempty"`
 }
 

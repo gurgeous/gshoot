@@ -58,6 +58,29 @@ func TestFindSpreadsheet(t *testing.T) {
 	assert.Equal(t, "2", file.ID)
 }
 
+func TestCreateSpreadsheetSendsWritableFields(t *testing.T) {
+	var body map[string]any
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/drive/v3/files", r.URL.Path)
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"id":   "sheet-1",
+			"name": "Budget",
+		})
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server.URL)
+	file, err := client.CreateSpreadsheet(context.Background(), "Budget")
+	assert.NoError(t, err)
+	assert.Equal(t, "sheet-1", file.ID)
+	assert.Equal(t, "Budget", body["name"])
+	assert.Equal(t, spreadsheetMimeType, body["mimeType"])
+	assert.NotContains(t, body, "id")
+	assert.NotContains(t, body, "modifiedByMeTime")
+}
+
 func TestFindSheet(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/v4/spreadsheets/sheet-1", r.URL.Path)
