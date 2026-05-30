@@ -13,7 +13,7 @@ import (
 )
 
 type refiller struct {
-	sheet           *uploadSheet      // target sheet being refilled
+	sheet           *uploader         // target sheet being refilled
 	localRows       google.Rows       // csv rows from disk
 	remoteRows      google.Rows       // remote displayed values
 	remoteUserRows  google.Rows       // remote user-entered values
@@ -24,18 +24,18 @@ type refiller struct {
 // linit refiller, load remote data
 //
 
-func newRefiller(u *uploadSheet) (*refiller, error) {
+func newRefiller(u *uploader) (*refiller, error) {
 	s := &refiller{sheet: u, localRows: u.rows}
 
 	// fetch values
 	var err error
-	s.remoteRows, err = u.client.GetRows(u.ctx, u.fileID, u.title)
+	s.remoteRows, err = u.client.GetRows(u.ctx, u.file.ID, u.title)
 	if err != nil {
 		return nil, err
 	}
 
 	// fetch "grid data" - formulas, filters, formats, etc
-	spreadsheet, err := u.client.GetSpreadsheetWithGridData(u.ctx, u.fileID, u.title)
+	spreadsheet, err := u.client.GetSpreadsheetWithGridData(u.ctx, u.file.ID, u.title)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +114,7 @@ func (s *refiller) extend() error {
 	requests = append(requests, s.clearPaddingRequests()...)
 
 	// do it
-	_, err := s.sheet.client.BatchUpdate(s.sheet.ctx, s.sheet.fileID, requests)
+	_, err := s.sheet.client.BatchUpdate(s.sheet.ctx, s.sheet.file.ID, requests)
 	if err != nil {
 		return err
 	}

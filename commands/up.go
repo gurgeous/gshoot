@@ -103,12 +103,12 @@ func (c *UpCmd) upload(ctx context.Context, client *google.Client, dots *ux.Dots
 	}
 
 	//
-	// find/create sheet
+	// find/create target sheet
 	//
 
 	dots.SetDescription(fmt.Sprintf("uploading %d rows to file '%s', sheet '%s'...", len(rows), file.Name, c.Sheet))
-	s := newUploadSheet(ctx, client, file.ID, spreadsheet, c, rows)
-	if err := s.ensure(); err != nil {
+	s := newUploader(ctx, client, file, spreadsheet, c, rows)
+	if err := s.resolveTargetSheet(); err != nil {
 		return nil, err
 	}
 
@@ -118,11 +118,7 @@ func (c *UpCmd) upload(ctx context.Context, client *google.Client, dots *ux.Dots
 
 	var refill *refiller
 	if c.Refill {
-		refill, err = newRefiller(s)
-		if err != nil {
-			return nil, err
-		}
-		s.rows, err = refill.mergedRows()
+		refill, err = s.prepareRefiller()
 		if err != nil {
 			return nil, err
 		}
@@ -133,17 +129,17 @@ func (c *UpCmd) upload(ctx context.Context, client *google.Client, dots *ux.Dots
 		run func() error
 	}{
 		// paste
-		{c.Replace, s.clear}, // --replace
-		{true, s.grow},       // add padding
-		{true, s.paste},      // paste local csv
+		{c.Replace, s.clearSheet}, // --replace
+		{true, s.growSheet},       // add padding
+		{true, s.pasteCSV},        // paste local csv
 
 		// extend
 		{c.Refill, func() error { return refill.extend() }}, // --refill
 
-		// apply
-		{s.filter, s.applyFilter},   // --filter
-		{s.numeric, s.applyNumeric}, // --numeric
-		{s.layout, s.applyLayout},   // --layout
+		// post-paste stuff
+		{c.Filter, s.applyFilter},   // --filter
+		{c.Numeric, s.applyNumeric}, // --numeric
+		{c.Layout, s.applyLayout},   // --layout
 	}
 	for _, p := range pipeline {
 		if p.on {

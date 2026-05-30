@@ -28,72 +28,71 @@ var (
 	leadingZeroRE = regexp.MustCompile(`\A-?0\d`)             // numeric-looking value that should remain text
 )
 
-type uploadSheet struct {
+//
+// this does most of the work
+//
+
+type uploader struct {
 	ctx         context.Context     // request context for Google calls
 	client      *google.Client      // Google API client
-	fileID      string              // spreadsheet file ID
+	file        *google.File        // spreadsheet Drive file
 	spreadsheet *google.Spreadsheet // current spreadsheet metadata
+	cmd         *UpCmd              // upload command options
 	title       string              // target sheet title
 	id          int64               // target sheet ID after ensure
 	rows        google.Rows         // rows to paste into the target sheet
-	refill      bool                // paste values only and preserve formulas
-	replace     bool                // clear or create the destination sheet
-	sheetName   string              // explicit destination sheet name
-	filter      bool                // apply a basic filter after upload
-	numeric     bool                // format obvious numeric columns
-	layout      bool                // auto-size columns with padding
 }
 
-// newUploadSheet creates a target sheet mutator.
-func newUploadSheet(
+func newUploader(
 	ctx context.Context,
 	client *google.Client,
-	fileID string,
+	file *google.File,
 	spreadsheet *google.Spreadsheet,
 	cmd *UpCmd,
 	rows google.Rows,
-) *uploadSheet {
-	return &uploadSheet{
+) *uploader {
+	return &uploader{
 		ctx:         ctx,
 		client:      client,
-		fileID:      fileID,
+		file:        file,
 		spreadsheet: spreadsheet,
+		cmd:         cmd,
 		title:       sheetTitle(cmd, spreadsheet),
 		rows:        rows,
-		refill:      cmd.Refill,
-		replace:     cmd.Replace,
-		sheetName:   cmd.Sheet,
-		filter:      cmd.Filter,
-		numeric:     cmd.Numeric,
-		layout:      cmd.Layout,
 	}
 }
 
-// ensure selects, creates, or renames the target sheet.
-func (s *uploadSheet) ensure() error {
-	if existingID, ok := s.findExistingID(); ok {
-		s.id = existingID
-		return nil
+// resolveTargetSheet selects, creates, or renames the target sheet.
+func (s *uploader) resolveTargetSheet() error {
+	// already present?
+	for _, sheet := range s.spreadsheet.Sheets {
+		if strings.EqualFold(sheet.Title, s.title) {
+			s.id = sheet.ID
+			return nil
+		}
 	}
-	blankDefault, err := s.blankDefault()
+
+	// is this an empty file?
+	isEmpty, err := s.isEmpty()
 	if err != nil {
 		return err
 	}
-	if s.refill || s.replace {
-		if blankDefault {
-			return s.rename(s.spreadsheet.Sheets[0].ID)
+
+	if s.cmd.Refill || s.cmd.Replace {
+		if isEmpty {
+			return s.renameSheet(s.spreadsheet.Sheets[0].ID)
 		}
-		return s.add()
+		return s.addSheet()
 	}
-	if s.sheetName != "" || !blankDefault {
-		return s.add()
+	if s.cmd.Sheet != "" || !isEmpty {
+		return s.addSheet()
 	}
-	return s.rename(s.spreadsheet.Sheets[0].ID)
+	return s.renameSheet(s.spreadsheet.Sheets[0].ID)
 }
 
-// add creates the target sheet and records its ID.
-func (s *uploadSheet) add() error {
-	res, err := s.client.BatchUpdate(s.ctx, s.fileID, []google.Request{{
+// addSheet creates the target sheet and records its ID.
+func (s *uploader) addSheet() error {
+	res, err := s.client.BatchUpdate(s.ctx, s.file.ID, []google.Request{{
 		AddSheet: &google.AddSheetRequest{
 			Properties: google.SheetProperties{
 				Title: s.title,
@@ -112,9 +111,9 @@ func (s *uploadSheet) add() error {
 	return nil
 }
 
-// rename renames an existing sheet and records it as the target.
-func (s *uploadSheet) rename(sheetID int64) error {
-	_, err := s.client.BatchUpdate(s.ctx, s.fileID, []google.Request{{
+// renameSheet renames an existing sheet and records it as the target.
+func (s *uploader) renameSheet(sheetID int64) error {
+	_, err := s.client.BatchUpdate(s.ctx, s.file.ID, []google.Request{{
 		UpdateSheetProperties: &google.UpdateSheetPropertiesRequest{
 			Properties: google.SheetProperties{
 				SheetID: new(sheetID),
@@ -127,9 +126,9 @@ func (s *uploadSheet) rename(sheetID int64) error {
 	return err
 }
 
-// clear clears every cell in the target sheet.
-func (s *uploadSheet) clear() error {
-	_, err := s.client.BatchUpdate(s.ctx, s.fileID, []google.Request{{
+// clearSheet clears every cell in the target sheet.
+func (s *uploader) clearSheet() error {
+	_, err := s.client.BatchUpdate(s.ctx, s.file.ID, []google.Request{{
 		UpdateCells: &google.UpdateCellsRequest{
 			Range:  google.GridRange{SheetID: s.id},
 			Fields: "*",
@@ -138,9 +137,9 @@ func (s *uploadSheet) clear() error {
 	return err
 }
 
-// grow expands the target grid to fit data plus padding.
-func (s *uploadSheet) grow() error {
-	_, err := s.client.BatchUpdate(s.ctx, s.fileID, []google.Request{{
+// growSheet expands the target grid to fit data plus padding.
+func (s *uploader) growSheet() error {
+	_, err := s.client.BatchUpdate(s.ctx, s.file.ID, []google.Request{{
 		UpdateSheetProperties: &google.UpdateSheetPropertiesRequest{
 			Properties: google.SheetProperties{
 				SheetID: new(s.id),
@@ -155,13 +154,13 @@ func (s *uploadSheet) grow() error {
 	return err
 }
 
-// paste pastes CSV data into the target sheet.
-func (s *uploadSheet) paste() error {
+// pasteCSV pastes CSV data into the target sheet.
+func (s *uploader) pasteCSV() error {
 	pasteType := "PASTE_NORMAL"
-	if s.refill {
+	if s.cmd.Refill {
 		pasteType = "PASTE_VALUES"
 	}
-	_, err := s.client.BatchUpdate(s.ctx, s.fileID, []google.Request{{
+	_, err := s.client.BatchUpdate(s.ctx, s.file.ID, []google.Request{{
 		PasteData: &google.PasteDataRequest{
 			Coordinate: google.GridCoordinate{SheetID: s.id},
 			Data:       util.CSVString(s.rows),
@@ -172,9 +171,22 @@ func (s *uploadSheet) paste() error {
 	return err
 }
 
+// prepareRefiller loads remote refill data and replaces rows with merged rows.
+func (s *uploader) prepareRefiller() (*refiller, error) {
+	refill, err := newRefiller(s)
+	if err != nil {
+		return nil, err
+	}
+	s.rows, err = refill.mergedRows()
+	if err != nil {
+		return nil, err
+	}
+	return refill, nil
+}
+
 // applyFilter adds a standard filter over uploaded data.
-func (s *uploadSheet) applyFilter() error {
-	_, err := s.client.BatchUpdate(s.ctx, s.fileID, []google.Request{{
+func (s *uploader) applyFilter() error {
+	_, err := s.client.BatchUpdate(s.ctx, s.file.ID, []google.Request{{
 		SetBasicFilter: &google.SetBasicFilterRequest{
 			Filter: google.BasicFilter{
 				Range: google.GridRange{
@@ -191,18 +203,21 @@ func (s *uploadSheet) applyFilter() error {
 }
 
 // applyNumeric formats obvious numeric CSV columns.
-func (s *uploadSheet) applyNumeric() error {
+func (s *uploader) applyNumeric() error {
 	formats := s.numericFormats()
 	requests := make([]google.Request, 0, len(formats))
-	for columnIndex, pattern := range formats {
+	if len(formats) == 0 {
+		return nil
+	}
+	for c, pattern := range formats {
 		requests = append(requests, google.Request{
 			RepeatCell: &google.RepeatCellRequest{
 				Range: google.GridRange{
 					SheetID:          s.id,
 					StartRowIndex:    1,
 					EndRowIndex:      len(s.rows),
-					StartColumnIndex: columnIndex,
-					EndColumnIndex:   columnIndex + 1,
+					StartColumnIndex: c,
+					EndColumnIndex:   c + 1,
 				},
 				Cell: google.CellData{
 					UserEnteredFormat: &google.CellFormat{
@@ -213,16 +228,16 @@ func (s *uploadSheet) applyNumeric() error {
 			},
 		})
 	}
-	if len(requests) == 0 {
-		return nil
+	_, err := s.client.BatchUpdate(s.ctx, s.file.ID, requests)
+	if err != nil {
+		return err
 	}
-	_, err := s.client.BatchUpdate(s.ctx, s.fileID, requests)
-	return err
+	return nil
 }
 
 // applyLayout auto-sizes columns and adds padding.
-func (s *uploadSheet) applyLayout() error {
-	_, err := s.client.BatchUpdate(s.ctx, s.fileID, []google.Request{{
+func (s *uploader) applyLayout() error {
+	_, err := s.client.BatchUpdate(s.ctx, s.file.ID, []google.Request{{
 		AutoResizeDimensions: &google.AutoResizeDimensionsRequest{
 			Dimensions: google.DimensionRange{
 				SheetID:    s.id,
@@ -243,18 +258,18 @@ func (s *uploadSheet) applyLayout() error {
 	if len(requests) == 0 {
 		return nil
 	}
-	_, err = s.client.BatchUpdate(s.ctx, s.fileID, requests)
+	_, err = s.client.BatchUpdate(s.ctx, s.file.ID, requests)
 	return err
 }
 
 // layoutWidthRequests builds padding requests from autosized column widths.
-func (s *uploadSheet) layoutWidthRequests() ([]google.Request, error) {
-	refreshed, err := s.client.GetSpreadsheetWithGridData(s.ctx, s.fileID, s.title)
+func (s *uploader) layoutWidthRequests() ([]google.Request, error) {
+	spreadsheet, err := s.client.GetSpreadsheetWithGridData(s.ctx, s.file.ID, s.title)
 	if err != nil {
 		return nil, err
 	}
 
-	data := refreshed.Data[s.id]
+	data := spreadsheet.Data[s.id]
 	requests := []google.Request{}
 	for columnIndex := range s.rows[0] {
 		meta := data.ColumnMetadata[columnIndex]
@@ -279,16 +294,16 @@ func (s *uploadSheet) layoutWidthRequests() ([]google.Request, error) {
 }
 
 // numericFormats returns target column indexes and Sheets number patterns.
-func (s *uploadSheet) numericFormats() map[int]string {
+func (s *uploader) numericFormats() map[int]string {
 	formats := map[int]string{}
 	if len(s.rows) < 2 {
 		return formats
 	}
 
-	for columnIndex := range s.rows[0] {
+	for c := range s.rows[0] {
 		values := []string{}
 		for _, row := range s.rows[1:] {
-			value := row[columnIndex]
+			value := row[c]
 			if value != "" {
 				values = append(values, value)
 			}
@@ -300,41 +315,35 @@ func (s *uploadSheet) numericFormats() map[int]string {
 			continue
 		}
 		if util.AllMatch(values, integerRE) {
-			formats[columnIndex] = "#,##0"
+			formats[c] = "#,##0"
 			continue
 		}
 		if !util.AllMatch(values, decimalRE) || !util.AnyContains(values, ".") {
 			continue
 		}
-		formats[columnIndex] = "#,##0." + strings.Repeat("0", util.DecimalPrecision(values))
+		formats[c] = "#,##0." + strings.Repeat("0", util.DecimalPrecision(values))
 	}
 	return formats
 }
 
-func hasLeadingZeroNumber(values []string) bool {
-	return slices.ContainsFunc(values, leadingZeroRE.MatchString)
-}
-
-// findExistingID returns the ID of the current target sheet, if present.
-func (s *uploadSheet) findExistingID() (int64, bool) {
-	for _, sheet := range s.spreadsheet.Sheets {
-		if strings.EqualFold(sheet.Title, s.title) {
-			return sheet.ID, true
-		}
-	}
-	return 0, false
-}
-
-// blankDefault reports whether the only existing sheet has no values.
-func (s *uploadSheet) blankDefault() (bool, error) {
+// isEmpty reports whether the only existing sheet has no values.
+func (s *uploader) isEmpty() (bool, error) {
 	if len(s.spreadsheet.Sheets) != 1 {
 		return false, nil
 	}
-	rows, err := s.client.GetRows(s.ctx, s.fileID, s.spreadsheet.Sheets[0].Title)
+	rows, err := s.client.GetRows(s.ctx, s.file.ID, s.spreadsheet.Sheets[0].Title)
 	if err != nil {
 		return false, err
 	}
 	return len(rows) == 0, nil
+}
+
+//
+// helpers
+//
+
+func hasLeadingZeroNumber(values []string) bool {
+	return slices.ContainsFunc(values, leadingZeroRE.MatchString)
 }
 
 // sheetTitle returns the requested or generated destination sheet name.
@@ -345,11 +354,7 @@ func sheetTitle(cmd *UpCmd, spreadsheet *google.Spreadsheet) string {
 	if cmd.Refill || cmd.Replace {
 		return defaultUploadSheet
 	}
-	return nextSheetTitle(spreadsheet)
-}
 
-// nextSheetTitle returns the next gsheet_N sheet title.
-func nextSheetTitle(spreadsheet *google.Spreadsheet) string {
 	next := 1
 	for _, sheet := range spreadsheet.Sheets {
 		if suffix, ok := strings.CutPrefix(sheet.Title, sheetPrefix); ok {
