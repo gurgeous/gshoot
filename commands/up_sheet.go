@@ -2,7 +2,6 @@ package commands
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"regexp"
 	"slices"
@@ -35,6 +34,11 @@ type uploadSheet struct {
 	id          int64
 	rows        google.Rows
 	refill      bool
+	replace     bool
+	sheetName   string
+	filter      bool
+	numeric     bool
+	layout      bool
 }
 
 // newUploadSheet creates a target sheet mutator.
@@ -54,11 +58,16 @@ func newUploadSheet(
 		title:       sheetTitle(cmd, spreadsheet),
 		rows:        rows,
 		refill:      cmd.Refill,
+		replace:     cmd.Replace,
+		sheetName:   cmd.Sheet,
+		filter:      cmd.Filter,
+		numeric:     cmd.Numeric,
+		layout:      cmd.Layout,
 	}
 }
 
 // ensure selects, creates, or renames the target sheet.
-func (s *uploadSheet) ensure(cmd *UpCmd) error {
+func (s *uploadSheet) ensure() error {
 	if existingID, ok := s.findExistingID(); ok {
 		s.id = existingID
 		return nil
@@ -67,13 +76,13 @@ func (s *uploadSheet) ensure(cmd *UpCmd) error {
 	if err != nil {
 		return err
 	}
-	if cmd.Refill || cmd.Replace {
+	if s.refill || s.replace {
 		if blankDefault {
 			return s.rename(s.spreadsheet.Sheets[0].ID)
 		}
 		return s.add()
 	}
-	if cmd.Sheet != "" || !blankDefault {
+	if s.sheetName != "" || !blankDefault {
 		return s.add()
 	}
 	return s.rename(s.spreadsheet.Sheets[0].ID)
@@ -95,9 +104,6 @@ func (s *uploadSheet) add() error {
 	}})
 	if err != nil {
 		return err
-	}
-	if len(res.Replies) == 0 || res.Replies[0].AddSheet == nil {
-		return errors.New("Google Sheets did not return the created sheet ID")
 	}
 	s.id = res.Replies[0].AddSheet.Properties.ID
 	return nil
@@ -164,18 +170,18 @@ func (s *uploadSheet) paste() error {
 }
 
 // applyOptions applies filter, numeric, and layout options.
-func (s *uploadSheet) applyOptions(cmd *UpCmd) error {
-	if cmd.Filter {
+func (s *uploadSheet) applyOptions() error {
+	if s.filter {
 		if err := s.applyFilter(); err != nil {
 			return err
 		}
 	}
-	if cmd.Numeric {
+	if s.numeric {
 		if err := s.applyNumeric(); err != nil {
 			return err
 		}
 	}
-	if cmd.Layout {
+	if s.layout {
 		return s.applyLayout()
 	}
 	return nil
@@ -264,11 +270,9 @@ func (s *uploadSheet) layoutWidthRequests() ([]google.Request, error) {
 	}
 
 	data := refreshed.Data[s.id]
-	if data == nil {
-		return nil, fmt.Errorf("missing grid data for sheet %d", s.id)
-	}
 	requests := []google.Request{}
-	for columnIndex, meta := range data.ColumnMetadata[:min(len(data.ColumnMetadata), len(s.rows[0]))] {
+	for columnIndex := range s.rows[0] {
+		meta := data.ColumnMetadata[columnIndex]
 		pixelSize := meta.PixelSize
 		if pixelSize == 0 {
 			pixelSize = 100

@@ -108,7 +108,7 @@ func (c *UpCmd) upload(ctx context.Context, client *google.Client, dots *ux.Dots
 
 	dots.SetDescription(fmt.Sprintf("uploading %d rows to file '%s', sheet '%s'...", len(rows), file.Name, c.Sheet))
 	sheet := newUploadSheet(ctx, client, file.ID, spreadsheet, c, rows)
-	if err := sheet.ensure(c); err != nil {
+	if err := sheet.ensure(); err != nil {
 		return nil, err
 	}
 
@@ -148,7 +148,7 @@ func (c *UpCmd) upload(ctx context.Context, client *google.Client, dots *ux.Dots
 			return nil, err
 		}
 	}
-	if err := sheet.applyOptions(c); err != nil {
+	if err := sheet.applyOptions(); err != nil {
 		return nil, err
 	}
 
