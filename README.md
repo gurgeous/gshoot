@@ -1,8 +1,8 @@
 TODO:
 
-- wipe should prompt or --force
-- improve peek output
-- smoke for up/down
+- wipe - peek/confirm before wiping, unless --force
+- peek - clean up this output
+- work on smoke some more
 - non-tty behavior
 - this readme
   - auth docs in readme
