@@ -128,14 +128,22 @@ func (c *UpCmd) upload(ctx context.Context, client *google.Client, dots *ux.Dots
 		}
 	}
 
-	pipeline := []struct { on  bool run func() error }{
+	pipeline := []struct {
+		on  bool
+		run func() error
+	}{
+		// paste
 		{c.Replace, s.clear}, // --replace
 		{true, s.grow},       // add padding
 		{true, s.paste},      // paste local csv
+
+		// extend
 		{c.Refill, func() error { return refill.extend() }}, // --refill
-		{s.filter, s.addFilter},                             // --filter
-		{s.numeric, s.applyNumeric},                         // --numeric
-		{s.layout, s.applyLayout},                           // --layout
+
+		// apply
+		{s.filter, s.applyFilter},   // --filter
+		{s.numeric, s.applyNumeric}, // --numeric
+		{s.layout, s.applyLayout},   // --layout
 	}
 	for _, p := range pipeline {
 		if p.on {

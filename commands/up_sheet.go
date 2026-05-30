@@ -172,8 +172,8 @@ func (s *uploadSheet) paste() error {
 	return err
 }
 
-// addFilter adds a standard filter over uploaded data.
-func (s *uploadSheet) addFilter() error {
+// applyFilter adds a standard filter over uploaded data.
+func (s *uploadSheet) applyFilter() error {
 	_, err := s.client.BatchUpdate(s.ctx, s.fileID, []google.Request{{
 		SetBasicFilter: &google.SetBasicFilterRequest{
 			Filter: google.BasicFilter{
