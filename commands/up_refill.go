@@ -1,7 +1,7 @@
 package commands
 
-// This file owns `up --refill`: merge CSV rows into an existing sheet while
-// preserving existing user-entered values, formats, and formula columns.
+// This file owns `up --refill`: merge CSV rows into a remote sheet while
+// preserving remote user-entered values, formats, and formula columns.
 
 import (
 	"fmt"
@@ -13,20 +13,20 @@ import (
 )
 
 type sheetRefill struct {
-	sheet             *uploadSheet      // target sheet being refilled
-	csvRows           google.Rows       // csv rows from disk
-	existingRows      google.Rows       // existing displayed values
-	existingUserRows  google.Rows       // existing user-entered values
-	existingSheetData *google.SheetData // existing grid data for formats/formulas
+	sheet           *uploadSheet      // target sheet being refilled
+	localRows       google.Rows       // csv rows from disk
+	remoteRows      google.Rows       // remote displayed values
+	remoteUserRows  google.Rows       // remote user-entered values
+	remoteSheetData *google.SheetData // remote grid data for formats/formulas
 }
 
 //
-// loads existing sheet data before we refill
+// loads remote sheet data before we refill
 //
 
 func newSheetRefill(sheet *uploadSheet) (*sheetRefill, error) {
 	// values
-	existingRows, err := sheet.client.GetRows(sheet.ctx, sheet.fileID, sheet.title)
+	remoteRows, err := sheet.client.GetRows(sheet.ctx, sheet.fileID, sheet.title)
 	if err != nil {
 		return nil, err
 	}
@@ -36,58 +36,67 @@ func newSheetRefill(sheet *uploadSheet) (*sheetRefill, error) {
 	if err != nil {
 		return nil, err
 	}
-	existingSheetData := spreadsheet.Data[sheet.id]
+	remoteSheetData := spreadsheet.Data[sheet.id]
 
 	return &sheetRefill{
-		sheet:             sheet,
-		csvRows:           sheet.rows,
-		existingRows:      existingRows,
-		existingUserRows:  userEnteredRows(existingSheetData),
-		existingSheetData: existingSheetData,
+		sheet:           sheet,
+		localRows:       sheet.rows,
+		remoteRows:      remoteRows,
+		remoteUserRows:  userEnteredRows(remoteSheetData),
+		remoteSheetData: remoteSheetData,
 	}, nil
 }
 
-// mergedRows returns the final rows to paste for refill.
+//
+// merge!
+//
+
 func (r *sheetRefill) mergedRows() (google.Rows, error) {
-	if len(r.existingRows) == 0 {
-		return r.csvRows, nil
+	if len(r.remoteRows) == 0 {
+		return r.localRows, nil
 	}
 
-	existingHeaders := r.existingRows[0]
-	csvHeaders := r.csvRows[0]
-	if err := r.validateHeaders(existingHeaders, "existing sheet"); err != nil {
+	// build final array of headers
+	localHeaders, remoteHeaders := r.localRows[0], r.remoteRows[0]
+	if err := r.validateHeaders(localHeaders, "csv"); err != nil {
 		return nil, err
 	}
-	if err := r.validateHeaders(csvHeaders, "csv"); err != nil {
+	if err := r.validateHeaders(remoteHeaders, "existing sheet"); err != nil {
 		return nil, err
 	}
-
-	finalHeaders := append([]string(nil), existingHeaders...)
-	for _, header := range csvHeaders {
-		if !util.ContainsString(finalHeaders, header) {
-			finalHeaders = append(finalHeaders, header)
+	headers := append([]string(nil), remoteHeaders...)
+	for _, header := range localHeaders {
+		if !util.ContainsString(headers, header) {
+			headers = append(headers, header)
 		}
 	}
+
+	// map from str => int
 	byHeader := map[string]int{}
-	for i, header := range finalHeaders {
+	for i, header := range headers {
 		byHeader[header] = i
 	}
 
-	finalRowCount := max(len(r.existingRows), len(r.csvRows))
-	merged := make(google.Rows, finalRowCount)
-	for ii := range merged {
-		merged[ii] = make([]string, len(finalHeaders))
+	//
+	// now merge rows
+	//
+
+	rows := make(google.Rows, max(len(r.remoteRows), len(r.localRows)))
+	for r := range rows {
+		rows[r] = make([]string, len(headers))
 	}
-	for ii, row := range r.existingUserRows {
-		copy(merged[ii], row)
+	// append remote rows
+	for ii, row := range r.remoteUserRows {
+		copy(rows[ii], row)
 	}
-	for csvColumnIndex, header := range csvHeaders {
-		targetColumnIndex := byHeader[header]
-		for ii, row := range r.csvRows {
-			merged[ii][targetColumnIndex] = row[csvColumnIndex]
+	// append local rows, remap headers
+	for c1, header := range localHeaders {
+		c2 := byHeader[header]
+		for r, local := range r.localRows {
+			rows[r][c2] = local[c1]
 		}
 	}
-	return merged, nil
+	return rows, nil
 }
 
 // apply copies refill formats, formulas, and clears padding formats.
@@ -101,13 +110,13 @@ func (r *sheetRefill) apply() error {
 	return r.clearPaddingFormats()
 }
 
-// applyFormats copies existing data-row formats across refilled columns.
+// applyFormats copies remote data-row formats across refilled columns.
 func (r *sheetRefill) applyFormats() error {
-	if len(r.existingRows) < 2 || len(r.sheet.rows) <= 1 {
+	if len(r.remoteRows) < 2 || len(r.sheet.rows) <= 1 {
 		return nil
 	}
 	requests := []google.Request{}
-	for _, columnIndex := range r.existingCSVColumns() {
+	for _, columnIndex := range r.remoteCSVColumns() {
 		requests = append(requests, google.Request{
 			CopyPaste: &google.CopyPasteRequest{
 				Source: google.GridRange{
@@ -138,11 +147,11 @@ func (r *sheetRefill) applyFormats() error {
 
 // applyFormulas extends non-CSV formula columns during refill.
 func (r *sheetRefill) applyFormulas() error {
-	existingRows := r.existingDataRowCount()
-	if len(r.sheet.rows) <= existingRows || existingRows < 2 {
+	remoteRows := r.remoteDataRowCount()
+	if len(r.sheet.rows) <= remoteRows || remoteRows < 2 {
 		return nil
 	}
-	formulaColumns, err := r.formulaColumns(existingRows)
+	formulaColumns, err := r.formulaColumns(remoteRows)
 	if err != nil {
 		return err
 	}
@@ -153,7 +162,7 @@ func (r *sheetRefill) applyFormulas() error {
 				Source: google.GridRange{
 					SheetID:          r.sheet.id,
 					StartRowIndex:    1,
-					EndRowIndex:      existingRows,
+					EndRowIndex:      remoteRows,
 					StartColumnIndex: columnIndex,
 					EndColumnIndex:   columnIndex + 1,
 				},
@@ -210,17 +219,17 @@ func (r *sheetRefill) clearPaddingFormats() error {
 }
 
 // formulaColumns returns non-CSV columns that contain formulas.
-func (r *sheetRefill) formulaColumns(existingRows int) ([]int, error) {
-	existingCSV := map[int]bool{}
-	for _, columnIndex := range r.existingCSVColumns() {
-		existingCSV[columnIndex] = true
+func (r *sheetRefill) formulaColumns(remoteRows int) ([]int, error) {
+	remoteCSV := map[int]bool{}
+	for _, columnIndex := range r.remoteCSVColumns() {
+		remoteCSV[columnIndex] = true
 	}
 	columns := []int{}
-	for columnIndex := range r.existingRows[0] {
-		if existingCSV[columnIndex] {
+	for columnIndex := range r.remoteRows[0] {
+		if remoteCSV[columnIndex] {
 			continue
 		}
-		formulaColumn, err := r.formulaColumn(columnIndex, existingRows)
+		formulaColumn, err := r.formulaColumn(columnIndex, remoteRows)
 		if err != nil {
 			return nil, err
 		}
@@ -232,20 +241,20 @@ func (r *sheetRefill) formulaColumns(existingRows int) ([]int, error) {
 }
 
 // formulaColumn reports whether a non-CSV column should be formula-extended.
-func (r *sheetRefill) formulaColumn(columnIndex int, existingRows int) (bool, error) {
+func (r *sheetRefill) formulaColumn(columnIndex int, remoteRows int) (bool, error) {
 	sawFormula := false
-	for ii := 1; ii < existingRows; ii++ {
-		value := r.existingRows[ii][columnIndex]
+	for ii := 1; ii < remoteRows; ii++ {
+		value := r.remoteRows[ii][columnIndex]
 		if value == "" {
 			continue
 		}
-		if ii >= len(r.existingSheetData.Rows) {
+		if ii >= len(r.remoteSheetData.Rows) {
 			return false, fmt.Errorf("missing grid data for sheet %s row %d", r.sheet.title, ii+1)
 		}
-		if columnIndex >= len(r.existingSheetData.Rows[ii].Values) {
+		if columnIndex >= len(r.remoteSheetData.Rows[ii].Values) {
 			return false, fmt.Errorf("missing grid data for sheet %s row %d column %d", r.sheet.title, ii+1, columnIndex+1)
 		}
-		cell := r.existingSheetData.Rows[ii].Values[columnIndex]
+		cell := r.remoteSheetData.Rows[ii].Values[columnIndex]
 		if cell.UserEnteredValue == nil || cell.UserEnteredValue.FormulaValue == nil || *cell.UserEnteredValue.FormulaValue == "" {
 			return false, nil
 		}
@@ -254,29 +263,33 @@ func (r *sheetRefill) formulaColumn(columnIndex int, existingRows int) (bool, er
 	return sawFormula, nil
 }
 
-// existingDataRowCount returns the existing rows covered by the filter or data.
-func (r *sheetRefill) existingDataRowCount() int {
-	count := len(r.existingRows)
-	if r.existingSheetData.BasicFilter != nil && r.existingSheetData.BasicFilter.Range.EndRowIndex > 0 {
-		count = r.existingSheetData.BasicFilter.Range.EndRowIndex
+// remoteDataRowCount returns remote rows covered by the filter or data.
+func (r *sheetRefill) remoteDataRowCount() int {
+	count := len(r.remoteRows)
+	if r.remoteSheetData.BasicFilter != nil && r.remoteSheetData.BasicFilter.Range.EndRowIndex > 0 {
+		count = r.remoteSheetData.BasicFilter.Range.EndRowIndex
 	}
-	return min(count, len(r.existingRows))
+	return min(count, len(r.remoteRows))
 }
 
-// existingCSVColumns returns existing sheet columns that also appear in the CSV.
-func (r *sheetRefill) existingCSVColumns() []int {
+// remoteCSVColumns returns remote columns that also appear in the CSV.
+func (r *sheetRefill) remoteCSVColumns() []int {
 	csvHeaders := map[string]bool{}
-	for _, header := range r.csvRows[0] {
+	for _, header := range r.localRows[0] {
 		csvHeaders[header] = true
 	}
 	columns := []int{}
-	for columnIndex, header := range r.existingRows[0] {
+	for columnIndex, header := range r.remoteRows[0] {
 		if csvHeaders[header] {
 			columns = append(columns, columnIndex)
 		}
 	}
 	return columns
 }
+
+//
+// helpers
+//
 
 // userEnteredRows extracts user-entered strings from grid data.
 func userEnteredRows(data *google.SheetData) google.Rows {
@@ -291,7 +304,7 @@ func userEnteredRows(data *google.SheetData) google.Rows {
 	return google.Rows(util.CSVRectangularize(rows))
 }
 
-// validateHeaders rejects duplicate non-empty headers.
+// validateHeaders rejects duplicate headers.
 func (r *sheetRefill) validateHeaders(headers []string, label string) error {
 	counts := map[string]int{}
 	for _, header := range headers {
