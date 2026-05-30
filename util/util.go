@@ -15,8 +15,6 @@ import (
 	"strings"
 	"time"
 
-	"charm.land/lipgloss/v2"
-	"github.com/adrg/xdg"
 	"github.com/charmbracelet/x/ansi"
 	"golang.org/x/term"
 )
@@ -30,7 +28,7 @@ const (
 )
 
 //
-// terminal
+// shell
 //
 
 // FileExists reports whether path exists.
@@ -65,39 +63,9 @@ func WritePrivateFile(path string, data []byte) error {
 	return os.Rename(tmpPath, path)
 }
 
-// ConfigDir returns the gshoot config directory under XDG config home.
-func ConfigDir() string {
-	return filepath.Join(xdg.ConfigHome, "gshoot")
-}
-
-// RandomHex returns n random bytes encoded as lowercase hex.
-func RandomHex(n int) (string, error) {
-	buf := make([]byte, n)
-	if _, err := rand.Read(buf); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(buf), nil
-}
-
-// OpenBrowserURL opens rawURL in the default browser for the current OS.
-func OpenBrowserURL(url string) error {
-	name, args := browserCommandArgs(runtime.GOOS, url)
-	return exec.Command(name, args...).Start()
-}
-
-// Hyperlink returns an OSC8 hyperlink when the writer is a TTY.
-func Hyperlink(w io.Writer, link, name string) string {
-	if !IsTty(w) {
-		return name
-	}
-	return OSC + "8;;" + link + ST + name + OSC + "8;;" + ST
-}
-
-// IsTty reports whether the writer wraps a terminal file descriptor.
-func IsTty(w io.Writer) bool {
-	file, ok := w.(*os.File)
-	return ok && term.IsTerminal(int(file.Fd()))
-}
+//
+// terminal
+//
 
 // EnterRawMode enters stdin raw mode and switches stdout to alt screen.
 func EnterRawMode() (func(), error) {
@@ -116,6 +84,25 @@ func EnterRawMode() (func(), error) {
 	return cleanup, nil
 }
 
+// Hyperlink returns an OSC8 hyperlink when the writer is a TTY.
+func Hyperlink(w io.Writer, link, name string) string {
+	if !IsTty(w) {
+		return name
+	}
+	return RenderHyperlink(link, name)
+}
+
+// RenderHyperlink returns an OSC8 hyperlink string.
+func RenderHyperlink(link, name string) string {
+	return OSC + "8;;" + link + ST + name + OSC + "8;;" + ST
+}
+
+// IsTty reports whether the writer wraps a terminal file descriptor.
+func IsTty(w io.Writer) bool {
+	file, ok := w.(*os.File)
+	return ok && term.IsTerminal(int(file.Fd()))
+}
+
 // TerminalSize returns the current stdout size or the fallback.
 func TerminalSize(fallback image.Point) image.Point {
 	termW, termH, err := term.GetSize(int(os.Stdout.Fd()))
@@ -129,7 +116,30 @@ func TerminalSize(fallback image.Point) image.Point {
 // strings
 //
 
-var indentRE = regexp.MustCompile(`(?m)^`)
+// AllMatch reports whether every value matches re.
+func AllMatch(values []string, re *regexp.Regexp) bool {
+	for _, value := range values {
+		if !re.MatchString(value) {
+			return false
+		}
+	}
+	return true
+}
+
+// AnyContains reports whether any value contains needle.
+func AnyContains(values []string, needle string) bool {
+	for _, value := range values {
+		if strings.Contains(value, needle) {
+			return true
+		}
+	}
+	return false
+}
+
+// ContainsString reports whether values contains target.
+func ContainsString(values []string, target string) bool {
+	return IndexOfString(values, target) >= 0
+}
 
 // DateAndTimeStr formats an RFC3339 timestamp in local time.
 func DateAndTimeStr(s string) string {
@@ -140,28 +150,14 @@ func DateAndTimeStr(s string) string {
 	return t.Local().Format("Mon Jan _2 2006 15:04 MST")
 }
 
-// DisplayWidth reports the rendered terminal width of a string.
-func DisplayWidth(s string) int {
-	return lipgloss.Width(s)
-}
-
-// Indent prefixes each line in s with indent.
-func Indent(s string, indent string) string {
-	if len(s) == 0 {
-		return s
+// IndexOfString returns the first index of target, or -1 when missing.
+func IndexOfString(values []string, target string) int {
+	for i, value := range values {
+		if value == target {
+			return i
+		}
 	}
-	return indentRE.ReplaceAllLiteralString(s, indent)
-}
-
-// PadRight right-pads s, always adding at least one space.
-func PadRight(s string, length int) string {
-	spaces := max(length-len(s), 1)
-	return s + strings.Repeat(" ", spaces)
-}
-
-// SpreadsheetURL builds a Google Sheets URL from an ID.
-func SpreadsheetURL(id string) string {
-	return "https://docs.google.com/spreadsheets/d/" + id
+	return -1
 }
 
 // Truncate trims s to the requested display width with an ellipsis.
@@ -192,33 +188,43 @@ func CSVString(rows [][]string) string {
 }
 
 //
-// helpers
+// misc
 //
 
-// AllMatch reports whether every value matches re.
-func AllMatch(values []string, re *regexp.Regexp) bool {
-	for _, value := range values {
-		if !re.MatchString(value) {
-			return false
-		}
-	}
-	return true
+// ConfigDir returns the gshoot config directory.
+func ConfigDir() string {
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".config", "gshoot")
 }
 
-// AnyContains reports whether any value contains needle.
-func AnyContains(values []string, needle string) bool {
-	for _, value := range values {
-		if strings.Contains(value, needle) {
-			return true
-		}
-	}
-	return false
+// OpenBrowserURL opens rawURL in the default browser for the current OS.
+// There's no point to returning an error IMO, this can fail brutally on headless
+// machines.
+func OpenBrowserURL(url string) {
+	name, args := browserCommandArgs(runtime.GOOS, url)
+	_ = exec.Command(name, args...).Start()
 }
 
-// ContainsString reports whether values contains target.
-func ContainsString(values []string, target string) bool {
-	return IndexOfString(values, target) >= 0
+// RandomHex returns a lowercase hex string with n bytes worth of characters.
+func RandomHex(n int) string {
+	if n <= 0 {
+		return ""
+	}
+	var buf strings.Builder
+	for buf.Len() < n*2 {
+		buf.WriteString(hex.EncodeToString([]byte(rand.Text())))
+	}
+	return buf.String()[:n*2]
 }
+
+// SpreadsheetURL builds a Google Sheets URL from an ID.
+func SpreadsheetURL(id string) string {
+	return "https://docs.google.com/spreadsheets/d/" + id
+}
+
+//
+// numbers
+//
 
 // DecimalPrecision returns the max decimal precision, clamped to four places.
 func DecimalPrecision(values []string) int {
@@ -231,15 +237,9 @@ func DecimalPrecision(values []string) int {
 	return min(precision, 4)
 }
 
-// IndexOfString returns the first index of target, or -1 when missing.
-func IndexOfString(values []string, target string) int {
-	for i, value := range values {
-		if value == target {
-			return i
-		}
-	}
-	return -1
-}
+//
+// internal
+//
 
 func browserCommandArgs(goos, rawURL string) (string, []string) {
 	switch goos {

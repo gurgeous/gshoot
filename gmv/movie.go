@@ -57,7 +57,7 @@ func loadMovie() (*movie, error) {
 	for i, c := range paletted.Palette {
 		rgba := rgba(c)
 		palette[i] = rgba
-		dimPalette[i] = dim(rgba, 0.35)
+		dimPalette[i] = dim(rgba, 0.2)
 	}
 
 	return &movie{

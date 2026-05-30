@@ -79,7 +79,7 @@ func (r *renderer) render(out *bytes.Buffer, fr int, card card, stats statsTrack
 	r.draw = r.layoutRect()
 	r.drawFrame(fr)
 	// draw card
-	r.next.overlay(card.image, center(r.next.size(), card.image.size()), r.blender(fr))
+	r.next.overlay(card.image, cardOrigin(r.next.size(), card.image.size()), r.blender(fr))
 	// draw stats
 	statsImage := stats.image(r.statsStyle, r.cardBG)
 	r.next.overlay(statsImage, bottomRight(r.next.size(), statsImage.size()), sourceOver)
@@ -95,6 +95,13 @@ func (r *renderer) render(out *bytes.Buffer, fr int, card card, stats statsTrack
 	}
 
 	r.renderDirty(out)
+}
+
+// cardOrigin centers the card horizontally and places it one-third down vertically.
+func cardOrigin(outer, inner size) point {
+	x := max(0, (outer.X-inner.X)/2)
+	y := max(0, (outer.Y-inner.Y)/3)
+	return pt(x, y)
 }
 
 // renderKeyFrame writes every pixel in the draw rectangle.

@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 	"syscall"
 	"time"
 
@@ -19,19 +18,6 @@ import (
 	"github.com/gurgeous/gshoot/util"
 	"github.com/gurgeous/gshoot/ux"
 )
-
-//
-// entrypoints
-//
-
-// Play shows the built-in GMV behind a centered ANSI card until any key is pressed.
-func Play(ctx context.Context, card string, showStats bool) error {
-	p, err := NewPlayer(card, showStats)
-	if err != nil {
-		return err
-	}
-	return p.Play(ctx)
-}
 
 // NewPlayer initializes the built-in GMV player.
 func NewPlayer(card string, showStats bool) (*Player, error) {
@@ -58,7 +44,7 @@ func NewPlayer(card string, showStats bool) (*Player, error) {
 func (p *Player) Play(ctx context.Context) error {
 	if !util.IsTty(os.Stdout) {
 		if p.cardText != "" {
-			fmt.Fprintln(os.Stdout, p.cardText)
+			fmt.Println(p.cardText)
 		}
 		return nil
 	}
@@ -86,16 +72,18 @@ func (p *Player) Play(ctx context.Context) error {
 
 // Demo plays the built-in GMV with sample first-run text.
 func Demo(ctx context.Context) error {
+	text := ("Welcome to gshoot. Looks like your " +
+		ux.Brand.Render("Google Sheets oauth") +
+		" isn't setup yet. This is tricky with Google Sheets, sorry about that. Don't blame us!\n\n" +
+		"Check our Github README for instructions.\n\n" +
+		ux.Muted.Render("press a key to exit the amazing welcome screen"))
+	text = lipgloss.Wrap(text, 50, " ")
+
 	card := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("#60a5fa")).
-		Padding(1, 4).
-		Render(strings.Join([]string{
-			ux.Brand.Render("welcome to gshoot"),
-			"",
-			ux.Info.Render("auth is not set up yet"),
-			ux.Subtle.Render("press any key to continue"),
-		}, "\n"))
+		Padding(1, 3).
+		Render(text)
 	p, err := NewPlayer(card, true)
 	if err != nil {
 		return err

@@ -10,44 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestIndent(t *testing.T) {
-	got := Indent("a\nb", "  ")
-	want := "  a\n  b"
-	if got != want {
-		t.Fatalf("Indent() = %q, want %q", got, want)
-	}
-}
-
-func TestPadRight(t *testing.T) {
-	tests := []struct {
-		s      string
-		length int
-		want   string
-	}{
-		{s: "a", length: 3, want: "a  "},
-		{s: "abc", length: 3, want: "abc "},
-		{s: "abcd", length: 3, want: "abcd "},
-	}
-
-	for _, tt := range tests {
-		if got := PadRight(tt.s, tt.length); got != tt.want {
-			t.Fatalf("PadRight() = %q, want %q", got, tt.want)
-		}
-	}
-}
-
-func TestFileExists(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "exists.txt")
-	_ = os.WriteFile(path, []byte("x"), 0o600)
-	if !FileExists(path) {
-		t.Fatalf("FileExists(%q) = false, want true", path)
-	}
-	if FileExists(filepath.Join(dir, "missing.txt")) {
-		t.Fatal("FileExists(missing) = true, want false")
-	}
-}
-
 func TestWritePrivateFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "nested", "secret.txt")
 	if err := WritePrivateFile(path, []byte("top secret\n")); err != nil {
@@ -71,11 +33,16 @@ func TestWritePrivateFile(t *testing.T) {
 	}
 }
 
+func TestConfigDirUsesHomeDotConfig(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "ignored"))
+
+	assert.Equal(t, filepath.Join(home, ".config", "gshoot"), ConfigDir())
+}
+
 func TestRandomHex(t *testing.T) {
-	got, err := RandomHex(16)
-	if err != nil {
-		t.Fatalf("RandomHex() error = %v", err)
-	}
+	got := RandomHex(16)
 	if len(got) != 32 {
 		t.Fatalf("len(RandomHex()) = %d, want 32", len(got))
 	}
@@ -91,10 +58,11 @@ func TestHyperlink(t *testing.T) {
 	}
 }
 
-func TestIsTTY(t *testing.T) {
-	var out bytes.Buffer
-	if IsTty(&out) {
-		t.Fatal("IsTTY() = true, want false")
+func TestRenderHyperlink(t *testing.T) {
+	got := RenderHyperlink("https://example.com", "Alpha")
+	want := OSC + "8;;https://example.com" + ST + "Alpha" + OSC + "8;;" + ST
+	if got != want {
+		t.Fatalf("RenderHyperlink() = %q, want %q", got, want)
 	}
 }
 

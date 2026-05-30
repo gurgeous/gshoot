@@ -54,6 +54,11 @@ func TestRenderCanSkipCardDimming(t *testing.T) {
 	assert.Contains(t, out.String(), renderer.cardBG.Escape+"X")
 }
 
+func TestCardOriginIsOneThirdDown(t *testing.T) {
+	assert.Equal(t, pt(4, 2), cardOrigin(sz(10, 8), sz(2, 2)))
+	assert.Equal(t, pt(0, 0), cardOrigin(sz(2, 2), sz(10, 8)))
+}
+
 func TestRenderOnlyWritesChangedPixels(t *testing.T) {
 	red := color.RGBA{R: 100, A: 255}
 	blue := color.RGBA{B: 100, A: 255}
@@ -176,9 +181,8 @@ func TestRenderDowngradesColorsToANSI256(t *testing.T) {
 func TestPlaybackDowngradesCardANSIToANSI256(t *testing.T) {
 	cardText := downsample("\x1b[38;2;255;133;55mX", config{profile: colorprofile.ANSI}.colorProfile())
 	card := newCard(cardText)
-	px, ok := card.pixelAt(pt(0, 0))
+	px := card.image.at(pt(0, 0))
 
-	assert.True(t, ok)
 	assert.Contains(t, px.Style, "\x1b[38;5;")
 	assert.NotContains(t, px.Style, "38;2")
 }

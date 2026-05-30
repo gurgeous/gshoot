@@ -3,6 +3,7 @@
 - Avoid overly specific tests; assert only meaningful behavior
 - Over-testing wastes time/money
 - In `httptest` flows, only assert important behavior (not every detail)
+- Avoid DI just for tests; prefer direct code. Add seams only when the alternative is clearly worse.
 
 ## Project
 

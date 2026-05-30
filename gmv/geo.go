@@ -40,8 +40,3 @@ func center(outer, inner size) point {
 func bottomRight(outer, inner size) point {
 	return pt(max(0, outer.X-inner.X), max(0, outer.Y-inner.Y))
 }
-
-// local converts an absolute point into rect-local coordinates.
-func local(r rect, p point) point {
-	return p.Sub(r.Min)
-}

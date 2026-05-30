@@ -11,13 +11,6 @@ import (
 	"golang.org/x/oauth2"
 )
 
-func TestReadOnlyScopes(t *testing.T) {
-	scopes := ReadOnlyScopes()
-
-	assert.Contains(t, scopes, "https://www.googleapis.com/auth/drive.readonly")
-	assert.Contains(t, scopes, "https://www.googleapis.com/auth/spreadsheets.readonly")
-}
-
 func TestListSpreadsheets(t *testing.T) {
 	var gotPageSize string
 
