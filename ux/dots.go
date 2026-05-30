@@ -5,6 +5,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/charmbracelet/x/ansi"
 	"github.com/gurgeous/gshoot/util"
 	"github.com/schollz/progressbar/v3"
 )
@@ -25,7 +26,7 @@ var dotsWithColor []string
 func renderDots() []string {
 	items := make([]string, 0, len(dots))
 	for _, ch := range dots {
-		items = append(items, Brand.Render(string(ch)))
+		items = append(items, Warn.Render(string(ch)))
 	}
 	return items
 }
@@ -58,6 +59,9 @@ func StartDots(w io.Writer, description string) *Dots {
 		return d
 	}
 
+	// hide cursor
+	fmt.Fprint(w, ansi.ResetModeTextCursorEnable) // hide cursor
+
 	d.bar = progressbar.NewOptions(-1,
 		progressbar.OptionClearOnFinish(),
 		progressbar.OptionEnableColorCodes(true),
@@ -80,7 +84,8 @@ func StartDots(w io.Writer, description string) *Dots {
 				_ = d.bar.Add(1)
 			case <-d.stop:
 				_ = d.bar.Finish()
-				fmt.Fprintf(d.w, "%s %s\n", Success.Render("✓"), Brand.Render(d.description))
+				fmt.Fprintf(w, "%s %s\n", Success.Render("✓"), Brand.Render(d.description))
+				fmt.Fprint(w, ansi.SetModeTextCursorEnable) // show cursor
 				return
 			}
 		}

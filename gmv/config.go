@@ -5,8 +5,6 @@ package gmv
 
 import (
 	"os"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/charmbracelet/colorprofile"
@@ -25,6 +23,7 @@ type config struct {
 
 // newConfig combines defaults, caller options, and environment overrides.
 func newConfig() config {
+	envCfg := env.NewConfig()
 	cfg := config{
 		fps:           25,
 		profile:       colorprofile.Detect(os.Stdout, os.Environ()),
@@ -32,20 +31,20 @@ func newConfig() config {
 		diffThreshold: 10,
 	}
 
-	if value := env.GSHOOT_GMV_FPS(); value != "" {
-		cfg.fps = envFloat(value, cfg.fps)
+	if envCfg.GMVFPS > 0 {
+		cfg.fps = envCfg.GMVFPS
 	}
-	if value := env.GSHOOT_GMV_WIDTH(); value != "" {
-		cfg.width = envInt(value, cfg.width)
+	if envCfg.GMVWidth > 0 {
+		cfg.width = envCfg.GMVWidth
 	}
-	if value := env.GSHOOT_GMV_HEIGHT(); value != "" {
-		cfg.height = envInt(value, cfg.height)
+	if envCfg.GMVHeight > 0 {
+		cfg.height = envCfg.GMVHeight
 	}
-	if value := env.GSHOOT_GMV_ALPHA(); value != "" {
-		cfg.alphaBlend = envBool(value, cfg.alphaBlend)
+	if envCfg.GMVNoAlpha {
+		cfg.alphaBlend = false
 	}
-	if value := env.GSHOOT_GMV_DIFF_THRESHOLD(); value != "" {
-		cfg.diffThreshold = envInt(value, cfg.diffThreshold)
+	if envCfg.GMVDiffThreshold > 0 {
+		cfg.diffThreshold = envCfg.GMVDiffThreshold
 	}
 
 	return cfg
@@ -62,34 +61,4 @@ func (cfg config) colorProfile() colorprofile.Profile {
 // frameDelay returns the configured frame duration.
 func (cfg config) frameDelay() time.Duration {
 	return time.Duration(float64(time.Second) / cfg.fps)
-}
-
-// envFloat reads a positive float override or keeps fallback.
-func envFloat(value string, fallback float64) float64 {
-	n, err := strconv.ParseFloat(value, 64)
-	if err != nil || n <= 0 {
-		return fallback
-	}
-	return n
-}
-
-// envInt reads a non-negative integer override or keeps fallback.
-func envInt(value string, fallback int) int {
-	n, err := strconv.Atoi(value)
-	if err != nil || n < 0 {
-		return fallback
-	}
-	return n
-}
-
-// envBool reads a boolean override or keeps fallback.
-func envBool(value string, fallback bool) bool {
-	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "1", "true", "t", "yes", "y", "on":
-		return true
-	case "0", "false", "f", "no", "n", "off":
-		return false
-	default:
-		return fallback
-	}
 }

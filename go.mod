@@ -5,6 +5,7 @@ go 1.26.0
 require (
 	charm.land/lipgloss/v2 v2.0.3
 	github.com/alecthomas/kong v1.15.0
+	github.com/caarlos0/env/v11 v11.4.1
 	github.com/charmbracelet/colorprofile v0.4.3
 	github.com/charmbracelet/x/ansi v0.11.7
 	github.com/schollz/progressbar/v3 v3.19.0

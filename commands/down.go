@@ -17,65 +17,13 @@ type DownCmd struct {
 }
 
 func (c *DownCmd) Run() error {
-	//
-	// init
-	//
-
-	ctx := context.Background()
-	dots := ux.StartDots(os.Stderr, "connecting to Google Sheets...")
-
-	client, err := google.NewClient(ctx)
+	rows, err := c.run0()
 	if err != nil {
 		return err
 	}
-
-	//
-	// find spreadsheet
-	//
-
-	dots.SetDescription("finding spreadsheet...")
-	spreadsheet, err := client.FindSpreadsheet(ctx, c.Spreadsheet)
-	if err != nil {
-		return fmt.Errorf("could not find spreadsheet '%s': %w", c.Spreadsheet, err)
-	}
-	if spreadsheet == nil {
-		return fmt.Errorf("could not find spreadsheet '%s'", c.Spreadsheet)
-	}
-
-	//
-	// find sheet
-	//
-
-	dots.SetDescription("finding specific sheet...")
-	sheet, err := client.FindSheet(ctx, spreadsheet.ID, c.Sheet)
-	if err != nil {
-		return err
-	}
-	if sheet == nil {
-		return fmt.Errorf("in spreadsheet '%s', could not find sheet '%s'", c.Spreadsheet, c.Sheet)
-	}
-
-	//
-	// download
-	//
-
-	dots.SetDescription("downloading cells...")
-	rows, err := client.GetRows(ctx, spreadsheet.ID, sheet.Title)
-	if err != nil {
-		return err
-	}
-	isStdout := c.Output == "" || c.Output == "-"
-	if !isStdout {
-		dots.SetDescription(fmt.Sprintf("saving %s", c.Output))
-	}
-	dots.Stop()
-
-	//
-	// write
-	//
 
 	writer := os.Stdout
-	if !isStdout {
+	if c.Output != "" && c.Output != "-" {
 		file, err := os.Create(c.Output)
 		if err != nil {
 			return err
@@ -84,4 +32,60 @@ func (c *DownCmd) Run() error {
 		writer = file
 	}
 	return util.CSVWrite(writer, rows)
+}
+
+func (c *DownCmd) run0() (google.Rows, error) {
+	//
+	// init
+	//
+
+	ctx := context.Background()
+	dots := ux.StartDots(os.Stderr, "connecting to Google Sheets...")
+	defer dots.Stop()
+
+	client, err := google.NewClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	//
+	// find spreadsheet file
+	//
+
+	dots.SetDescription("finding spreadsheet file...")
+	spreadsheet, err := client.FindSpreadsheet(ctx, c.Spreadsheet)
+	if err != nil {
+		return nil, err
+	}
+	if spreadsheet == nil {
+		return nil, fmt.Errorf("could not find spreadsheet file named '%s'", c.Spreadsheet)
+	}
+
+	//
+	// find sheet
+	//
+
+	dots.SetDescription("finding sheet...")
+	sheet, err := client.FindSheet(ctx, spreadsheet.ID, c.Sheet)
+	if err != nil {
+		return nil, err
+	}
+	if sheet == nil {
+		return nil, fmt.Errorf("found spreadsheet file '%s', but could not find sheet named '%s'", c.Spreadsheet, c.Sheet)
+	}
+
+	//
+	// download
+	//
+
+	dots.SetDescription("downloading rows...")
+	rows, err := client.GetRows(ctx, spreadsheet.ID, sheet.Title)
+	if err != nil {
+		return nil, err
+	}
+	isStdout := c.Output == "" || c.Output == "-"
+	if !isStdout {
+		dots.SetDescription(fmt.Sprintf("saving %d rows to %s...", len(rows), c.Output))
+	}
+	return rows, nil
 }

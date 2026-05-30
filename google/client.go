@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/gurgeous/gshoot/auth"
+	"github.com/gurgeous/gshoot/util"
 )
 
 const spreadsheetMimeType = "application/vnd.google-apps.spreadsheet"
@@ -138,7 +139,7 @@ func (c *Client) GetRows(ctx context.Context, spreadsheetID string, sheetTitle s
 		rows = append(rows, cells)
 	}
 
-	return Rectangularize(rows), nil
+	return Rows(util.CSVRectangularize(rows)), nil
 }
 
 // BatchUpdate sends one or more Sheets mutation requests and returns API replies.
@@ -186,28 +187,6 @@ func (c *Client) FindSheet(ctx context.Context, spreadsheetID, name string) (*Sh
 		}
 	}
 	return nil, nil
-}
-
-//
-// standalone stuff
-//
-
-// Rectangularize pads rows so every row has the same column count.
-func Rectangularize(rows Rows) Rows {
-	cols := 0
-	for _, row := range rows {
-		cols = max(cols, len(row))
-	}
-
-	out := make([][]string, 0, len(rows))
-	for _, src := range rows {
-		dst := append([]string(nil), src...)
-		if len(dst) < cols {
-			dst = append(dst, make([]string, cols-len(dst))...)
-		}
-		out = append(out, dst)
-	}
-	return out
 }
 
 func (c *Client) getSpreadsheet(ctx context.Context, spreadsheetID string, includeGridData bool, ranges ...string) (*Spreadsheet, error) {

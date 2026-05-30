@@ -2,7 +2,6 @@ package commands
 
 import (
 	"context"
-	"encoding/csv"
 	"errors"
 	"fmt"
 	"os"
@@ -14,13 +13,13 @@ import (
 
 // UpCmd uploads a CSV to Google Sheets.
 type UpCmd struct {
+	Sheet       string `help:"Destination sheet name."`
+	Refill      bool   `help:"Merge CSV data INTO the sheet."`
+	Replace     bool   `help:"Create or overwrite the destination sheet."`
 	Filter      bool   `help:"Add a standard Google Sheets filter."`
-	Layout      bool   `help:"Auto-size columns to fit cells."`
+	Layout      bool   `help:"Auto-size column width to fit cells."`
 	Numeric     bool   `help:"Format obvious numeric columns."`
 	Open        bool   `help:"Open the sheet URL when done."`
-	Refill      bool   `help:"Merge CSV data into the destination sheet."`
-	Replace     bool   `help:"Create or overwrite the destination sheet."`
-	Sheet       string `help:"Destination sheet name."`
 	Spreadsheet string `arg:"" name:"spreadsheet" help:"Spreadsheet name."`
 	CSVPath     string `arg:"" name:"csv" type:"path" help:"CSV file to upload."`
 }
@@ -31,31 +30,40 @@ func (c *UpCmd) Run() error {
 		return errors.New("use either --refill or --replace")
 	}
 
-	rows, err := c.readCSV()
+	//
+	// read csv
+	//
+
+	dots := ux.StartDots(os.Stderr, "reading csv...")
+	defer dots.Stop()
+
+	rows, err := util.CSVRead(c.CSVPath)
 	if err != nil {
 		return err
 	}
 
-	ctx := context.Background()
-	dots := ux.StartDots(os.Stderr, "connecting to Google Sheets...")
+	//
+	// init
+	//
 
+	dots.SetDescription("connecting to Google Sheets...")
+	ctx := context.Background()
 	client, err := google.NewClient(ctx)
 	if err != nil {
 		return err
 	}
 
-	runner := &upRunner{
-		cmd:    c,
-		ctx:    ctx,
-		client: client,
-		rows:   rows,
-	}
-	if err := runner.upload(dots); err != nil {
+	//
+	// upload
+	//
+
+	file, err := c.upload(ctx, client, dots, google.Rows(rows))
+	if err != nil {
 		return err
 	}
 
-	dots.Stop()
-	url := util.SpreadsheetURL(runner.file.ID) + "/edit"
+	// print url and maybe open
+	url := util.SpreadsheetURL(file.ID) + "/edit"
 	fmt.Println(url)
 	if c.Open {
 		util.OpenBrowserURL(url)
@@ -63,116 +71,88 @@ func (c *UpCmd) Run() error {
 	return nil
 }
 
-// REVIEW: add a suffix comment for each ivar
-type upRunner struct {
-	cmd         *UpCmd              // parsed CLI options
-	ctx         context.Context     // upload request context
-	client      *google.Client      // Google API client
-	file        *google.File        // target spreadsheet file
-	spreadsheet *google.Spreadsheet // target spreadsheet metadata
-	rows        google.Rows         // CSV rows from disk
-	sheet       *uploadSheet        // target sheet mutator
-}
-
 // upload runs the complete upload workflow.
-func (u *upRunner) upload(dots *ux.Dots) error {
-	if err := u.findOrCreateFile(dots); err != nil {
-		return err
-	}
-	if err := u.loadSpreadsheet(); err != nil {
-		return err
-	}
+func (c *UpCmd) upload(ctx context.Context, client *google.Client, dots *ux.Dots, rows google.Rows) (*google.File, error) {
+	var err error
 
-	u.sheet = newUploadSheet(u.ctx, u.client, u.file.ID, u.spreadsheet, u.cmd, u.rows)
+	//
+	// find/create File
+	//
 
-	dots.SetDescription(fmt.Sprintf("uploading %d rows to '%s' / '%s'...", len(u.rows), u.file.Name, u.sheet.title))
-	if err := u.sheet.ensure(u.cmd); err != nil {
-		return err
-	}
-
-	uploadRows := u.rows
-	var refill *refillUpload
-	if u.cmd.Refill {
-		refillData, err := newRefillUpload(u.ctx, u.client, u.file.ID, u.sheet.id, u.sheet.title, u.rows)
-		if err != nil {
-			return err
-		}
-		merged, err := refillData.rows()
-		if err != nil {
-			return err
-		}
-		refill = refillData
-		uploadRows = merged
-	}
-	u.sheet.rows = uploadRows
-
-	if u.cmd.Replace {
-		if err := u.sheet.clear(); err != nil {
-			return err
-		}
-	}
-	if err := u.sheet.resize(); err != nil {
-		return err
-	}
-	if err := u.sheet.paste(); err != nil {
-		return err
-	}
-	if refill != nil {
-		if err := refill.apply(u.sheet); err != nil {
-			return err
-		}
-	}
-	return u.sheet.applyOptions(u.cmd)
-}
-
-// REVIEW: move this to google client
-// findOrCreateFile finds the target spreadsheet or creates it.
-func (u *upRunner) findOrCreateFile(dots *ux.Dots) error {
-	dots.SetDescription("finding spreadsheet...")
-	file, err := u.client.FindSpreadsheet(u.ctx, u.cmd.Spreadsheet)
-	if err != nil {
-		return err
-	}
-	if file != nil {
-		u.file = file
-		return nil
-	}
-
-	dots.SetDescription(fmt.Sprintf("creating '%s'...", u.cmd.Spreadsheet))
-	u.file, err = u.client.CreateSpreadsheet(u.ctx, u.cmd.Spreadsheet)
-	return err
-}
-
-// REVIEW: why dos this exist?
-// loadSpreadsheet fetches sheet metadata for the selected file.
-func (u *upRunner) loadSpreadsheet() error {
-	spreadsheet, err := u.client.GetSpreadsheet(u.ctx, u.file.ID)
-	if err != nil {
-		return err
-	}
-	u.spreadsheet = spreadsheet
-	return nil
-}
-
-// readCSV reads and rectangularizes the input CSV.
-func (c *UpCmd) readCSV() (google.Rows, error) {
-	file, err := os.Open(c.CSVPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("not found: %s", c.CSVPath)
-		}
-		return nil, fmt.Errorf("open csv: %w", err)
-	}
-	defer file.Close()
-
-	reader := csv.NewReader(file)
-	reader.FieldsPerRecord = -1
-	rows, err := reader.ReadAll()
+	dots.SetDescription("finding spreadsheet file...")
+	file, err := client.FindSpreadsheet(ctx, c.Spreadsheet)
 	if err != nil {
 		return nil, err
 	}
-	if len(rows) == 0 {
-		return nil, fmt.Errorf("csv is empty: %s", c.CSVPath)
+	if file == nil {
+		dots.SetDescription(fmt.Sprintf("creating new spreadsheet '%s'...", c.Spreadsheet))
+		file, err = client.CreateSpreadsheet(ctx, c.Spreadsheet)
+		if err != nil {
+			return nil, err
+		}
 	}
-	return google.Rectangularize(rows), nil
+
+	//
+	// get Spreadsheet for that File
+	//
+
+	dots.SetDescription("fetching spreadsheet metadata...")
+	spreadsheet, err := client.GetSpreadsheet(ctx, file.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	//
+	// find/create target sheet
+	//
+
+	dots.SetDescription(fmt.Sprintf("uploading %d rows to file '%s', sheet '%s'...", len(rows), file.Name, c.Sheet))
+	s := newUploader(ctx, client, file, spreadsheet, c, rows)
+	s.id, err = s.resolveTargetSheet()
+	if err != nil {
+		return nil, err
+	}
+
+	//
+	// --refill
+	//
+
+	var refill *refiller
+	if c.Refill {
+		refill, err = s.prepareRefiller()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	pipeline := []struct {
+		on  bool
+		run func() error
+	}{
+		// paste
+		{c.Replace, s.clearSheet}, // --replace
+		{true, s.growSheet},       // add padding
+		{true, s.pasteCSV},        // paste local csv
+
+		// extend
+		{c.Refill, func() error { return refill.extend() }}, // --refill
+
+		// post-paste stuff
+		{c.Filter, s.applyFilter},   // --filter
+		{c.Numeric, s.applyNumeric}, // --numeric
+		{c.Layout, s.applyLayout},   // --layout
+	}
+	for _, p := range pipeline {
+		if p.on {
+			if err := p.run(); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	//
+	// success!
+	//
+
+	return file, nil
 }

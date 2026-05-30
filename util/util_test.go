@@ -92,6 +92,20 @@ func TestCSVString(t *testing.T) {
 	assert.Equal(t, "name,count\nalpha,1\n", got)
 }
 
+func TestCSVReadRectangularizesRows(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "data.csv")
+	assert.NoError(t, os.WriteFile(path, []byte("a,b\n1\n2,3,4\n"), 0o600))
+
+	rows, err := CSVRead(path)
+
+	assert.NoError(t, err)
+	assert.Equal(t, [][]string{
+		{"a", "b", ""},
+		{"1", "", ""},
+		{"2", "3", "4"},
+	}, rows)
+}
+
 func TestStringSliceHelpers(t *testing.T) {
 	values := []string{"alpha", "beta", "gamma"}
 

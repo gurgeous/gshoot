@@ -6,20 +6,25 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewConfigReadsAlphaEnv(t *testing.T) {
-	t.Setenv("GSHOOT_GMV_ALPHA", "off")
+func TestNewConfigReadsEnv(t *testing.T) {
+	t.Setenv("GSHOOT_GMV_FPS", "12.5")
+	t.Setenv("GSHOOT_GMV_WIDTH", "80")
+	t.Setenv("GSHOOT_GMV_HEIGHT", "24")
+	t.Setenv("GSHOOT_GMV_NO_ALPHA", "true")
+	t.Setenv("GSHOOT_GMV_DIFF_THRESHOLD", "4")
 
 	cfg := newConfig()
 
+	assert.Equal(t, 12.5, cfg.fps)
+	assert.Equal(t, 80, cfg.width)
+	assert.Equal(t, 24, cfg.height)
 	assert.False(t, cfg.alphaBlend)
+	assert.Equal(t, 4, cfg.diffThreshold)
 }
 
 func TestNewConfigIgnoresInvalidEnv(t *testing.T) {
 	t.Setenv("GSHOOT_GMV_FPS", "wat")
-	t.Setenv("GSHOOT_GMV_WIDTH", "-1")
-	t.Setenv("GSHOOT_GMV_HEIGHT", "-1")
-	t.Setenv("GSHOOT_GMV_ALPHA", "maybe")
-	t.Setenv("GSHOOT_GMV_DIFF_THRESHOLD", "-1")
+	t.Setenv("GSHOOT_GMV_WIDTH", "80")
 
 	cfg := newConfig()
 

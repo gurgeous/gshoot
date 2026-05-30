@@ -29,8 +29,9 @@ func init() {
 
 // setup styles from GSHOOT_THEME or HasDarkBackground.
 func Init() {
-	if env.GSHOOT_THEME() != "" {
-		setStyles(lipgloss.LightDark(env.GSHOOT_THEME() != "light"))
+	cfg := env.NewConfig()
+	if cfg.Theme != "" {
+		setStyles(lipgloss.LightDark(cfg.Theme != "light"))
 		return
 	}
 
