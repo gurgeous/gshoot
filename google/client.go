@@ -50,12 +50,52 @@ func NewClient(ctx context.Context) (*Client, error) {
 }
 
 //
-// api requests
+// Spreadsheet file operations
 //
 
-// ListSpreadsheets returns recently modified spreadsheets.
+// CreateSpreadsheetFile creates a Google Sheets file.
+// https://developers.google.com/drive/api/reference/rest/v3/files/create
+func (c *Client) CreateSpreadsheetFile(ctx context.Context, name string) (*File, error) {
+	q := url.Values{}
+	q.Set("fields", "id,name")
+
+	body := File{
+		Name:     name,
+		MimeType: spreadsheetMimeType,
+	}
+	var res File
+	if err := c.driveReqJSON(ctx, http.MethodPost, "/drive/v3/files", q, body, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+// FindSpreadsheetFile returns the most recent spreadsheet with this name (case insensitive).
+func (c *Client) FindSpreadsheetFile(ctx context.Context, name string) (*File, error) {
+	items, err := c.ListSpreadsheetFiles(ctx, 0)
+	if err != nil {
+		return nil, err
+	}
+	for _, item := range items {
+		if strings.EqualFold(item.Name, name) {
+			return item, nil
+		}
+	}
+	return nil, nil
+}
+
+// FindOrCreateSpreadsheetFile returns a spreadsheet with this name, creating one if needed.
+func (c *Client) FindOrCreateSpreadsheetFile(ctx context.Context, name string) (*File, error) {
+	file, err := c.FindSpreadsheetFile(ctx, name)
+	if err != nil || file != nil {
+		return file, err
+	}
+	return c.CreateSpreadsheetFile(ctx, name)
+}
+
+// ListSpreadsheetFiles returns recently modified spreadsheets.
 // https://developers.google.com/workspace/drive/api/reference/rest/v3/files/list
-func (c *Client) ListSpreadsheets(ctx context.Context, limit int) ([]*File, error) {
+func (c *Client) ListSpreadsheetFiles(ctx context.Context, limit int) ([]*File, error) {
 	if limit <= 0 {
 		limit = 100
 	}
@@ -75,32 +115,9 @@ func (c *Client) ListSpreadsheets(ctx context.Context, limit int) ([]*File, erro
 	return res.Files, nil
 }
 
-// CreateSpreadsheet creates a Google Sheets file.
-// https://developers.google.com/drive/api/reference/rest/v3/files/create
-func (c *Client) CreateSpreadsheet(ctx context.Context, name string) (*File, error) {
-	q := url.Values{}
-	q.Set("fields", "id,name")
-
-	body := File{
-		Name:     name,
-		MimeType: spreadsheetMimeType,
-	}
-	var res File
-	if err := c.driveReqJSON(ctx, http.MethodPost, "/drive/v3/files", q, body, &res); err != nil {
-		return nil, err
-	}
-	return &res, nil
-}
-
-// GetSheets returns the sheets (tabs) in a spreadsheet.
-// https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets/get
-func (c *Client) GetSheets(ctx context.Context, spreadsheetID string) ([]*Sheet, error) {
-	spreadsheet, err := c.GetSpreadsheet(ctx, spreadsheetID)
-	if err != nil {
-		return nil, err
-	}
-	return spreadsheet.Sheets, nil
-}
+//
+// Spreadsheet operations
+//
 
 // GetSpreadsheet returns spreadsheet metadata.
 // https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets/get
@@ -112,6 +129,76 @@ func (c *Client) GetSpreadsheet(ctx context.Context, spreadsheetID string) (*Spr
 // https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets/get
 func (c *Client) GetSpreadsheetWithGridData(ctx context.Context, spreadsheetID string, ranges ...string) (*Spreadsheet, error) {
 	return c.getSpreadsheet(ctx, spreadsheetID, true, ranges...)
+}
+
+// WipeSpreadsheet replaces all existing sheets with one blank Sheet1.
+func (c *Client) WipeSpreadsheet(ctx context.Context, spreadsheetID string) error {
+	spreadsheet, err := c.GetSpreadsheet(ctx, spreadsheetID)
+	if err != nil {
+		return err
+	}
+
+	requests := []Request{}
+	for _, sheet := range spreadsheet.Sheets {
+		if strings.EqualFold(sheet.Title, "Sheet1") {
+			requests = append(requests, Request{
+				UpdateSheetProperties: &UpdateSheetPropertiesRequest{
+					Properties: SheetProperties{
+						SheetID: new(sheet.ID),
+						Title:   "gshoot-wipe-" + util.RandomHex(4),
+					},
+					Fields: "title",
+				},
+			})
+		}
+	}
+	requests = append(requests, Request{
+		AddSheet: &AddSheetRequest{
+			Properties: SheetProperties{
+				Title: "Sheet1",
+				Index: new(0),
+			},
+		},
+	})
+	for _, sheet := range spreadsheet.Sheets {
+		requests = append(requests, Request{
+			DeleteSheet: &DeleteSheetRequest{SheetID: sheet.ID},
+		})
+	}
+
+	_, err = c.BatchUpdate(ctx, spreadsheetID, requests)
+	return err
+}
+
+//
+// Sheet operations
+//
+
+// FindSheet returns the sheet with this name, or the first sheet when name is empty.
+func (c *Client) FindSheet(ctx context.Context, spreadsheetID, name string) (*Sheet, error) {
+	items, err := c.GetSheets(ctx, spreadsheetID)
+	if err != nil {
+		return nil, err
+	}
+	if name == "" {
+		return items[0], nil
+	}
+	for _, item := range items {
+		if strings.EqualFold(item.Title, name) {
+			return item, nil
+		}
+	}
+	return nil, nil
+}
+
+// GetSheets returns the sheets (tabs) in a spreadsheet.
+// https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets/get
+func (c *Client) GetSheets(ctx context.Context, spreadsheetID string) ([]*Sheet, error) {
+	spreadsheet, err := c.GetSpreadsheet(ctx, spreadsheetID)
+	if err != nil {
+		return nil, err
+	}
+	return spreadsheet.Sheets, nil
 }
 
 // GetRows returns stringified cell values for a sheet.
@@ -154,41 +241,6 @@ func (c *Client) BatchUpdate(ctx context.Context, spreadsheetID string, requests
 	return &res, nil
 }
 
-//
-// nice wrappers
-//
-
-// FindSpreadsheet returns the most recent spreadsheet with this name (case insensitive).
-func (c *Client) FindSpreadsheet(ctx context.Context, name string) (*File, error) {
-	items, err := c.ListSpreadsheets(ctx, 0)
-	if err != nil {
-		return nil, err
-	}
-	for _, item := range items {
-		if strings.EqualFold(item.Name, name) {
-			return item, nil
-		}
-	}
-	return nil, nil
-}
-
-// FindSheet returns the sheet with this name, or the first sheet when name is empty.
-func (c *Client) FindSheet(ctx context.Context, spreadsheetID, name string) (*Sheet, error) {
-	items, err := c.GetSheets(ctx, spreadsheetID)
-	if err != nil {
-		return nil, err
-	}
-	if name == "" {
-		return items[0], nil
-	}
-	for _, item := range items {
-		if strings.EqualFold(item.Title, name) {
-			return item, nil
-		}
-	}
-	return nil, nil
-}
-
 func (c *Client) getSpreadsheet(ctx context.Context, spreadsheetID string, includeGridData bool, ranges ...string) (*Spreadsheet, error) {
 	path := fmt.Sprintf("/v4/spreadsheets/%s", url.PathEscape(spreadsheetID))
 	q := url.Values{}
@@ -208,6 +260,10 @@ func (c *Client) getSpreadsheet(ctx context.Context, spreadsheetID string, inclu
 	}
 	return res.spreadsheet(), nil
 }
+
+//
+// low-level req helpers
+//
 
 // driveReq sends a Drive GET request and decodes JSON.
 func (c *Client) driveReq(ctx context.Context, path string, q url.Values, dst any) error {

@@ -11,6 +11,7 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/gurgeous/gshoot/auth"
 	"github.com/gurgeous/gshoot/commands"
+	"github.com/gurgeous/gshoot/env"
 	"github.com/gurgeous/gshoot/gmv"
 	"github.com/gurgeous/gshoot/util"
 	"github.com/gurgeous/gshoot/ux"
@@ -24,9 +25,11 @@ var (
 type CLI struct {
 	Version kong.VersionFlag `short:"v" help:"Print the version number"`
 	Auth    commands.AuthCmd `cmd:"" help:"Login or logout from Google Sheets."`
-	List    commands.ListCmd `cmd:"" help:"List your Google Sheets."`
 	Down    commands.DownCmd `cmd:"" help:"Download a Google Sheet as CSV."`
 	Up      commands.UpCmd   `cmd:"" help:"Upload a CSV to Google Sheets."`
+	List    commands.ListCmd `cmd:"" help:"List your Google Sheets."`
+	Peek    commands.PeekCmd `cmd:"" help:"List sheets in a spreadsheet."`
+	Wipe    commands.WipeCmd `cmd:"" help:"Danger! Wipe all sheets and data from a spreadsheet."`
 }
 
 func main() {
@@ -51,6 +54,7 @@ func main() {
 	//
 
 	ux.Init()
+	envCfg := env.NewConfig()
 
 	//
 	// show welcome?
@@ -63,7 +67,11 @@ func main() {
 
 	if (isFirstRun && isNaked) || isWelcome {
 		// show movie, then auth status
-		_ = gmv.Demo(context.Background())
+		if envCfg.Smoke {
+			fmt.Println("welcome")
+		} else {
+			_ = gmv.Demo(context.Background())
+		}
 		mustNewManager().ShowStatus()
 		return
 	}
@@ -116,7 +124,7 @@ func main() {
 			boom(msg)
 			fmt.Fprintln(os.Stderr)
 			manager.ShowStatus()
-			return
+			os.Exit(1)
 		}
 	}
 

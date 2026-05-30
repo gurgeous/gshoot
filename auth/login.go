@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"charm.land/lipgloss/v2"
+	"github.com/gurgeous/gshoot/env"
 	"github.com/gurgeous/gshoot/util"
 	"github.com/gurgeous/gshoot/ux"
 	"golang.org/x/oauth2"
@@ -54,6 +56,15 @@ func (m *Manager) Logout() {
 
 // browserLoginFlow performs the browser round trip and code exchange.
 func browserLoginFlow(ctx context.Context, client *OClient) (*oauth2.Token, error) {
+	if env.NewConfig().Smoke {
+		return &oauth2.Token{
+			AccessToken:  "smoke-access-token",
+			RefreshToken: "smoke-refresh-token",
+			TokenType:    "Bearer",
+			Expiry:       time.Now().Add(time.Hour),
+		}, nil
+	}
+
 	//
 	// create oauth2 config
 	//

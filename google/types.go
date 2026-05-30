@@ -26,8 +26,9 @@ type File struct {
 
 // Sheet is one tab from a Google spreadsheet.
 type Sheet struct {
-	ID    int64  `json:"sheetId"`
-	Title string `json:"title"`
+	ID             int64           `json:"sheetId"`
+	Title          string          `json:"title"`
+	GridProperties *GridProperties `json:"gridProperties,omitempty"`
 }
 
 // Spreadsheet is sheet metadata plus optional grid data.
@@ -73,7 +74,11 @@ func (p SheetProperties) sheet() *Sheet {
 	if p.SheetID != nil {
 		id = *p.SheetID
 	}
-	return &Sheet{ID: id, Title: p.Title}
+	grid := p.GridProperties
+	if grid == nil {
+		grid = &GridProperties{}
+	}
+	return &Sheet{ID: id, Title: p.Title, GridProperties: grid}
 }
 
 func (r sheetResponse) sheetData() *SheetData {
@@ -222,6 +227,7 @@ type BasicFilter struct {
 // Request is one Sheets batchUpdate request.
 type Request struct {
 	AddSheet                  *AddSheetRequest                  `json:"addSheet,omitempty"`
+	DeleteSheet               *DeleteSheetRequest               `json:"deleteSheet,omitempty"`
 	UpdateSheetProperties     *UpdateSheetPropertiesRequest     `json:"updateSheetProperties,omitempty"`
 	UpdateCells               *UpdateCellsRequest               `json:"updateCells,omitempty"`
 	PasteData                 *PasteDataRequest                 `json:"pasteData,omitempty"`
@@ -235,6 +241,11 @@ type Request struct {
 // AddSheetRequest adds a sheet.
 type AddSheetRequest struct {
 	Properties SheetProperties `json:"properties"`
+}
+
+// DeleteSheetRequest deletes a sheet.
+type DeleteSheetRequest struct {
+	SheetID int64 `json:"sheetId"`
 }
 
 // UpdateSheetPropertiesRequest updates sheet properties.

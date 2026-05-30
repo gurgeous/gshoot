@@ -6,6 +6,7 @@ import cenv "github.com/caarlos0/env/v11"
 // Charm also looks at many env vars, like NO_COLOR, TERM, etc. Those are not listed here.
 type Config struct {
 	Theme string `env:"GSHOOT_THEME"` // force light or dark UI theme
+	Smoke bool   `env:"GSHOOT_SMOKE"` // use deterministic smoke-test behavior
 
 	// these are for messing around with the movie player
 	GMVFPS           float64 `env:"GSHOOT_GMV_FPS"`            // override movie playback FPS
