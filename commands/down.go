@@ -24,7 +24,7 @@ func (c *DownCmd) Run() error {
 	ctx := context.Background()
 	dots := ux.StartDots(os.Stderr, "connecting to Google Sheets...")
 
-	client, err := google.NewClient(ctx, google.ReadOnlyScopes())
+	client, err := google.NewClient(ctx)
 	if err != nil {
 		return err
 	}

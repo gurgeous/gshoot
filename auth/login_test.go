@@ -1,128 +1,20 @@
 package auth
 
 import (
-	"bytes"
-	"context"
-	"encoding/json"
-	"errors"
+	"io"
 	"net/http"
-	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/adrg/xdg"
 	"github.com/gurgeous/gshoot/util"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/oauth2"
 )
 
 // auth/login_test.go covers the browser login flow and login-specific helpers.
-
-// TestLoginMissingClientSecretGuidance checks the setup hint when no client JSON exists.
-func TestLoginMissingClientSecretGuidance(t *testing.T) {
-	client := withAuthHome(t)
-
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	err := client.Login(context.Background(), LoginOptions{
-		Stdout: &stdout,
-		Stderr: &stderr,
-	})
-
-	assert.Error(t, err)
-	if err != nil {
-		assert.Contains(t, err.Error(), "oauth-client.json")
-		assert.Contains(t, err.Error(), "Desktop app")
-		assert.Contains(t, err.Error(), "Test users")
-		assert.Contains(t, err.Error(), "gshoot auth login --client-secret")
-	}
-}
-
-// TestLoginImportsClientAndSavesToken checks the happy-path browser login flow.
-func TestLoginImportsClientAndSavesToken(t *testing.T) {
-	client := withAuthHome(t)
-
-	var tokenEndpointHit bool
-	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		tokenEndpointHit = true
-		assert.NoError(t, r.ParseForm())
-		assert.Equal(t, "test-code", r.Form.Get("code"))
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"access_token":  "access",
-			"refresh_token": "refresh",
-			"token_type":    "Bearer",
-			"expires_in":    3600,
-		})
-	}))
-	defer tokenServer.Close()
-
-	clientSecretPath := filepath.Join(t.TempDir(), "client_secret.json")
-	assert.NoError(t, os.WriteFile(clientSecretPath, []byte(`{"installed":{"client_id":"cid","client_secret":"secret","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"`+tokenServer.URL+`","redirect_uris":["http://127.0.0.1/oauth2/callback"]}}`), 0o600))
-	assert.NoError(t, client.ImportOClient(clientSecretPath))
-
-	authURLCh := stubOpenBrowser(t)
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	errCh := make(chan error, 1)
-	go func() {
-		errCh <- client.Login(context.Background(), LoginOptions{
-			Stdout: &stdout,
-			Stderr: &stderr,
-		})
-	}()
-
-	sendOAuthCallback(t, <-authURLCh, "test-code")
-	err := <-errCh
-	assert.NoError(t, err)
-	assert.True(t, tokenEndpointHit)
-	assert.Contains(t, stdout.String(), "Login complete")
-	assert.Empty(t, stderr.String())
-
-	clientData, readErr := os.ReadFile(client.ClientPath())
-	assert.NoError(t, readErr)
-	assert.Contains(t, string(clientData), `"client_id":"cid"`)
-
-	token, loadErr := client.LoadOAuthToken()
-	assert.NoError(t, loadErr)
-	assert.Equal(t, "access", token.AccessToken)
-	assert.Equal(t, "refresh", token.RefreshToken)
-}
-
-// TestLoginFlowErrorAddsGoogleGuidance checks the friendly OAuth failure hints.
-func TestLoginFlowErrorAddsGoogleGuidance(t *testing.T) {
-	client := withAuthHome(t)
-
-	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		_, _ = w.Write([]byte(`{"error":"access_denied","error_description":"Access blocked"}`))
-	}))
-	defer tokenServer.Close()
-
-	writeClient(t, `{"installed":{"client_id":"cid","client_secret":"secret","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"`+tokenServer.URL+`","redirect_uris":["http://127.0.0.1/oauth2/callback"]}}`)
-	authURLCh := stubOpenBrowser(t)
-
-	errCh := make(chan error, 1)
-	go func() {
-		errCh <- client.Login(context.Background(), LoginOptions{
-			Stdout: new(bytes.Buffer),
-			Stderr: new(bytes.Buffer),
-		})
-	}()
-
-	sendOAuthCallback(t, <-authURLCh, "denied-code")
-	err := <-errCh
-	assert.Error(t, err)
-	if err != nil {
-		assert.Contains(t, err.Error(), "Access blocked")
-		assert.Contains(t, err.Error(), "Test users")
-		assert.Contains(t, err.Error(), "OAuth consent screen")
-	}
-	assert.False(t, util.FileExists(client.TokenPath()))
-}
 
 // TestLoginRejectsNonOClientSecret rejects non-browser client JSON files.
 func TestLoginRejectsNonOClientSecret(t *testing.T) {
@@ -131,17 +23,17 @@ func TestLoginRejectsNonOClientSecret(t *testing.T) {
 	clientSecretPath := filepath.Join(t.TempDir(), "service-account.json")
 	assert.NoError(t, os.WriteFile(clientSecretPath, []byte(`{"type":"service_account","client_email":"robot@example.com","private_key":"abc"}`), 0o600))
 
-	err := client.ImportOClient(clientSecretPath)
+	err := client.SaveOClient(clientSecretPath)
 
 	assert.Error(t, err)
 	if err != nil {
-		assert.Contains(t, err.Error(), "unsupported credential file")
+		assert.Contains(t, err.Error(), "missing `installed:`")
 	}
 }
 
 // TestSelectLoopbackRedirect picks the first supported localhost redirect.
 func TestSelectLoopbackRedirect(t *testing.T) {
-	redirect, err := selectLoopbackRedirect([]string{
+	redirect, err := findLocalhostRedirect([]string{
 		"https://example.com/callback",
 		"http://127.0.0.1/oauth2/callback",
 	})
@@ -154,32 +46,8 @@ func TestSelectLoopbackRedirect(t *testing.T) {
 
 // TestSelectLoopbackRedirectMissing rejects configs without a loopback redirect.
 func TestSelectLoopbackRedirectMissing(t *testing.T) {
-	_, err := selectLoopbackRedirect([]string{"https://example.com/callback"})
+	_, err := findLocalhostRedirect([]string{"https://example.com/callback"})
 	assert.Error(t, err)
-}
-
-// TestFriendlyLoginErrorInvalidClient adds the invalid-client recovery hint.
-func TestFriendlyLoginErrorInvalidClient(t *testing.T) {
-	base := errors.New("invalid_client")
-	err := friendlyLoginError(base)
-
-	assert.ErrorIs(t, err, base)
-	assert.Contains(t, err.Error(), "re-download")
-}
-
-// TestOAuthConfigForLoginDefaultsToGoogleEndpoints keeps Google's default endpoints.
-func TestOAuthConfigForLoginDefaultsToGoogleEndpoints(t *testing.T) {
-	config, err := oauthConfigForLogin(&OClient{
-		ClientID:     "cid",
-		ClientSecret: "secret",
-		RedirectURIs: []string{"http://127.0.0.1/oauth2/callback"},
-	})
-
-	assert.NoError(t, err)
-	if err == nil {
-		assert.Equal(t, "https://accounts.google.com/o/oauth2/auth", config.Endpoint.AuthURL)
-		assert.Equal(t, "https://oauth2.googleapis.com/token", config.Endpoint.TokenURL)
-	}
 }
 
 // stubOpenBrowser captures the OAuth URL instead of opening a real browser.
@@ -188,14 +56,49 @@ func stubOpenBrowser(t *testing.T) <-chan string {
 
 	authURLCh := make(chan string, 1)
 	orig := openBrowser
-	openBrowser = func(rawURL string) error {
+	openBrowser = func(rawURL string) {
 		authURLCh <- rawURL
-		return nil
 	}
 	t.Cleanup(func() {
 		openBrowser = orig
 	})
 	return authURLCh
+}
+
+// captureProcessIO redirects stdout/stderr for auth tests.
+func captureProcessIO(t *testing.T) func() (string, string) {
+	t.Helper()
+
+	stdoutPath := filepath.Join(t.TempDir(), "stdout")
+	stderrPath := filepath.Join(t.TempDir(), "stderr")
+	stdoutFile, err := os.Create(stdoutPath)
+	assert.NoError(t, err)
+	stderrFile, err := os.Create(stderrPath)
+	assert.NoError(t, err)
+
+	origStdout, origStderr := os.Stdout, os.Stderr
+	os.Stdout, os.Stderr = stdoutFile, stderrFile
+	t.Cleanup(func() {
+		os.Stdout, os.Stderr = origStdout, origStderr
+		assert.NoError(t, stdoutFile.Close())
+		assert.NoError(t, stderrFile.Close())
+	})
+
+	return func() (string, string) {
+		t.Helper()
+
+		assert.NoError(t, stdoutFile.Sync())
+		assert.NoError(t, stderrFile.Sync())
+		_, err := stdoutFile.Seek(0, 0)
+		assert.NoError(t, err)
+		_, err = stderrFile.Seek(0, 0)
+		assert.NoError(t, err)
+		stdout, err := io.ReadAll(stdoutFile)
+		assert.NoError(t, err)
+		stderr, err := io.ReadAll(stderrFile)
+		assert.NoError(t, err)
+		return string(stdout), string(stderr)
+	}
 }
 
 // sendOAuthCallback delivers an auth code to the temporary loopback server.
@@ -241,30 +144,32 @@ func withAuthHome(t *testing.T) *Manager {
 	t.Helper()
 
 	home := t.TempDir()
-	t.Cleanup(xdg.Reload)
 	t.Setenv("HOME", home)
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
-	xdg.Reload()
-	return NewManager()
+	manager, err := NewManager()
+	assert.NoError(t, err)
+	return manager
 }
 
 // writeClient saves a test OAuth client file in the current auth config dir.
 func writeClient(t *testing.T, body string) {
 	t.Helper()
 
-	assert.NoError(t, util.WritePrivateFile(NewManager().ClientPath(), []byte(body)))
+	path := filepath.Join(util.ConfigDir(), "oauth-client.json")
+	assert.NoError(t, util.WritePrivateFile(path, []byte(body)))
 }
 
 // writeAuthToken saves a test OAuth token file in the current auth config dir.
-func writeAuthToken(t *testing.T, token OAuthToken) {
+func writeAuthToken(t *testing.T, token oauth2.Token) {
 	t.Helper()
 
-	assert.NoError(t, NewManager().SaveOAuthToken(token))
+	manager, err := NewManager()
+	assert.NoError(t, err)
+	assert.NoError(t, manager.SaveOAuthToken(&token))
 }
 
 // futureToken returns a valid cached token for auth tests.
-func futureToken() OAuthToken {
-	return OAuthToken{
+func futureToken() oauth2.Token {
+	return oauth2.Token{
 		AccessToken:  "access",
 		RefreshToken: "refresh",
 		TokenType:    "Bearer",

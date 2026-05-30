@@ -1,6 +1,9 @@
 default:
   just --list
 
+auth-watch:
+  GSHOOT_THEME=1 watchexec -q --clear=reset "just build && clear && gshoot auth status"
+
 build:
   go build -o bin/gshoot
   just banner "✓ build ✓"

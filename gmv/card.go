@@ -35,15 +35,6 @@ func newCard(text string) card {
 	return card
 }
 
-// pixelAt returns a card pixel at local terminal coordinates.
-func (c card) pixelAt(p point) (tpixel, bool) {
-	if !c.image.contains(p) {
-		return tpixel{}, false
-	}
-	px := c.image.at(p)
-	return px, px.Ch != ""
-}
-
 //
 // helpers
 //
@@ -81,15 +72,8 @@ func (c card) parseLine(row int, line string) {
 
 // sgrStyle is the effective foreground text style at one point in a card line.
 type sgrStyle struct {
-	intensity      string
-	italic         string
-	underline      string
-	blink          string
-	reverse        string
-	conceal        string
-	strike         string
-	foreground     string
-	underlineColor string
+	intensity  string
+	foreground string
 }
 
 // apply updates the effective style from one SGR parameter list.
@@ -108,30 +92,6 @@ func (style *sgrStyle) apply(params xansi.Params) {
 			style.intensity = strconv.Itoa(attr)
 		case attr == 22:
 			style.intensity = ""
-		case attr == 3:
-			style.italic = "3"
-		case attr == 23:
-			style.italic = ""
-		case attr == 4 || attr == 21:
-			style.underline = strconv.Itoa(attr)
-		case attr == 24:
-			style.underline = ""
-		case attr == 5 || attr == 6:
-			style.blink = strconv.Itoa(attr)
-		case attr == 25:
-			style.blink = ""
-		case attr == 7:
-			style.reverse = "7"
-		case attr == 27:
-			style.reverse = ""
-		case attr == 8:
-			style.conceal = "8"
-		case attr == 28:
-			style.conceal = ""
-		case attr == 9:
-			style.strike = "9"
-		case attr == 29:
-			style.strike = ""
 		case (attr >= 30 && attr <= 37) || (attr >= 90 && attr <= 97):
 			style.foreground = strconv.Itoa(attr)
 		case attr == 38:
@@ -140,10 +100,6 @@ func (style *sgrStyle) apply(params xansi.Params) {
 			style.foreground = ""
 		case attr == 48:
 			_, ii = sgrExtended(params, ii, attr)
-		case attr == 58:
-			style.underlineColor, ii = sgrExtended(params, ii, attr)
-		case attr == 59:
-			style.underlineColor = ""
 		}
 	}
 }
@@ -157,14 +113,7 @@ func (style *sgrStyle) reset() {
 func (style sgrStyle) String() string {
 	parts := []string{
 		style.intensity,
-		style.italic,
-		style.underline,
-		style.blink,
-		style.reverse,
-		style.conceal,
-		style.strike,
 		style.foreground,
-		style.underlineColor,
 	}
 
 	var out strings.Builder

@@ -16,7 +16,7 @@ type ListCmd struct{}
 func (c *ListCmd) Run() error {
 	ctx := context.Background()
 	dots := ux.StartDots(os.Stderr, "connecting to Google Sheets...")
-	client, err := google.NewClient(ctx, google.ReadOnlyScopes())
+	client, err := google.NewClient(ctx)
 	if err != nil {
 		return err
 	}
@@ -32,9 +32,9 @@ func (c *ListCmd) Run() error {
 	// print
 	for i, file := range files {
 		const width = 30
-		num := ux.Dim.Render(fmt.Sprintf("%2d.", i+1))
+		num := ux.Muted.Render(fmt.Sprintf("%2d.", i+1))
 		name := fmt.Sprintf("%-"+strconv.Itoa(width)+"s", util.Truncate(file.Name, width))
-		date := ux.Dim.Render(util.DateAndTimeStr(file.ModifiedByMeTime))
+		date := ux.Muted.Render(util.DateAndTimeStr(file.ModifiedByMeTime))
 		fmt.Printf(
 			" %s %s     %s\n",
 			num,

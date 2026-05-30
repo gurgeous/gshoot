@@ -3,55 +3,80 @@ package commands
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/gurgeous/gshoot/auth"
 	"github.com/gurgeous/gshoot/ux"
 )
 
-// commands/auth.go wires the auth subcommands to Manager methods.
+//
+// commands
+//
 
-// AuthCmd groups the auth-related subcommands.
-type AuthCmd struct {
-	Login  AuthLoginCmd  `cmd:"" help:"Run browser OAuth login."`
-	Logout AuthLogoutCmd `cmd:"" help:"Clear the cached OAuth token."`
-	Status AuthStatusCmd `cmd:"" help:"Show auth status."`
-}
-
-// AuthLoginCmd runs interactive browser login.
-type AuthLoginCmd struct {
-	ClientSecretPath string `name:"client-secret" type:"path" help:"Path to a Google Desktop app OAuth client JSON."`
-}
-
-// Run executes the auth login command.
-func (c *AuthLoginCmd) Run() error {
-	client := auth.NewManager()
-	if c.ClientSecretPath != "" {
-		if err := client.ImportOClient(c.ClientSecretPath); err != nil {
-			return err
-		}
-		fmt.Println(ux.Success.Render("Imported client config to " + client.ClientPath()))
+type (
+	AuthCmd struct {
+		Login  AuthLoginCmd  `cmd:"" help:"Login via OAuth. (start here!)"`
+		Logout AuthLogoutCmd `cmd:"" help:"Logout of OAuth."`
+		Status AuthStatusCmd `cmd:"" help:"Show auth status."`
 	}
 
-	return client.Login(context.Background(), auth.LoginOptions{
-		Stdout: os.Stdout,
-		Stderr: os.Stderr,
-	})
+	// subcommands
+	AuthLoginCmd struct {
+		ClientSecretPath string `name:"client-secret" type:"path" help:"Path to a Google Desktop app OAuth client JSON."`
+	}
+	AuthLogoutCmd struct{}
+	AuthStatusCmd struct{}
+)
+
+//
+// login
+//
+
+func (c *AuthLoginCmd) Run() error {
+	manager, err := auth.NewManager()
+	if err != nil {
+		return err
+	}
+
+	// --client-secret
+	if c.ClientSecretPath != "" {
+		if err = manager.SaveOClient(c.ClientSecretPath); err != nil {
+			return err
+		}
+		fmt.Println(ux.Success.Render("gshoot: copied to " + manager.ClientPath))
+		fmt.Println()
+	}
+
+	// can't proceed with login without client secrets
+	if !manager.HasClientSecrets() {
+		manager.ShowStatus()
+		return nil
+	}
+
+	return manager.Login(context.Background())
 }
 
-// AuthLogoutCmd clears the saved OAuth token.
-type AuthLogoutCmd struct{}
+//
+// logout
+//
 
-// Run executes the auth logout command.
 func (c *AuthLogoutCmd) Run() error {
-	auth.NewManager().Logout()
+	client, err := auth.NewManager()
+	if err != nil {
+		return err
+	}
+	client.Logout()
 	return nil
 }
 
-// AuthStatusCmd prints the current auth status.
-type AuthStatusCmd struct{}
+//
+// status
+//
 
-// Run executes the auth status command.
 func (c *AuthStatusCmd) Run() error {
-	return auth.NewManager().Status(os.Stdout)
+	manager, err := auth.NewManager()
+	if err != nil {
+		return err
+	}
+	manager.ShowStatus()
+	return nil
 }

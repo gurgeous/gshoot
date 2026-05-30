@@ -1,19 +1,19 @@
 package commands
 
 import (
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/adrg/xdg"
+	"github.com/gurgeous/gshoot/auth"
 	"github.com/gurgeous/gshoot/util"
+	"github.com/stretchr/testify/assert"
+	"golang.org/x/oauth2"
 )
 
 //
@@ -82,25 +82,25 @@ func testCommandWithSetup(t *testing.T, cmd runnable, handler http.HandlerFunc, 
 	t.Helper()
 
 	// use temp dir and temp files for stdout/stderr
-	origDir, _ := os.Getwd()
+	origDir, err := os.Getwd()
+	assert.NoError(t, err)
 	tmp := t.TempDir()
-	os.Chdir(tmp)
-	t.Cleanup(func() { os.Chdir(origDir) })
+	assert.NoError(t, os.Chdir(tmp))
+	t.Cleanup(func() { assert.NoError(t, os.Chdir(origDir)) })
 
 	// stub stdout/stderr
 	origStdout, origStderr := os.Stdout, os.Stderr
-	stdoutFile, _ := os.Create("test-stdout")
-	stderrFile, _ := os.Create("test-stderr")
+	stdoutFile, err := os.Create("test-stdout")
+	assert.NoError(t, err)
+	stderrFile, err := os.Create("test-stderr")
+	assert.NoError(t, err)
 	os.Stdout, os.Stderr = stdoutFile, stderrFile
 	t.Cleanup(func() { os.Stdout, os.Stderr = origStdout, origStderr })
 	t.Cleanup(func() { stdoutFile.Close() })
 	t.Cleanup(func() { stderrFile.Close() })
 
 	// fake browser auth under HOME
-	t.Cleanup(xdg.Reload)
 	t.Setenv("HOME", tmp)
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
-	xdg.Reload()
 	if len(setup) > 0 && setup[0] != nil {
 		setup[0](tmp)
 	} else {
@@ -140,20 +140,24 @@ func writeAuthFiles(t *testing.T, _ string, opts ...authFilesOptions) {
 		}
 	}
 
-	configDir := util.ConfigDir()
+	manager, err := auth.NewManager()
+	if err != nil {
+		t.Fatalf("load auth manager: %v", err)
+	}
 	if cfg.HasClient {
-		clientJSON := `{"installed":{"client_id":"cid","client_secret":"secret","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","redirect_uris":["http://127.0.0.1/oauth2/callback"]}}`
-		if err := util.WritePrivateFile(filepath.Join(configDir, "oauth-client.json"), []byte(clientJSON)); err != nil {
+		clientJSON := `{"installed":{"client_id":"cid","client_secret":"secret","redirect_uris":["http://127.0.0.1/oauth2/callback"]}}`
+		if err := util.WritePrivateFile(manager.ClientPath, []byte(clientJSON)); err != nil {
 			t.Fatalf("write oauth-client.json: %v", err)
 		}
 	}
 	if cfg.HasToken {
-		tokenJSON := fmt.Sprintf(
-			`{"access_token":"token","refresh_token":"refresh","token_type":"Bearer","expiry":"%s"}`,
-			cfg.Expiry.UTC().Format(time.RFC3339),
-		)
-		if err := util.WritePrivateFile(filepath.Join(configDir, "oauth-token.json"), []byte(tokenJSON)); err != nil {
-			t.Fatalf("write oauth-token.json: %v", err)
+		if err := manager.SaveOAuthToken(&oauth2.Token{
+			AccessToken:  "token",
+			RefreshToken: "refresh",
+			TokenType:    "Bearer",
+			Expiry:       cfg.Expiry,
+		}); err != nil {
+			t.Fatalf("write oauth token: %v", err)
 		}
 	}
 }

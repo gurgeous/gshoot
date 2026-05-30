@@ -39,7 +39,7 @@ func (c *UpCmd) Run() error {
 	ctx := context.Background()
 	dots := ux.StartDots(os.Stderr, "connecting to Google Sheets...")
 
-	client, err := google.NewClient(ctx, google.ReadWriteScopes())
+	client, err := google.NewClient(ctx)
 	if err != nil {
 		return err
 	}
@@ -56,9 +56,9 @@ func (c *UpCmd) Run() error {
 
 	dots.Stop()
 	url := util.SpreadsheetURL(runner.file.ID) + "/edit"
-	fmt.Fprintln(os.Stdout, url)
+	fmt.Println(url)
 	if c.Open {
-		return util.OpenBrowserURL(url)
+		util.OpenBrowserURL(url)
 	}
 	return nil
 }

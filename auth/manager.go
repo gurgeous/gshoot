@@ -4,191 +4,197 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
+	"net/url"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/gurgeous/gshoot/util"
-	"github.com/gurgeous/gshoot/ux"
+	"golang.org/x/oauth2"
 )
 
-// auth/manager.go owns on-disk browser auth state and status reporting.
+var (
+	AuthReadmeURL = "https://github.com/gurgeous/gshoot#authentication"
+	Scopes        = []string{
+		"https://www.googleapis.com/auth/drive",
+		"https://www.googleapis.com/auth/spreadsheets",
+	}
+)
 
-// Manager manages browser auth files under one config directory.
+//
+// OClient is an installed OAuth client config from google client secrets
+//
+
+type OClient struct {
+	ClientID          string   `json:"client_id"`     // Google OAuth client id
+	ClientSecret      string   `json:"client_secret"` // Google OAuth client secret
+	RedirectURIs      []string `json:"redirect_uris"` // redirect URIs from the client JSON
+	LocalhostRedirect *url.URL `json:"-"`             // validated localhost redirect selected at load time
+}
+
+//
+// Manager manages auth flow
+//
+
 type Manager struct {
-	ConfigDir string
+	ClientPath string // saved OAuth client JSON path
+	TokenPath  string // saved OAuth token JSON path
+
+	// internal
+	client *OClient
+	token  *oauth2.Token
 }
 
 // NewManager builds an auth manager for the default config directory.
-func NewManager() *Manager {
-	return &Manager{ConfigDir: util.ConfigDir()}
+func NewManager() (*Manager, error) {
+	dir := util.ConfigDir()
+	m := &Manager{
+		ClientPath: filepath.Join(dir, "oauth-client.json"),
+		TokenPath:  filepath.Join(dir, "oauth-token.json"),
+	}
+
+	// load client/token. there are uncommon edge cases where the files exist but
+	// are invalid for some reasonm, so handle errors carefully
+	var err error
+	m.client, err = loadOClient(m.ClientPath)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+	m.token, err = loadOAuthToken(m.TokenPath)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+
+	return m, nil
+}
+
+// does this manager have client secrets already?
+func (m *Manager) HasClientSecrets() bool {
+	return m.client != nil
+}
+
+func (m *Manager) LoggedIn() bool {
+	return m.client != nil && m.token != nil
 }
 
 //
-// paths
+// save
 //
 
-// ClientPath returns the oauth-client.json path.
-func (m *Manager) ClientPath() string {
-	return filepath.Join(m.ConfigDir, "oauth-client.json")
+func (m *Manager) SaveOClient(srcPath string) error {
+	var err error
+
+	var data []byte
+	if data, err = os.ReadFile(srcPath); err != nil {
+		return err
+	}
+	client, err := loadOClient(srcPath)
+	if err != nil {
+		return err
+	}
+	if err := util.WritePrivateFile(m.ClientPath, data); err != nil {
+		return err
+	}
+	m.client = client
+
+	return nil
 }
 
-// TokenPath returns the oauth-token.json path.
-func (m *Manager) TokenPath() string {
-	return filepath.Join(m.ConfigDir, "oauth-token.json")
-}
-
-//
-// load from disk
-//
-
-// OClient is an installed/web OAuth client config.
-type OClient struct {
-	ClientID     string   `json:"client_id"`
-	ClientSecret string   `json:"client_secret"`
-	AuthURI      string   `json:"auth_uri"`
-	TokenURI     string   `json:"token_uri"`
-	RedirectURIs []string `json:"redirect_uris"`
-}
-
-// OAuthToken is cached OAuth token state.
-type OAuthToken struct {
-	AccessToken  string    `json:"access_token"`
-	RefreshToken string    `json:"refresh_token"`
-	TokenType    string    `json:"token_type"`
-	Expiry       time.Time `json:"expiry"`
-}
-
-// LoadOClient reads the saved OAuth client config.
-func (m *Manager) LoadOClient() (*OClient, error) {
-	return loadOClient(m.ClientPath())
-}
-
-// LoadOAuthToken reads the saved OAuth token.
-func (m *Manager) LoadOAuthToken() (OAuthToken, error) {
-	return loadOAuthToken(m.TokenPath())
-}
-
-//
-// save to disk
-//
-
-// SaveOAuthToken writes the saved OAuth token.
-func (m *Manager) SaveOAuthToken(token OAuthToken) error {
+func (m *Manager) SaveOAuthToken(token *oauth2.Token) error {
 	data, err := json.MarshalIndent(token, "", "  ")
 	if err != nil {
-		return fmt.Errorf("marshal oauth token: %w", err)
+		return err
 	}
-	if err := util.WritePrivateFile(m.TokenPath(), append(data, '\n')); err != nil {
-		return fmt.Errorf("save oauth token: %w", err)
+	if _, err := parseOAuthToken(data); err != nil {
+		return err
 	}
+	if err := util.WritePrivateFile(m.TokenPath, append(data, '\n')); err != nil {
+		return err
+	}
+	m.token = token
 	return nil
-}
-
-// ImportOClient validates and saves a downloaded client JSON file.
-func (m *Manager) ImportOClient(srcPath string) error {
-	data, err := os.ReadFile(srcPath)
-	if err != nil {
-		return fmt.Errorf("read client secret file: %w", err)
-	}
-	_, err = loadOClient(srcPath)
-	if err != nil {
-		return fmt.Errorf("load client secret file: %w", err)
-	}
-	if err := util.WritePrivateFile(m.ClientPath(), data); err != nil {
-		return fmt.Errorf("save oauth client config: %w", err)
-	}
-	return nil
-}
-
-//
-// logout (delete token)
-//
-
-// Logout clears the cached OAuth token while keeping the client config.
-func (m *Manager) Logout() {
-	os.Remove(m.TokenPath())
-}
-
-//
-// dump status to writer
-//
-
-// Status writes a short auth status summary.
-func (m *Manager) Status(w io.Writer) error {
-	hasOClient := util.FileExists(m.ClientPath())
-	hasCachedToken := util.FileExists(m.TokenPath())
-	loggedIn := false
-	if hasCachedToken {
-		token, err := m.LoadOAuthToken()
-		loggedIn = err == nil && token.AccessToken != "" && (token.Expiry.IsZero() || token.Expiry.After(time.Now()))
-	}
-
-	fmt.Fprintln(w, ux.Subtle.Render("Config dir: "+m.ConfigDir))
-	fmt.Fprintln(w, ux.Subtle.Render("OAuth client: "+presentLine(hasOClient, m.ClientPath())))
-	fmt.Fprintln(w, ux.Subtle.Render("Cached token: "+presentLine(hasCachedToken, m.TokenPath())))
-
-	switch {
-	case loggedIn:
-		fmt.Fprintln(w, ux.Success.Render("Status: logged in"))
-	case hasOClient || hasCachedToken:
-		fmt.Fprintln(w, ux.Warn.Render("Status: not logged in yet"))
-		fmt.Fprintln(w, ux.Info.Render("Next step: run `gshoot auth login`"))
-	default:
-		fmt.Fprintln(w, ux.Warn.Render("Status: no auth configured"))
-		fmt.Fprintln(w, ux.Info.Render("Next step: run `gshoot auth login --client-secret /path/to/client_secret.json`"))
-	}
-
-	return nil
-}
-
-// presentLine formats one status line for an auth file path.
-func presentLine(ok bool, path string) string {
-	if ok {
-		return "present (" + path + ")"
-	}
-	return "missing (" + path + ")"
 }
 
 //
 // low-level helpers for parsing our files
 //
 
-// loadOClient parses an installed/web OAuth client file from disk.
 func loadOClient(path string) (*OClient, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	var raw struct {
-		Installed *OClient `json:"installed"`
-		Web       *OClient `json:"web"`
+	client, err := parseOClient(data)
+	if err != nil {
+		return nil, fmt.Errorf("open %s: %w", path, err)
 	}
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return nil, err
-	}
-
-	switch {
-	case raw.Installed != nil:
-		return raw.Installed, nil
-	case raw.Web != nil:
-		return raw.Web, nil
-	default:
-		return nil, errors.New("unsupported credential file")
-	}
+	return client, nil
 }
 
-// loadOAuthToken parses a cached OAuth token file from disk.
-func loadOAuthToken(path string) (OAuthToken, error) {
+func loadOAuthToken(path string) (*oauth2.Token, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return OAuthToken{}, err
+		return nil, err
 	}
-
-	var token OAuthToken
-	if err := json.Unmarshal(data, &token); err != nil {
-		return OAuthToken{}, err
+	token, err := parseOAuthToken(data)
+	if err != nil {
+		return nil, fmt.Errorf("open %s: %w", path, err)
 	}
 	return token, nil
+}
+
+func parseOClient(data []byte) (*OClient, error) {
+	var raw struct {
+		Installed *OClient `json:"installed"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return nil, errors.New("not JSON") // uncommmon
+	}
+
+	// maybe they set it up as Web by mistake?
+	client := raw.Installed
+	if client == nil {
+		return nil, errors.New("missing `installed:`") // common?
+	}
+
+	redirect, err := findLocalhostRedirect(client.RedirectURIs)
+	if err != nil {
+		return nil, errors.New("no localhost/127.0.01 redirect") // uncommon
+	}
+	client.LocalhostRedirect = redirect
+
+	return client, nil
+}
+
+func parseOAuthToken(data []byte) (*oauth2.Token, error) {
+	var token oauth2.Token
+	if err := json.Unmarshal(data, &token); err != nil {
+		return nil, errors.New("not JSON") // uncommon
+	}
+	if token.AccessToken == "" {
+		return nil, errors.New("missing `access_token`") // uncommon
+	}
+	if token.RefreshToken == "" {
+		return nil, errors.New("missing `refresh_token`") // uncommon
+	}
+	if token.Expiry.IsZero() {
+		return nil, errors.New("missing `expiry`") // uncommon
+	}
+	return &token, nil
+}
+
+// findLocalhostRedirect picks the first localhost redirect URI from the client config.
+func findLocalhostRedirect(redirectURIs []string) (*url.URL, error) {
+	for _, raw := range redirectURIs {
+		u, err := url.Parse(raw)
+		if err != nil {
+			return nil, err
+		}
+		if u.Hostname() == "localhost" || u.Hostname() == "127.0.0.1" {
+			if u.Path == "" {
+				u.Path = "/"
+			}
+			return u, nil
+		}
+	}
+	return nil, errors.New("client secrets json needs a localhost or 127.0.0.1 redirect URI")
 }

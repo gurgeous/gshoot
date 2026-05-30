@@ -11,26 +11,7 @@ import (
 	"strings"
 
 	"github.com/gurgeous/gshoot/auth"
-	"golang.org/x/oauth2"
 )
-
-//
-// scopes
-//
-
-func ReadOnlyScopes() []string {
-	return []string{
-		"https://www.googleapis.com/auth/drive.readonly",
-		"https://www.googleapis.com/auth/spreadsheets.readonly",
-	}
-}
-
-func ReadWriteScopes() []string {
-	return []string{
-		"https://www.googleapis.com/auth/drive",
-		"https://www.googleapis.com/auth/spreadsheets",
-	}
-}
 
 const spreadsheetMimeType = "application/vnd.google-apps.spreadsheet"
 
@@ -49,15 +30,19 @@ type Client struct {
 	sheetsBaseURL string
 }
 
-// NewClient creates a Google API client with auth for the requested scopes.
-func NewClient(ctx context.Context, scopes []string) (*Client, error) {
-	tokenSource, err := auth.NewManager().TokenSource(ctx, scopes)
+// NewClient creates a Google API client with saved auth.
+func NewClient(ctx context.Context) (*Client, error) {
+	manager, err := auth.NewManager()
+	if err != nil {
+		return nil, err
+	}
+	httpClient, err := manager.HTTPClient(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Client{
-		httpClient:    oauth2.NewClient(ctx, tokenSource),
+		httpClient:    httpClient,
 		driveBaseURL:  driveBaseURL,
 		sheetsBaseURL: sheetsBaseURL,
 	}, nil

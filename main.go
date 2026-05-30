@@ -2,15 +2,18 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"runtime/debug"
+	"strings"
 
 	"github.com/alecthomas/kong"
+	"github.com/gurgeous/gshoot/auth"
 	"github.com/gurgeous/gshoot/commands"
 	"github.com/gurgeous/gshoot/gmv"
+	"github.com/gurgeous/gshoot/util"
 	"github.com/gurgeous/gshoot/ux"
-	// "github.com/k0kubun/pp/v3"
 )
 
 var (
@@ -21,17 +24,9 @@ var (
 type CLI struct {
 	Version kong.VersionFlag `short:"v" help:"Print the version number"`
 	Auth    commands.AuthCmd `cmd:"" help:"Login or logout from Google Sheets."`
-	Demo    demoCmd          `cmd:"" help:"Play the first-run GMV demo."`
 	List    commands.ListCmd `cmd:"" help:"List your Google Sheets."`
 	Down    commands.DownCmd `cmd:"" help:"Download a Google Sheet as CSV."`
 	Up      commands.UpCmd   `cmd:"" help:"Upload a CSV to Google Sheets."`
-}
-
-type demoCmd struct{}
-
-// Run plays the first-run GMV demo.
-func (c *demoCmd) Run() error {
-	return gmv.Demo(context.Background())
 }
 
 func main() {
@@ -58,29 +53,95 @@ func main() {
 	ux.Init()
 
 	//
+	// show welcome?
+	//
+
+	args := os.Args[1:]
+	isFirstRun := !util.FileExists(util.ConfigDir())
+	isNaked := len(args) == 0
+	isWelcome := len(args) == 1 && args[0] == "welcome"
+
+	if (isFirstRun && isNaked) || isWelcome {
+		// show movie, then auth status
+		_ = gmv.Demo(context.Background())
+		mustNewManager().ShowStatus()
+		return
+	}
+
+	// fake --help when naked
+	if isNaked {
+		args = append(args, "--help")
+	}
+
+	//
 	// Kong (note that kong handles --help and --version internally)
 	//
 
-	// hack - no args becomes --help
-	if len(os.Args) < 2 {
-		os.Args = append(os.Args, "--help")
-	}
-
-	cli := &CLI{}
-	ctx := kong.Parse(
-		cli,
+	parser := kong.Must(
+		&CLI{},
 		kong.Name("gshoot"),
-		kong.Description(fmt.Sprintf("Magically %s from Google Sheets.", ux.Brand.Render("upload/download CSVs"))),
-		kong.UsageOnError(),
+		kong.Description("Magically upload/download CSVs from Google Sheets."),
+		kong.Help(ux.HelpPrinter),
 		kong.ConfigureHelp(kong.HelpOptions{Compact: true}),
 		kong.Vars{
 			"version":       version,
 			"versionNumber": Version,
 		},
 	)
+	ctx, err := parser.Parse(args)
+	if err != nil {
+		var parseErr *kong.ParseError
+		if errors.As(err, &parseErr) && parseErr.Context != nil {
+			_ = parseErr.Context.PrintUsage(false)
+			fmt.Fprintln(os.Stdout)
+		}
+		fatal(err.Error())
+	}
+
+	//
+	// preflight - all (non-auth) commands require login
+	//
+
+	if !strings.HasPrefix(ctx.Command(), "auth") {
+		manager := mustNewManager()
+		if !manager.LoggedIn() {
+			var msg string
+			if manager.HasClientSecrets() {
+				// botched browser flow
+				msg = "you must complete `gshoot auth login` first"
+			} else {
+				// don't say "gshoot auth login" because of --client-secret
+				msg = "you must authenticate first"
+			}
+			boom(msg)
+			fmt.Fprintln(os.Stderr)
+			manager.ShowStatus()
+			return
+		}
+	}
+
+	//
+	// run
+	//
 
 	if err := ctx.Run(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		fatal(err.Error())
 	}
+}
+
+func mustNewManager() *auth.Manager {
+	manager, err := auth.NewManager()
+	if err != nil {
+		fatal(err.Error())
+	}
+	return manager
+}
+
+func boom(msg string) {
+	fmt.Fprintln(os.Stderr, ux.Fatal.Render(fmt.Sprintf("gshoot: %-64s", msg)))
+}
+
+func fatal(msg string) {
+	boom(msg)
+	os.Exit(1)
 }
