@@ -1,12 +1,7 @@
 package commands
 
 import (
-	"context"
 	"fmt"
-	"os"
-
-	"github.com/gurgeous/gshoot/google"
-	"github.com/gurgeous/gshoot/ux"
 )
 
 // WipeCmd resets a spreadsheet to one blank Sheet1.
@@ -16,26 +11,18 @@ type WipeCmd struct {
 
 // Run wipes the selected spreadsheet, creating it if needed.
 func (c *WipeCmd) Run() error {
-	ctx := context.Background()
-	dots := ux.StartDots(os.Stderr, "connecting to Google Sheets...")
-	defer dots.Stop()
-
-	client, err := google.NewClient(ctx)
+	cmd, err := srunStart(srunOptions{spreadsheet: c.Spreadsheet, create: true})
 	if err != nil {
 		return err
 	}
+	defer cmd.stop()
 
-	dots.SetDescription(fmt.Sprintf("find or create spreadsheet '%s'...", c.Spreadsheet))
-	file, err := client.FindOrCreateSpreadsheetFile(ctx, c.Spreadsheet)
-	if err != nil {
+	cmd.dots.SetDescription("wiping spreadsheet...")
+	if err := cmd.client.WipeSpreadsheet(cmd.ctx, cmd.file.ID); err != nil {
 		return err
 	}
-	dots.SetDescription("wiping spreadsheet...")
-	if err := client.WipeSpreadsheet(ctx, file.ID); err != nil {
-		return err
-	}
-	dots.SetDescription("wiped " + file.Name)
+	cmd.dots.SetDescription("wiped " + cmd.file.Name)
 
-	fmt.Println("wiped " + file.Name)
+	fmt.Println("wiped " + cmd.file.Name)
 	return nil
 }

@@ -1,10 +1,7 @@
 package commands
 
 import (
-	"context"
-	"errors"
 	"fmt"
-	"os"
 
 	"github.com/gurgeous/gshoot/google"
 	"github.com/gurgeous/gshoot/util"
@@ -18,32 +15,10 @@ type PeekCmd struct {
 
 // Run prints one sheet name per line.
 func (c *PeekCmd) Run() error {
-	ctx := context.Background()
-	dots := ux.StartDots(os.Stderr, "connecting to Google Sheets...")
-	defer stopDots(&dots)
-
-	client, err := google.NewClient(ctx)
+	sheets, err := c.run0()
 	if err != nil {
 		return err
 	}
-
-	dots.SetDescription("finding spreadsheet file...")
-	file, err := client.FindSpreadsheetFile(ctx, c.Spreadsheet)
-	if err != nil {
-		return err
-	}
-	if file == nil {
-		return errors.New("could not find spreadsheet file '" + c.Spreadsheet + "'")
-	}
-
-	dots.SetDescription("getting sheet list...")
-	sheets, err := client.GetSheets(ctx, file.ID)
-	if err != nil {
-		return err
-	}
-	dots.SetDescription(fmt.Sprintf("%d sheets in %s", len(sheets), file.Name))
-	stopDots(&dots)
-
 	for ii, sheet := range sheets {
 		rows := ux.Success.Render(util.FormatInt(sheet.GridProperties.RowCount))
 		cols := ux.Success.Render(util.FormatInt(sheet.GridProperties.ColumnCount))
@@ -53,10 +28,18 @@ func (c *PeekCmd) Run() error {
 	return nil
 }
 
-func stopDots(dots **ux.Dots) {
-	if *dots == nil {
-		return
+func (c *PeekCmd) run0() ([]*google.Sheet, error) {
+	cmd, err := srunStart(srunOptions{spreadsheet: c.Spreadsheet})
+	if err != nil {
+		return nil, err
 	}
-	(*dots).Stop()
-	*dots = nil
+	defer cmd.stop()
+
+	cmd.dots.SetDescription("getting sheet list...")
+	sheets, err := cmd.client.GetSheets(cmd.ctx, cmd.file.ID)
+	if err != nil {
+		return nil, err
+	}
+	cmd.dots.SetDescription(fmt.Sprintf("%d sheets in %s", len(sheets), cmd.file.Name))
+	return sheets, nil
 }

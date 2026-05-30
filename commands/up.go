@@ -1,14 +1,11 @@
 package commands
 
 import (
-	"context"
 	"errors"
 	"fmt"
-	"os"
 
 	"github.com/gurgeous/gshoot/google"
 	"github.com/gurgeous/gshoot/util"
-	"github.com/gurgeous/gshoot/ux"
 )
 
 // UpCmd uploads a CSV to Google Sheets.
@@ -30,13 +27,6 @@ func (c *UpCmd) Run() error {
 		return errors.New("use either --refill or --replace")
 	}
 
-	//
-	// read csv
-	//
-
-	dots := ux.StartDots(os.Stderr, "reading csv...")
-	defer dots.Stop()
-
 	rows, err := util.CSVRead(c.CSVPath)
 	if err != nil {
 		return err
@@ -46,18 +36,17 @@ func (c *UpCmd) Run() error {
 	// init
 	//
 
-	dots.SetDescription("connecting to Google Sheets...")
-	ctx := context.Background()
-	client, err := google.NewClient(ctx)
+	cmd, err := srunStart(srunOptions{spreadsheet: c.Spreadsheet, create: true})
 	if err != nil {
 		return err
 	}
+	defer cmd.stop()
 
 	//
 	// upload
 	//
 
-	file, err := c.upload(ctx, client, dots, google.Rows(rows))
+	file, err := c.upload(cmd, google.Rows(rows))
 	if err != nil {
 		return err
 	}
@@ -72,25 +61,15 @@ func (c *UpCmd) Run() error {
 }
 
 // upload runs the complete upload workflow.
-func (c *UpCmd) upload(ctx context.Context, client *google.Client, dots *ux.Dots, rows google.Rows) (*google.File, error) {
+func (c *UpCmd) upload(cmd *srun, rows google.Rows) (*google.File, error) {
 	var err error
-
-	//
-	// find/create File
-	//
-
-	dots.SetDescription(fmt.Sprintf("find or create spreadsheet '%s'...", c.Spreadsheet))
-	file, err := client.FindOrCreateSpreadsheetFile(ctx, c.Spreadsheet)
-	if err != nil {
-		return nil, err
-	}
 
 	//
 	// get Spreadsheet for that File
 	//
 
-	dots.SetDescription("fetching spreadsheet metadata...")
-	spreadsheet, err := client.GetSpreadsheet(ctx, file.ID)
+	cmd.dots.SetDescription("fetching spreadsheet metadata...")
+	spreadsheet, err := cmd.client.GetSpreadsheet(cmd.ctx, cmd.file.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -99,8 +78,8 @@ func (c *UpCmd) upload(ctx context.Context, client *google.Client, dots *ux.Dots
 	// find/create target sheet
 	//
 
-	dots.SetDescription(fmt.Sprintf("uploading %d rows to file '%s', sheet '%s'...", len(rows), file.Name, c.Sheet))
-	s := newUploader(ctx, client, file, spreadsheet, c, rows)
+	cmd.dots.SetDescription(fmt.Sprintf("uploading %d rows to file '%s', sheet '%s'...", len(rows), cmd.file.Name, c.Sheet))
+	s := newUploader(cmd.ctx, cmd.client, cmd.file, spreadsheet, c, rows)
 	s.id, err = s.resolveTargetSheet()
 	if err != nil {
 		return nil, err
@@ -147,5 +126,5 @@ func (c *UpCmd) upload(ctx context.Context, client *google.Client, dots *ux.Dots
 	// success!
 	//
 
-	return file, nil
+	return cmd.file, nil
 }
