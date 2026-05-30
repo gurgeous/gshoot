@@ -21,7 +21,7 @@ setup() {
   [ "$status" -eq 0 ]
   [[ "$output" == "Sheet1 "* ]]
 
-  printf 'name,score,zip\nalice,1,0123\nbob,2,0456\n' > "$BATS_TEST_TMPDIR/basic.csv"
+  printf 'name,score,city\nalice,1,denver\nbob,2,austin\n' >"$BATS_TEST_TMPDIR/basic.csv"
   run "$BIN" up --replace --sheet basic "$SHEET" "$BATS_TEST_TMPDIR/basic.csv"
   [ "$status" -eq 0 ]
   [[ "$output" == *"docs.google.com/spreadsheets/d/"* ]]
@@ -32,16 +32,16 @@ setup() {
 
   run "$BIN" down -o "$BATS_TEST_TMPDIR/basic.out.csv" "$SHEET" basic
   [ "$status" -eq 0 ]
-  grep -q "name,score,zip" "$BATS_TEST_TMPDIR/basic.out.csv"
-  grep -q "alice,1,0123" "$BATS_TEST_TMPDIR/basic.out.csv"
-  grep -q "bob,2,0456" "$BATS_TEST_TMPDIR/basic.out.csv"
+  grep -q "name,score,city" "$BATS_TEST_TMPDIR/basic.out.csv"
+  grep -q "alice,1,denver" "$BATS_TEST_TMPDIR/basic.out.csv"
+  grep -q "bob,2,austin" "$BATS_TEST_TMPDIR/basic.out.csv"
 
-  printf 'name,count\nalice,1000\nbob,2000\n' > "$BATS_TEST_TMPDIR/numeric.csv"
+  printf 'name,count\nalice,10\nbob,20\n' >"$BATS_TEST_TMPDIR/numeric.csv"
   run "$BIN" up --replace --numeric --sheet numeric "$SHEET" "$BATS_TEST_TMPDIR/numeric.csv"
   [ "$status" -eq 0 ]
 
   run "$BIN" down -o "$BATS_TEST_TMPDIR/numeric.out.csv" "$SHEET" numeric
   [ "$status" -eq 0 ]
-  grep -q "alice,1000" "$BATS_TEST_TMPDIR/numeric.out.csv"
-  grep -q "bob,2000" "$BATS_TEST_TMPDIR/numeric.out.csv"
+  grep -q "alice,10" "$BATS_TEST_TMPDIR/numeric.out.csv"
+  grep -q "bob,20" "$BATS_TEST_TMPDIR/numeric.out.csv"
 }
