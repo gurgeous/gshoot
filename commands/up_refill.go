@@ -71,118 +71,131 @@ func (r *sheetRefill) mergedRows() (google.Rows, error) {
 		}
 	}
 
-	// map from str => int
-	byHeader := map[string]int{}
-	for i, header := range headers {
-		byHeader[header] = i
-	}
-
 	//
 	// now merge rows
 	//
 
-	rows := make(google.Rows, max(len(r.remoteRows), len(r.localRows)))
-	for r := range rows {
-		rows[r] = make([]string, len(headers))
+	merged := make(google.Rows, max(len(r.remoteRows), len(r.localRows)))
+	for r := range merged {
+		merged[r] = make([]string, len(headers))
 	}
-	// append remote rows
+
+	// append remote
 	for ii, row := range r.remoteUserRows {
-		copy(rows[ii], row)
+		copy(merged[ii], row)
 	}
-	// append local rows, remap headers
-	for c1, header := range localHeaders {
-		c2 := byHeader[header]
+
+	// append local (w/ header remap)
+	for lc, header := range localHeaders {
+		c := util.IndexOfString(headers, header)
 		for r, local := range r.localRows {
-			rows[r][c2] = local[c1]
+			merged[r][c] = local[lc]
 		}
 	}
-	return rows, nil
+
+	return merged, nil
 }
 
-// apply copies refill formats, formulas, and clears padding formats.
-func (r *sheetRefill) apply() error {
-	if err := r.applyFormats(); err != nil {
-		return err
-	}
-	if err := r.applyFormulas(); err != nil {
-		return err
+//
+// extend formats, formulas, and clears padding formats.
+//
+
+func (r *sheetRefill) extend() error {
+	remoteRows := r.remoteDataRowCount()
+	if len(r.sheet.rows) > remoteRows && remoteRows >= 2 {
+		if err := r.extendFormats(); err != nil {
+			return err
+		}
+		if err := r.extendFormulas(remoteRows); err != nil {
+			return err
+		}
 	}
 	return r.clearPaddingFormats()
 }
 
-// applyFormats copies remote data-row formats across refilled columns.
-func (r *sheetRefill) applyFormats() error {
-	if len(r.remoteRows) < 2 || len(r.sheet.rows) <= 1 {
+//
+// copy remote formats across refilled columns
+//
+
+func (r *sheetRefill) extendFormats() error {
+	columns := r.remoteCSVColumns()
+	if len(columns) == 0 {
 		return nil
 	}
-	requests := []google.Request{}
-	for _, columnIndex := range r.remoteCSVColumns() {
+
+	requests := make([]google.Request, 0, len(columns))
+	for _, c := range columns {
 		requests = append(requests, google.Request{
 			CopyPaste: &google.CopyPasteRequest{
 				Source: google.GridRange{
 					SheetID:          r.sheet.id,
 					StartRowIndex:    1,
 					EndRowIndex:      2,
-					StartColumnIndex: columnIndex,
-					EndColumnIndex:   columnIndex + 1,
+					StartColumnIndex: c,
+					EndColumnIndex:   c + 1,
 				},
 				Destination: google.GridRange{
 					SheetID:          r.sheet.id,
 					StartRowIndex:    1,
 					EndRowIndex:      len(r.sheet.rows),
-					StartColumnIndex: columnIndex,
-					EndColumnIndex:   columnIndex + 1,
+					StartColumnIndex: c,
+					EndColumnIndex:   c + 1,
 				},
 				PasteType:        "PASTE_FORMAT",
 				PasteOrientation: "NORMAL",
 			},
 		})
 	}
-	if len(requests) == 0 {
-		return nil
-	}
 	_, err := r.sheet.client.BatchUpdate(r.sheet.ctx, r.sheet.fileID, requests)
-	return err
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
-// applyFormulas extends non-CSV formula columns during refill.
-func (r *sheetRefill) applyFormulas() error {
-	remoteRows := r.remoteDataRowCount()
-	if len(r.sheet.rows) <= remoteRows || remoteRows < 2 {
-		return nil
-	}
+//
+// extend formulas
+//
+
+func (r *sheetRefill) extendFormulas(remoteRows int) error {
 	formulaColumns, err := r.formulaColumns(remoteRows)
 	if err != nil {
 		return err
 	}
+	if len(formulaColumns) == 0 {
+		return nil
+	}
+
 	requests := []google.Request{}
-	for _, columnIndex := range formulaColumns {
+	for _, c := range formulaColumns {
 		requests = append(requests, google.Request{
 			CopyPaste: &google.CopyPasteRequest{
 				Source: google.GridRange{
 					SheetID:          r.sheet.id,
 					StartRowIndex:    1,
 					EndRowIndex:      remoteRows,
-					StartColumnIndex: columnIndex,
-					EndColumnIndex:   columnIndex + 1,
+					StartColumnIndex: c,
+					EndColumnIndex:   c + 1,
 				},
 				Destination: google.GridRange{
 					SheetID:          r.sheet.id,
 					StartRowIndex:    1,
 					EndRowIndex:      len(r.sheet.rows),
-					StartColumnIndex: columnIndex,
-					EndColumnIndex:   columnIndex + 1,
+					StartColumnIndex: c,
+					EndColumnIndex:   c + 1,
 				},
 				PasteType:        "PASTE_FORMULA",
 				PasteOrientation: "NORMAL",
 			},
 		})
 	}
-	if len(requests) == 0 {
-		return nil
-	}
 	_, err = r.sheet.client.BatchUpdate(r.sheet.ctx, r.sheet.fileID, requests)
-	return err
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // clearPaddingFormats clears formatting outside the refilled data area.
@@ -221,20 +234,20 @@ func (r *sheetRefill) clearPaddingFormats() error {
 // formulaColumns returns non-CSV columns that contain formulas.
 func (r *sheetRefill) formulaColumns(remoteRows int) ([]int, error) {
 	remoteCSV := map[int]bool{}
-	for _, columnIndex := range r.remoteCSVColumns() {
-		remoteCSV[columnIndex] = true
+	for _, c := range r.remoteCSVColumns() {
+		remoteCSV[c] = true
 	}
 	columns := []int{}
-	for columnIndex := range r.remoteRows[0] {
-		if remoteCSV[columnIndex] {
+	for c := range r.remoteRows[0] {
+		if remoteCSV[c] {
 			continue
 		}
-		formulaColumn, err := r.formulaColumn(columnIndex, remoteRows)
+		formulaColumn, err := r.formulaColumn(c, remoteRows)
 		if err != nil {
 			return nil, err
 		}
 		if formulaColumn {
-			columns = append(columns, columnIndex)
+			columns = append(columns, c)
 		}
 	}
 	return columns, nil
@@ -279,9 +292,9 @@ func (r *sheetRefill) remoteCSVColumns() []int {
 		csvHeaders[header] = true
 	}
 	columns := []int{}
-	for columnIndex, header := range r.remoteRows[0] {
+	for c, header := range r.remoteRows[0] {
 		if csvHeaders[header] {
-			columns = append(columns, columnIndex)
+			columns = append(columns, c)
 		}
 	}
 	return columns

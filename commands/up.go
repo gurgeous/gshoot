@@ -149,7 +149,7 @@ func (c *UpCmd) upload(ctx context.Context, client *google.Client, dots *ux.Dots
 		return nil, err
 	}
 	if c.Refill {
-		if err := refill.apply(); err != nil {
+		if err := refill.extend(); err != nil {
 			return nil, err
 		}
 	}
