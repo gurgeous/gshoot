@@ -56,10 +56,10 @@ func (s *sheetRefill) mergedRows() (google.Rows, error) {
 
 	// build final array of headers
 	localHeaders, remoteHeaders := s.localRows[0], s.remoteRows[0]
-	if err := s.validateHeaders(localHeaders, "csv"); err != nil {
+	if err := validateHeaders(localHeaders, "csv"); err != nil {
 		return nil, err
 	}
-	if err := s.validateHeaders(remoteHeaders, "existing sheet"); err != nil {
+	if err := validateHeaders(remoteHeaders, "existing sheet"); err != nil {
 		return nil, err
 	}
 	headers := append([]string(nil), remoteHeaders...)
@@ -213,15 +213,14 @@ func (s *sheetRefill) formulaColumns() []int {
 func (s *sheetRefill) hasFormula(c int) bool {
 	sawFormula := false
 	for r := 1; r < s.remoteDataHeight(); r++ {
-		value := s.remoteRows[r][c]
-		if value == "" {
-			continue
-		}
 		if r >= len(s.remoteSheetData.Rows) || c >= len(s.remoteSheetData.Rows[r].Values) {
 			return false
 		}
 		cell := s.remoteSheetData.Rows[r].Values[c]
-		if cell.UserEnteredValue == nil || cell.UserEnteredValue.FormulaValue == nil || *cell.UserEnteredValue.FormulaValue == "" {
+		if cell.UserEnteredValue == nil {
+			continue
+		}
+		if cell.UserEnteredValue.FormulaValue == nil || *cell.UserEnteredValue.FormulaValue == "" {
 			return false
 		}
 		sawFormula = true
@@ -242,11 +241,13 @@ func (s *sheetRefill) remoteDataHeight() int {
 func (s *sheetRefill) sharedColumns() []int {
 	csvHeaders := map[string]bool{}
 	for _, header := range s.localRows[0] {
-		csvHeaders[header] = true
+		if header != "" {
+			csvHeaders[header] = true
+		}
 	}
 	columns := []int{}
 	for c, header := range s.remoteRows[0] {
-		if csvHeaders[header] {
+		if header != "" && csvHeaders[header] {
 			columns = append(columns, c)
 		}
 	}
@@ -271,7 +272,7 @@ func userEnteredRows(data *google.SheetData) google.Rows {
 }
 
 // validateHeaders rejects duplicate headers.
-func (s *sheetRefill) validateHeaders(headers []string, label string) error {
+func validateHeaders(headers []string, label string) error {
 	counts := map[string]int{}
 	for _, header := range headers {
 		if header != "" {
