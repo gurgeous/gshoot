@@ -1,5 +1,8 @@
 package commands
 
+// This file owns the target worksheet for `up`: choose/create/rename it,
+// paste rows into it, and apply optional sheet-level formatting.
+
 import (
 	"context"
 	"fmt"

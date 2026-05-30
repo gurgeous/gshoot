@@ -1,5 +1,8 @@
 package commands
 
+// This file owns `up --refill`: merge CSV rows into an existing sheet while
+// preserving existing user-entered values, formats, and formula columns.
+
 import (
 	"context"
 	"fmt"
