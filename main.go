@@ -11,6 +11,7 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/gurgeous/gshoot/auth"
 	"github.com/gurgeous/gshoot/commands"
+	"github.com/gurgeous/gshoot/env"
 	"github.com/gurgeous/gshoot/gmv"
 	"github.com/gurgeous/gshoot/util"
 	"github.com/gurgeous/gshoot/ux"
@@ -51,6 +52,7 @@ func main() {
 	//
 
 	ux.Init()
+	envCfg := env.NewConfig()
 
 	//
 	// show welcome?
@@ -63,7 +65,11 @@ func main() {
 
 	if (isFirstRun && isNaked) || isWelcome {
 		// show movie, then auth status
-		_ = gmv.Demo(context.Background())
+		if envCfg.Smoke {
+			fmt.Println("welcome")
+		} else {
+			_ = gmv.Demo(context.Background())
+		}
 		mustNewManager().ShowStatus()
 		return
 	}
