@@ -1,12 +1,23 @@
 package commands
 
+import (
+	"fmt"
+
+	"github.com/gurgeous/gshoot/ux"
+)
+
 // WipeCmd resets a spreadsheet to one blank Sheet1.
 type WipeCmd struct {
+	Force       bool   `short:"f" help:"Skip confirmation."`
 	Spreadsheet string `arg:"" name:"spreadsheet" help:"Spreadsheet name."`
 }
 
 // Run wipes the selected spreadsheet, creating it if needed.
 func (c *WipeCmd) Run() error {
+	if !c.Force {
+		ux.Confirm(fmt.Sprintf("wipe spreadsheet '%s'?", c.Spreadsheet))
+	}
+
 	cmd, err := srunStart(srunOptions{spreadsheet: c.Spreadsheet, create: true})
 	if err != nil {
 		return err

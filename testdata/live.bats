@@ -22,7 +22,7 @@ banner() {
 
   # reset the scratch spreadsheet to a single blank sheet
   banner "wipe $SHEET..."
-  run "$BIN" wipe "$SHEET"
+  run "$BIN" wipe -f "$SHEET"
   [ "$status" -eq 0 ]
   [[ "$output" == *"wiped $SHEET"* ]]
 
