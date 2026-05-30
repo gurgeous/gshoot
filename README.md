@@ -1,6 +1,5 @@
 TODO:
 
-- cli smoke for auth behavior
 - smoke for up/down
 - non-tty behavior
 - this readme

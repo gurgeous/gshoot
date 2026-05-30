@@ -22,7 +22,7 @@ func (c *ListCmd) Run() error {
 	}
 
 	dots.SetDescription("getting list of spreadsheets...")
-	files, err := client.ListSpreadsheets(ctx, 20)
+	files, err := client.ListSpreadsheetFiles(ctx, 20)
 	if err != nil {
 		return err
 	}

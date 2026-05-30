@@ -53,7 +53,7 @@ func (c *DownCmd) run0() (google.Rows, error) {
 	//
 
 	dots.SetDescription("finding spreadsheet file...")
-	spreadsheet, err := client.FindSpreadsheet(ctx, c.Spreadsheet)
+	spreadsheet, err := client.FindSpreadsheetFile(ctx, c.Spreadsheet)
 	if err != nil {
 		return nil, err
 	}

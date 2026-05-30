@@ -45,6 +45,10 @@ test-bats *ARGS: build
   bats {{ARGS}} --print-output-on-failure testdata/smoke.bats
   just banner "✓ test-bats ✓"
 
+test-live *ARGS: build
+  bats {{ARGS}} --print-output-on-failure testdata/live.bats
+  just banner "✓ test-live ✓"
+
 test-watch *ARGS:
   GSHOOT_THEME=1 watchexec -q --clear=reset just test {{ARGS}}
 

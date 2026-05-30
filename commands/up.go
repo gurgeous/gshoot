@@ -79,17 +79,10 @@ func (c *UpCmd) upload(ctx context.Context, client *google.Client, dots *ux.Dots
 	// find/create File
 	//
 
-	dots.SetDescription("finding spreadsheet file...")
-	file, err := client.FindSpreadsheet(ctx, c.Spreadsheet)
+	dots.SetDescription(fmt.Sprintf("find or create spreadsheet '%s'...", c.Spreadsheet))
+	file, err := client.FindOrCreateSpreadsheetFile(ctx, c.Spreadsheet)
 	if err != nil {
 		return nil, err
-	}
-	if file == nil {
-		dots.SetDescription(fmt.Sprintf("creating new spreadsheet '%s'...", c.Spreadsheet))
-		file, err = client.CreateSpreadsheet(ctx, c.Spreadsheet)
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	//

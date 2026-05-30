@@ -11,7 +11,7 @@ import (
 	"golang.org/x/oauth2"
 )
 
-func TestListSpreadsheets(t *testing.T) {
+func TestListSpreadsheetFiles(t *testing.T) {
 	var gotPageSize string
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -26,7 +26,7 @@ func TestListSpreadsheets(t *testing.T) {
 	defer server.Close()
 
 	client := newTestClient(t, server.URL)
-	files, err := client.ListSpreadsheets(context.Background(), 0)
+	files, err := client.ListSpreadsheetFiles(context.Background(), 0)
 	assert.NoError(t, err)
 	assert.Len(t, files, 1)
 	assert.Equal(t, "100", gotPageSize)
@@ -61,7 +61,7 @@ func TestClientRoutesRequestsByService(t *testing.T) {
 	defer sheets.Close()
 
 	client := newTestClientWithBaseURLs(t, drive.URL, sheets.URL)
-	_, err := client.ListSpreadsheets(context.Background(), 1)
+	_, err := client.ListSpreadsheetFiles(context.Background(), 1)
 	assert.NoError(t, err)
 	_, err = client.GetSpreadsheet(context.Background(), "sheet-1")
 	assert.NoError(t, err)
@@ -69,7 +69,7 @@ func TestClientRoutesRequestsByService(t *testing.T) {
 	assert.Equal(t, 1, sheetsHits)
 }
 
-func TestFindSpreadsheet(t *testing.T) {
+func TestFindSpreadsheetFile(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"files": []map[string]string{
@@ -81,13 +81,64 @@ func TestFindSpreadsheet(t *testing.T) {
 	defer server.Close()
 
 	client := newTestClient(t, server.URL)
-	file, err := client.FindSpreadsheet(context.Background(), "budget")
+	file, err := client.FindSpreadsheetFile(context.Background(), "budget")
 	assert.NoError(t, err)
 	assert.NotNil(t, file)
 	assert.Equal(t, "2", file.ID)
 }
 
-func TestCreateSpreadsheetSendsWritableFields(t *testing.T) {
+func TestFindOrCreateSpreadsheetFileCreatesMissingFile(t *testing.T) {
+	hits := []string{}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits = append(hits, r.Method+" "+r.URL.Path)
+		switch r.Method {
+		case http.MethodGet:
+			_ = json.NewEncoder(w).Encode(map[string]any{"files": []any{}})
+		case http.MethodPost:
+			_ = json.NewEncoder(w).Encode(map[string]any{"id": "new-1", "name": "Smoke"})
+		}
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server.URL)
+	file, err := client.FindOrCreateSpreadsheetFile(context.Background(), "Smoke")
+	assert.NoError(t, err)
+	assert.Equal(t, "new-1", file.ID)
+	assert.Equal(t, []string{"GET /drive/v3/files", "POST /drive/v3/files"}, hits)
+}
+
+func TestWipeSpreadsheetAddsSheet1ThenDeletesOldSheets(t *testing.T) {
+	var batch map[string]any
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v4/spreadsheets/sheet-1":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"sheets": []map[string]any{
+					{"properties": map[string]any{"sheetId": 7, "title": "Sheet1"}},
+					{"properties": map[string]any{"sheetId": 8, "title": "Data"}},
+				},
+			})
+		case "/v4/spreadsheets/sheet-1:batchUpdate":
+			assert.NoError(t, json.NewDecoder(r.Body).Decode(&batch))
+			_ = json.NewEncoder(w).Encode(map[string]any{"replies": []any{}})
+		default:
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server.URL)
+	err := client.WipeSpreadsheet(context.Background(), "sheet-1")
+	assert.NoError(t, err)
+	assertBatchRequest(t, batch, 0, "updateSheetProperties", `"title":"gshoot-wipe-`)
+	assertBatchRequest(t, batch, 1, "addSheet", `"title":"Sheet1"`)
+	assertBatchRequest(t, batch, 2, "deleteSheet", `"sheetId":7`)
+	assertBatchRequest(t, batch, 3, "deleteSheet", `"sheetId":8`)
+}
+
+func TestCreateSpreadsheetFileSendsWritableFields(t *testing.T) {
 	var body map[string]any
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -101,7 +152,7 @@ func TestCreateSpreadsheetSendsWritableFields(t *testing.T) {
 	defer server.Close()
 
 	client := newTestClient(t, server.URL)
-	file, err := client.CreateSpreadsheet(context.Background(), "Budget")
+	file, err := client.CreateSpreadsheetFile(context.Background(), "Budget")
 	assert.NoError(t, err)
 	assert.Equal(t, "sheet-1", file.ID)
 	assert.Equal(t, "Budget", body["name"])
@@ -193,5 +244,21 @@ func newTestClientWithBaseURLs(t *testing.T, driveURL, sheetsURL string) *Client
 		httpClient:    httpClient,
 		driveBaseURL:  driveURL,
 		sheetsBaseURL: sheetsURL,
+	}
+}
+
+func assertBatchRequest(t *testing.T, batch map[string]any, index int, requestName string, snippets ...string) {
+	t.Helper()
+
+	requests, ok := batch["requests"].([]any)
+	assert.True(t, ok)
+	if !ok || index >= len(requests) {
+		t.Fatalf("batch request %d missing in %#v", index, batch)
+	}
+	raw, err := json.Marshal(requests[index])
+	assert.NoError(t, err)
+	assert.Contains(t, string(raw), requestName)
+	for _, snippet := range snippets {
+		assert.Contains(t, string(raw), snippet)
 	}
 }
