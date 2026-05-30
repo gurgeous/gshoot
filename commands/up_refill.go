@@ -101,28 +101,25 @@ func (r *sheetRefill) mergedRows() (google.Rows, error) {
 //
 
 func (r *sheetRefill) extend() error {
+	requests := []google.Request{}
 	remoteRows := r.remoteDataRowCount()
 	if len(r.sheet.rows) > remoteRows && remoteRows >= 2 {
-		if err := r.extendFormats(); err != nil {
+		requests = append(requests, r.copyRequests(r.remoteCSVColumns(), 2, "PASTE_FORMAT")...)
+
+		formulaColumns, err := r.formulaColumns(remoteRows)
+		if err != nil {
 			return err
 		}
-		if err := r.extendFormulas(remoteRows); err != nil {
-			return err
-		}
+		requests = append(requests, r.copyRequests(formulaColumns, remoteRows, "PASTE_FORMULA")...)
 	}
-	return r.clearPaddingFormats()
+	requests = append(requests, r.clearPaddingRequests()...)
+
+	_, err := r.sheet.client.BatchUpdate(r.sheet.ctx, r.sheet.fileID, requests)
+	return err
 }
 
-//
-// copy remote formats across refilled columns
-//
-
-func (r *sheetRefill) extendFormats() error {
-	columns := r.remoteCSVColumns()
-	if len(columns) == 0 {
-		return nil
-	}
-
+// copyRequests copies one-column ranges from remote data rows to refilled rows.
+func (r *sheetRefill) copyRequests(columns []int, sourceEndRow int, pasteType string) []google.Request {
 	requests := make([]google.Request, 0, len(columns))
 	for _, c := range columns {
 		requests = append(requests, google.Request{
@@ -130,7 +127,7 @@ func (r *sheetRefill) extendFormats() error {
 				Source: google.GridRange{
 					SheetID:          r.sheet.id,
 					StartRowIndex:    1,
-					EndRowIndex:      2,
+					EndRowIndex:      sourceEndRow,
 					StartColumnIndex: c,
 					EndColumnIndex:   c + 1,
 				},
@@ -141,66 +138,17 @@ func (r *sheetRefill) extendFormats() error {
 					StartColumnIndex: c,
 					EndColumnIndex:   c + 1,
 				},
-				PasteType:        "PASTE_FORMAT",
+				PasteType:        pasteType,
 				PasteOrientation: "NORMAL",
 			},
 		})
 	}
-	_, err := r.sheet.client.BatchUpdate(r.sheet.ctx, r.sheet.fileID, requests)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return requests
 }
 
-//
-// extend formulas
-//
-
-func (r *sheetRefill) extendFormulas(remoteRows int) error {
-	formulaColumns, err := r.formulaColumns(remoteRows)
-	if err != nil {
-		return err
-	}
-	if len(formulaColumns) == 0 {
-		return nil
-	}
-
-	requests := []google.Request{}
-	for _, c := range formulaColumns {
-		requests = append(requests, google.Request{
-			CopyPaste: &google.CopyPasteRequest{
-				Source: google.GridRange{
-					SheetID:          r.sheet.id,
-					StartRowIndex:    1,
-					EndRowIndex:      remoteRows,
-					StartColumnIndex: c,
-					EndColumnIndex:   c + 1,
-				},
-				Destination: google.GridRange{
-					SheetID:          r.sheet.id,
-					StartRowIndex:    1,
-					EndRowIndex:      len(r.sheet.rows),
-					StartColumnIndex: c,
-					EndColumnIndex:   c + 1,
-				},
-				PasteType:        "PASTE_FORMULA",
-				PasteOrientation: "NORMAL",
-			},
-		})
-	}
-	_, err = r.sheet.client.BatchUpdate(r.sheet.ctx, r.sheet.fileID, requests)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// clearPaddingFormats clears formatting outside the refilled data area.
-func (r *sheetRefill) clearPaddingFormats() error {
-	_, err := r.sheet.client.BatchUpdate(r.sheet.ctx, r.sheet.fileID, []google.Request{
+// clearPaddingRequests clears formatting outside the refilled data area.
+func (r *sheetRefill) clearPaddingRequests() []google.Request {
+	return []google.Request{
 		{
 			RepeatCell: &google.RepeatCellRequest{
 				Range: google.GridRange{
@@ -227,8 +175,7 @@ func (r *sheetRefill) clearPaddingFormats() error {
 				Fields: "userEnteredFormat",
 			},
 		},
-	})
-	return err
+	}
 }
 
 // formulaColumns returns non-CSV columns that contain formulas.
