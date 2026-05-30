@@ -100,13 +100,13 @@ func (s *sheetRefill) mergedRows() (google.Rows, error) {
 
 func (s *sheetRefill) extend() error {
 	requests := []google.Request{}
-	nrows := s.remoteDataRowCount()
+	nrows := s.remoteDataHeight()
 	if len(s.sheet.rows) > nrows && nrows >= 2 {
 		// copy FORMATS
-		requests = append(requests, s.copyRequests(s.sharedRemoteColumns(), 2, "PASTE_FORMAT")...)
+		requests = append(requests, s.copyRequests(s.sharedColumns(), 2, "PASTE_FORMAT")...)
 
 		// copy FORMULAS
-		formulaColumns := s.formulaColumns(nrows)
+		formulaColumns := s.formulaColumns()
 		requests = append(requests, s.copyRequests(formulaColumns, nrows, "PASTE_FORMULA")...)
 	}
 
@@ -190,28 +190,29 @@ func (s *sheetRefill) clearPaddingRequests() []google.Request {
 }
 
 // formulaColumns returns non-CSV columns that contain formulas.
-func (s *sheetRefill) formulaColumns(remoteRows int) []int {
-	set := map[int]bool{}
-	for _, c := range s.sharedRemoteColumns() {
-		set[c] = true
+func (s *sheetRefill) formulaColumns() []int {
+	// ignore cols that came from the csv
+	ignore := map[int]bool{}
+	for _, c := range s.sharedColumns() {
+		ignore[c] = true
 	}
 
 	columns := []int{}
 	for c := range s.remoteRows[0] {
-		if set[c] {
+		if ignore[c] {
 			continue
 		}
-		if s.formulaColumn(c, remoteRows) {
+		if s.hasFormula(c) {
 			columns = append(columns, c)
 		}
 	}
 	return columns
 }
 
-// formulaColumn reports whether a non-CSV column should be formula-extended.
-func (s *sheetRefill) formulaColumn(c int, remoteRows int) bool {
+// hasFormula reports whether a non-CSV column should be formula-extended.
+func (s *sheetRefill) hasFormula(c int) bool {
 	sawFormula := false
-	for r := 1; r < remoteRows; r++ {
+	for r := 1; r < s.remoteDataHeight(); r++ {
 		value := s.remoteRows[r][c]
 		if value == "" {
 			continue
@@ -228,8 +229,8 @@ func (s *sheetRefill) formulaColumn(c int, remoteRows int) bool {
 	return sawFormula
 }
 
-// remoteDataRowCount returns remote rows covered by the filter or data.
-func (s *sheetRefill) remoteDataRowCount() int {
+// remoteDataHeight returns remote rows covered by the filter or data.
+func (s *sheetRefill) remoteDataHeight() int {
 	count := len(s.remoteRows)
 	if s.remoteSheetData.BasicFilter != nil && s.remoteSheetData.BasicFilter.Range.EndRowIndex > 0 {
 		count = s.remoteSheetData.BasicFilter.Range.EndRowIndex
@@ -238,7 +239,7 @@ func (s *sheetRefill) remoteDataRowCount() int {
 }
 
 // returns columns that are both local and remote
-func (s *sheetRefill) sharedRemoteColumns() []int {
+func (s *sheetRefill) sharedColumns() []int {
 	csvHeaders := map[string]bool{}
 	for _, header := range s.localRows[0] {
 		csvHeaders[header] = true
