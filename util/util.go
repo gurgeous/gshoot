@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -148,6 +149,26 @@ func DateAndTimeStr(s string) string {
 		return s
 	}
 	return t.Local().Format("Mon Jan _2 2006 15:04 MST")
+}
+
+// FormatInt formats n with comma group separators.
+func FormatInt(n int) string {
+	s := strconv.Itoa(n)
+	if len(s) <= 3 {
+		return s
+	}
+
+	var out strings.Builder
+	rem := len(s) % 3
+	if rem == 0 {
+		rem = 3
+	}
+	out.WriteString(s[:rem])
+	for ii := rem; ii < len(s); ii += 3 {
+		out.WriteByte(',')
+		out.WriteString(s[ii : ii+3])
+	}
+	return out.String()
 }
 
 // IndexOfString returns the first index of target, or -1 when missing.

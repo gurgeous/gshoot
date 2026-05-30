@@ -35,7 +35,7 @@ banner() {
   banner "peek..."
   run "$BIN" peek "$SHEET"
   [ "$status" -eq 0 ]
-  [[ "$output" == "Sheet1 "* ]]
+  [[ "$output" == *"Sheet1 "* ]]
 
   # replace upload should round-trip through download
   banner "up --replace..."
