@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gurgeous/gshoot/google"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -69,6 +70,32 @@ func TestUpCommandReplaceClearsExistingSheet(t *testing.T) {
 	assertBatchContains(t, batches, "pasteData", `"type":"PASTE_NORMAL"`)
 }
 
+func TestUpCommandCustomSheetAddsSheetWhenDefaultBlank(t *testing.T) {
+	csvPath := writeCSV(t, "name,count\nalpha,1\n")
+	batches := []map[string]any{}
+
+	err, _, _ := testCommand(t, &UpCmd{Spreadsheet: "Budget", Sheet: "Monthly", CSVPath: csvPath}, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/drive/v3/files":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"files": []map[string]string{{"id": "sheet-1", "name": "Budget"}},
+			})
+		case r.URL.Path == "/v4/spreadsheets/sheet-1":
+			writeSpreadsheet(w, "Sheet1", 0, nil)
+		case strings.HasPrefix(r.URL.Path, "/v4/spreadsheets/sheet-1/values/"):
+			_ = json.NewEncoder(w).Encode(map[string]any{"values": []any{}})
+		case r.URL.Path == "/v4/spreadsheets/sheet-1:batchUpdate":
+			batches = append(batches, readBatch(t, r))
+			writeBatchReply(w)
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	})
+
+	assert.NoError(t, err)
+	assertBatchContains(t, batches, "addSheet", `"title":"Monthly"`)
+}
+
 func TestUpCommandRefillMergesAndExtendsFormulas(t *testing.T) {
 	csvPath := writeCSV(t, "id,name\na,Ada\nb,Bob\nc,Cyd\nd,Dee\n")
 	batches := []map[string]any{}
@@ -106,6 +133,218 @@ func TestUpCommandRefillMergesAndExtendsFormulas(t *testing.T) {
 	assertBatchContains(t, batches, "pasteData", `"type":"PASTE_VALUES"`)
 	assertBatchContains(t, batches, "pasteData", `"data":"id,calc,name\na,=A2,Ada\nb,=A3,Bob\nc,=A4,Cyd\nd,,Dee\n"`)
 	assertBatchContains(t, batches, "copyPaste", `"pasteType":"PASTE_FORMULA"`, `"endRowIndex":5`)
+}
+
+func TestUpCommandRefillExtendsFormulasWithBlankDisplayValues(t *testing.T) {
+	csvPath := writeCSV(t, "id,name\na,Ada\nb,Bob\nc,Cyd\n")
+	batches := []map[string]any{}
+
+	err, _, _ := testCommand(t, &UpCmd{Spreadsheet: "Budget", CSVPath: csvPath, Refill: true}, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/drive/v3/files":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"files": []map[string]string{{"id": "sheet-1", "name": "Budget"}},
+			})
+		case r.URL.Path == "/v4/spreadsheets/sheet-1":
+			if r.URL.Query().Get("includeGridData") == "true" {
+				writeSpreadsheet(w, "gsheet_up", 7, refillBlankFormulaGridData())
+			} else {
+				writeSpreadsheet(w, "gsheet_up", 7, nil)
+			}
+		case strings.HasPrefix(r.URL.Path, "/v4/spreadsheets/sheet-1/values/"):
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"values": [][]string{
+					{"id", "calc"},
+					{"a", ""},
+					{"b", ""},
+				},
+			})
+		case r.URL.Path == "/v4/spreadsheets/sheet-1:batchUpdate":
+			batches = append(batches, readBatch(t, r))
+			writeBatchReply(w)
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	})
+
+	assert.NoError(t, err)
+	assertBatchContains(t, batches, "copyPaste", `"pasteType":"PASTE_FORMULA"`, `"endRowIndex":4`)
+}
+
+func TestUpCommandRefillRejectsDuplicateHeaders(t *testing.T) {
+	csvPath := writeCSV(t, "id,id\na,b\n")
+
+	err, _, _ := testCommand(t, &UpCmd{Spreadsheet: "Budget", CSVPath: csvPath, Refill: true}, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/drive/v3/files":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"files": []map[string]string{{"id": "sheet-1", "name": "Budget"}},
+			})
+		case r.URL.Path == "/v4/spreadsheets/sheet-1":
+			if r.URL.Query().Get("includeGridData") == "true" {
+				writeSpreadsheet(w, "gsheet_up", 7, refillGridData())
+			} else {
+				writeSpreadsheet(w, "gsheet_up", 7, nil)
+			}
+		case strings.HasPrefix(r.URL.Path, "/v4/spreadsheets/sheet-1/values/"):
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"values": [][]string{{"id", "calc"}, {"a", "1"}},
+			})
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	})
+
+	assert.ErrorContains(t, err, "csv has duplicate headers: id")
+}
+
+func TestUpCommandRefillRejectsDuplicateHeadersOnEmptyRemote(t *testing.T) {
+	csvPath := writeCSV(t, "id,id\na,b\n")
+
+	err, _, _ := testCommand(t, &UpCmd{Spreadsheet: "Budget", CSVPath: csvPath, Refill: true}, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/drive/v3/files":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"files": []map[string]string{{"id": "sheet-1", "name": "Budget"}},
+			})
+		case r.URL.Path == "/v4/spreadsheets/sheet-1":
+			if r.URL.Query().Get("includeGridData") == "true" {
+				writeSpreadsheet(w, "gsheet_up", 7, []map[string]any{{"rowData": []any{}}})
+			} else {
+				writeSpreadsheet(w, "gsheet_up", 7, nil)
+			}
+		case strings.HasPrefix(r.URL.Path, "/v4/spreadsheets/sheet-1/values/"):
+			_ = json.NewEncoder(w).Encode(map[string]any{"values": []any{}})
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	})
+
+	assert.ErrorContains(t, err, "csv has duplicate headers: id")
+}
+
+func TestUpCommandRefillRejectsDuplicateRemoteHeaders(t *testing.T) {
+	csvPath := writeCSV(t, "id,name\na,Ada\n")
+
+	err, _, _ := testCommand(t, &UpCmd{Spreadsheet: "Budget", CSVPath: csvPath, Refill: true}, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/drive/v3/files":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"files": []map[string]string{{"id": "sheet-1", "name": "Budget"}},
+			})
+		case r.URL.Path == "/v4/spreadsheets/sheet-1":
+			if r.URL.Query().Get("includeGridData") == "true" {
+				writeSpreadsheet(w, "gsheet_up", 7, refillGridData())
+			} else {
+				writeSpreadsheet(w, "gsheet_up", 7, nil)
+			}
+		case strings.HasPrefix(r.URL.Path, "/v4/spreadsheets/sheet-1/values/"):
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"values": [][]string{{"id", "id"}, {"a", "1"}},
+			})
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	})
+
+	assert.ErrorContains(t, err, "existing sheet has duplicate headers: id")
+}
+
+func TestUpCommandRefillPreservesExtraRemoteRows(t *testing.T) {
+	csvPath := writeCSV(t, "id,name\na,Ada\n")
+	batches := []map[string]any{}
+
+	err, _, _ := testCommand(t, &UpCmd{Spreadsheet: "Budget", CSVPath: csvPath, Refill: true}, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/drive/v3/files":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"files": []map[string]string{{"id": "sheet-1", "name": "Budget"}},
+			})
+		case r.URL.Path == "/v4/spreadsheets/sheet-1":
+			if r.URL.Query().Get("includeGridData") == "true" {
+				writeSpreadsheet(w, "gsheet_up", 7, refillExtraRowsGridData())
+			} else {
+				writeSpreadsheet(w, "gsheet_up", 7, nil)
+			}
+		case strings.HasPrefix(r.URL.Path, "/v4/spreadsheets/sheet-1/values/"):
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"values": [][]string{
+					{"id", "name"},
+					{"a", "old Ada"},
+					{"b", "Bob"},
+					{"c", "Cyd"},
+				},
+			})
+		case r.URL.Path == "/v4/spreadsheets/sheet-1:batchUpdate":
+			batches = append(batches, readBatch(t, r))
+			writeBatchReply(w)
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	})
+
+	assert.NoError(t, err)
+	assertBatchContains(t, batches, "pasteData", `"data":"id,name\na,Ada\nb,Bob\nc,Cyd\n"`)
+}
+
+func TestUpCommandRefillWithoutNewRowsOnlyClearsPadding(t *testing.T) {
+	csvPath := writeCSV(t, "id,name\na,Ada\n")
+	batches := []map[string]any{}
+
+	err, _, _ := testCommand(t, &UpCmd{Spreadsheet: "Budget", CSVPath: csvPath, Refill: true}, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/drive/v3/files":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"files": []map[string]string{{"id": "sheet-1", "name": "Budget"}},
+			})
+		case r.URL.Path == "/v4/spreadsheets/sheet-1":
+			if r.URL.Query().Get("includeGridData") == "true" {
+				writeSpreadsheet(w, "gsheet_up", 7, refillBlankTrailingFormulaGridData())
+			} else {
+				writeSpreadsheet(w, "gsheet_up", 7, nil)
+			}
+		case strings.HasPrefix(r.URL.Path, "/v4/spreadsheets/sheet-1/values/"):
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"values": [][]string{
+					{"id", "name"},
+					{"a", "old Ada"},
+					{"b", "Bob"},
+				},
+			})
+		case r.URL.Path == "/v4/spreadsheets/sheet-1:batchUpdate":
+			batches = append(batches, readBatch(t, r))
+			writeBatchReply(w)
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	})
+
+	assert.NoError(t, err)
+	assertBatchContains(t, batches, "pasteData", `"data":"id,name\na,Ada\nb,Bob\n"`)
+	assertBatchMissing(t, batches, "copyPaste", `"pasteType":"PASTE_FORMAT"`)
+	assertBatchMissing(t, batches, "copyPaste", `"pasteType":"PASTE_FORMULA"`)
+	assertBatchContains(t, batches, "repeatCell", `"fields":"userEnteredFormat"`)
+}
+
+func TestRefillerSharedColumnsIgnoresBlankHeaders(t *testing.T) {
+	refill := &refiller{
+		localRows:  google.Rows{{"", "name"}},
+		remoteRows: google.Rows{{"", "name", "calc"}},
+	}
+
+	assert.Equal(t, []int{1}, refill.sharedColumns())
+}
+
+func TestRefillerHasFormulaRejectsLiteralColumns(t *testing.T) {
+	refill := &refiller{
+		remoteRows: google.Rows{{"id", "note"}, {"a", "hello"}},
+		remoteSheetData: &google.SheetData{Rows: []google.RowData{
+			{Values: []google.CellData{{UserEnteredValue: stringValue("id")}, {UserEnteredValue: stringValue("note")}}},
+			{Values: []google.CellData{{UserEnteredValue: stringValue("a")}, {UserEnteredValue: stringValue("hello")}}},
+		}},
+	}
+
+	assert.False(t, refill.hasFormula(1))
 }
 
 func TestUpCommandCreatesSpreadsheet(t *testing.T) {
@@ -261,6 +500,75 @@ func refillGridData() []map[string]any {
 			{"values": []map[string]any{
 				{"userEnteredValue": map[string]string{"stringValue": "c"}},
 				{"userEnteredValue": map[string]string{"formulaValue": "=A4"}},
+			}},
+		},
+	}}
+}
+
+func refillBlankFormulaGridData() []map[string]any {
+	return []map[string]any{{
+		"rowData": []map[string]any{
+			{"values": []map[string]any{
+				{"userEnteredValue": map[string]string{"stringValue": "id"}},
+				{"userEnteredValue": map[string]string{"stringValue": "calc"}},
+			}},
+			{"values": []map[string]any{
+				{"userEnteredValue": map[string]string{"stringValue": "a"}},
+				{"userEnteredValue": map[string]string{"formulaValue": `=IF(A2="","","x")`}},
+			}},
+			{"values": []map[string]any{
+				{"userEnteredValue": map[string]string{"stringValue": "b"}},
+				{"userEnteredValue": map[string]string{"formulaValue": `=IF(A3="","","x")`}},
+			}},
+		},
+	}}
+}
+
+func refillExtraRowsGridData() []map[string]any {
+	return []map[string]any{{
+		"rowData": []map[string]any{
+			{"values": []map[string]any{
+				{"userEnteredValue": map[string]string{"stringValue": "id"}},
+				{"userEnteredValue": map[string]string{"stringValue": "name"}},
+			}},
+			{"values": []map[string]any{
+				{"userEnteredValue": map[string]string{"stringValue": "a"}},
+				{"userEnteredValue": map[string]string{"stringValue": "old Ada"}},
+			}},
+			{"values": []map[string]any{
+				{"userEnteredValue": map[string]string{"stringValue": "b"}},
+				{"userEnteredValue": map[string]string{"stringValue": "Bob"}},
+			}},
+			{"values": []map[string]any{
+				{"userEnteredValue": map[string]string{"stringValue": "c"}},
+				{"userEnteredValue": map[string]string{"stringValue": "Cyd"}},
+			}},
+		},
+	}}
+}
+
+func stringValue(value string) *google.ExtendedValue {
+	return &google.ExtendedValue{StringValue: &value}
+}
+
+func refillBlankTrailingFormulaGridData() []map[string]any {
+	return []map[string]any{{
+		"rowData": []map[string]any{
+			{"values": []map[string]any{
+				{"userEnteredValue": map[string]string{"stringValue": "id"}},
+				{"userEnteredValue": map[string]string{"stringValue": "name"}},
+			}},
+			{"values": []map[string]any{
+				{"userEnteredValue": map[string]string{"stringValue": "a"}},
+				{"userEnteredValue": map[string]string{"stringValue": "old Ada"}},
+			}},
+			{"values": []map[string]any{
+				{"userEnteredValue": map[string]string{"stringValue": "b"}},
+				{"userEnteredValue": map[string]string{"stringValue": "Bob"}},
+			}},
+			{"values": []map[string]any{
+				{"userEnteredValue": map[string]string{"formulaValue": `=IF(A4="","","x")`}},
+				{"userEnteredValue": map[string]string{"formulaValue": `=IF(B4="","","x")`}},
 			}},
 		},
 	}}

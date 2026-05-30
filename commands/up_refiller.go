@@ -50,15 +50,16 @@ func newRefiller(u *uploader) (*refiller, error) {
 //
 
 func (s *refiller) mergedRows() (google.Rows, error) {
+	localHeaders := s.localRows[0]
+	if err := validateHeaders(localHeaders, "csv"); err != nil {
+		return nil, err
+	}
 	if len(s.remoteRows) == 0 {
 		return s.localRows, nil
 	}
 
 	// build final array of headers
-	localHeaders, remoteHeaders := s.localRows[0], s.remoteRows[0]
-	if err := validateHeaders(localHeaders, "csv"); err != nil {
-		return nil, err
-	}
+	remoteHeaders := s.remoteRows[0]
 	if err := validateHeaders(remoteHeaders, "existing sheet"); err != nil {
 		return nil, err
 	}
@@ -80,6 +81,10 @@ func (s *refiller) mergedRows() (google.Rows, error) {
 
 	// append remote
 	for ii, row := range s.remoteUserRows {
+		if ii >= len(merged) {
+			// Grid data can include formula-only rows that display blank and are absent from the values API.
+			break
+		}
 		copy(merged[ii], row)
 	}
 
