@@ -15,11 +15,13 @@ type DownCmd struct {
 }
 
 func (c *DownCmd) Run() error {
+	// fetch
 	rows, err := c.run0()
 	if err != nil {
 		return err
 	}
 
+	// print
 	writer := os.Stdout
 	if c.Output != "" && c.Output != "-" {
 		file, err := os.Create(c.Output)
