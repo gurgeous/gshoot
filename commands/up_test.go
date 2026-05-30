@@ -35,7 +35,7 @@ func TestUpCommandRenamesBlankDefaultSheet(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, "https://docs.google.com/spreadsheets/d/sheet-1/edit\n", stdout)
-	assertBatchContains(t, batches, "updateSheetProperties", `"sheetId":0`, `"title":"gsheet_up_1"`)
+	assertBatchContains(t, batches, "updateSheetProperties", `"sheetId":0`, `"title":"gsheet_1"`)
 	assertBatchContains(t, batches, "pasteData", `"data":"name,count\nalpha,1\n"`)
 }
 
@@ -155,7 +155,7 @@ func TestUpCommandAppliesFilterNumericAndLayout(t *testing.T) {
 			})
 		case r.URL.Path == "/v4/spreadsheets/sheet-1":
 			if r.URL.Query().Get("includeGridData") == "true" {
-				writeSpreadsheet(w, "gsheet_up_1", 0, layoutGridData())
+				writeSpreadsheet(w, "gsheet_1", 0, layoutGridData())
 			} else {
 				writeSpreadsheet(w, "Sheet1", 0, nil)
 			}
@@ -198,7 +198,7 @@ func readBatch(t *testing.T, r *http.Request) map[string]any {
 func writeBatchReply(w http.ResponseWriter) {
 	_ = json.NewEncoder(w).Encode(map[string]any{
 		"replies": []map[string]any{
-			{"addSheet": map[string]any{"properties": map[string]any{"sheetId": 9, "title": "gsheet_up_1"}}},
+			{"addSheet": map[string]any{"properties": map[string]any{"sheetId": 9, "title": "gsheet_1"}}},
 		},
 	})
 }

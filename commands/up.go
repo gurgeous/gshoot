@@ -85,7 +85,7 @@ func (u *upRunner) upload(dots *ux.Dots) error {
 
 	u.sheet = newUploadSheet(u.ctx, u.client, u.file.ID, u.spreadsheet, u.cmd, u.rows)
 
-	dots.SetDescription(fmt.Sprintf("uploading %d rows to '%s' / '%s'...", len(u.rows), u.file.Name, u.sheet.title))
+	dots.SetDescription(fmt.Sprintf("uploading %d rows to file '%s', sheet '%s'...", len(u.rows), u.file.Name, u.sheet.title))
 	if err := u.sheet.ensure(u.cmd); err != nil {
 		return err
 	}

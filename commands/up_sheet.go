@@ -15,7 +15,7 @@ import (
 const (
 	defaultUploadSheet = "gsheet_up"
 	gridPadding        = 2
-	sheetPrefix        = "gsheet_up_"
+	sheetPrefix        = "gsheet_"
 	layoutPadding      = 20
 )
 
@@ -361,7 +361,7 @@ func sheetTitle(cmd *UpCmd, spreadsheet *google.Spreadsheet) string {
 	return nextSheetTitle(spreadsheet)
 }
 
-// nextSheetTitle returns the next gsheet_up_N sheet title.
+// nextSheetTitle returns the next gsheet_N sheet title.
 func nextSheetTitle(spreadsheet *google.Spreadsheet) string {
 	next := 1
 	for _, sheet := range spreadsheet.Sheets {
