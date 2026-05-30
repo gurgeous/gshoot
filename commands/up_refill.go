@@ -145,17 +145,22 @@ func (r *refillUpload) applyFormats(sheet *uploadSheet) error {
 
 // applyFormulas extends non-CSV formula columns during refill.
 func (r *refillUpload) applyFormulas(sheet *uploadSheet) error {
-	if len(sheet.rows) <= r.existingDataRowCount() || r.existingDataRowCount() < 2 {
+	existingRows := r.existingDataRowCount()
+	if len(sheet.rows) <= existingRows || existingRows < 2 {
 		return nil
 	}
+	formulaColumns, err := r.formulaColumns(existingRows)
+	if err != nil {
+		return err
+	}
 	requests := []google.Request{}
-	for _, columnIndex := range r.formulaColumns() {
+	for _, columnIndex := range formulaColumns {
 		requests = append(requests, google.Request{
 			CopyPaste: &google.CopyPasteRequest{
 				Source: google.GridRange{
 					SheetID:          sheet.id,
 					StartRowIndex:    1,
-					EndRowIndex:      r.existingDataRowCount(),
+					EndRowIndex:      existingRows,
 					StartColumnIndex: columnIndex,
 					EndColumnIndex:   columnIndex + 1,
 				},
@@ -174,7 +179,7 @@ func (r *refillUpload) applyFormulas(sheet *uploadSheet) error {
 	if len(requests) == 0 {
 		return nil
 	}
-	_, err := r.client.BatchUpdate(r.ctx, r.fileID, requests)
+	_, err = r.client.BatchUpdate(r.ctx, r.fileID, requests)
 	return err
 }
 
@@ -212,35 +217,51 @@ func (r *refillUpload) clearPaddingFormats(sheet *uploadSheet) error {
 }
 
 // formulaColumns returns non-CSV columns that contain formulas.
-func (r *refillUpload) formulaColumns() []int {
+func (r *refillUpload) formulaColumns(existingRows int) ([]int, error) {
 	existingCSV := map[int]bool{}
 	for _, columnIndex := range r.existingCSVColumns() {
 		existingCSV[columnIndex] = true
 	}
 	columns := []int{}
 	for columnIndex := range r.existingRows[0] {
-		if !existingCSV[columnIndex] && r.formulaColumn(columnIndex) {
+		if existingCSV[columnIndex] {
+			continue
+		}
+		formulaColumn, err := r.formulaColumn(columnIndex, existingRows)
+		if err != nil {
+			return nil, err
+		}
+		if formulaColumn {
 			columns = append(columns, columnIndex)
 		}
 	}
-	return columns
+	return columns, nil
 }
 
 // formulaColumn reports whether a non-CSV column should be formula-extended.
-func (r *refillUpload) formulaColumn(columnIndex int) bool {
+func (r *refillUpload) formulaColumn(columnIndex int, existingRows int) (bool, error) {
 	sawFormula := false
-	for ii := 1; ii < r.existingDataRowCount(); ii++ {
+	for ii := 1; ii < existingRows; ii++ {
 		value := r.existingRows[ii][columnIndex]
 		if value == "" {
 			continue
 		}
+		if r.existingSheetData == nil {
+			return false, fmt.Errorf("missing grid data for sheet %s", r.sheetTitle)
+		}
+		if ii >= len(r.existingSheetData.Rows) {
+			return false, fmt.Errorf("missing grid data for sheet %s row %d", r.sheetTitle, ii+1)
+		}
+		if columnIndex >= len(r.existingSheetData.Rows[ii].Values) {
+			return false, fmt.Errorf("missing grid data for sheet %s row %d column %d", r.sheetTitle, ii+1, columnIndex+1)
+		}
 		cell := r.existingSheetData.Rows[ii].Values[columnIndex]
 		if cell.UserEnteredValue == nil || cell.UserEnteredValue.FormulaValue == nil || *cell.UserEnteredValue.FormulaValue == "" {
-			return false
+			return false, nil
 		}
 		sawFormula = true
 	}
-	return sawFormula
+	return sawFormula, nil
 }
 
 // existingDataRowCount returns the existing rows covered by the filter or data.

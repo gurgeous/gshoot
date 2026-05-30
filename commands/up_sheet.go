@@ -296,7 +296,6 @@ func (s *uploadSheet) numericFormats() map[int]string {
 		return formats
 	}
 
-	targetColumns := s.csvTargetColumns()
 	for columnIndex := range s.rows[0] {
 		values := []string{}
 		for _, row := range s.rows[1:] {
@@ -312,29 +311,19 @@ func (s *uploadSheet) numericFormats() map[int]string {
 			continue
 		}
 		if util.AllMatch(values, integerRE) {
-			formats[targetColumns[columnIndex]] = "#,##0"
+			formats[columnIndex] = "#,##0"
 			continue
 		}
 		if !util.AllMatch(values, decimalRE) || !util.AnyContains(values, ".") {
 			continue
 		}
-		formats[targetColumns[columnIndex]] = "#,##0." + strings.Repeat("0", util.DecimalPrecision(values))
+		formats[columnIndex] = "#,##0." + strings.Repeat("0", util.DecimalPrecision(values))
 	}
 	return formats
 }
 
 func hasLeadingZeroNumber(values []string) bool {
 	return slices.ContainsFunc(values, leadingZeroRE.MatchString)
-}
-
-// csvTargetColumns maps CSV columns to upload target columns.
-func (s *uploadSheet) csvTargetColumns() []int {
-	targetHeaders := s.rows[0]
-	targetColumns := make([]int, 0, len(s.rows[0]))
-	for _, header := range s.rows[0] {
-		targetColumns = append(targetColumns, util.IndexOfString(targetHeaders, header))
-	}
-	return targetColumns
 }
 
 // findExistingID returns the ID of the current target sheet, if present.
