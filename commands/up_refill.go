@@ -24,27 +24,25 @@ type sheetRefill struct {
 // loads remote sheet data before we refill
 //
 
-func newSheetRefill(sheet *uploadSheet) (*sheetRefill, error) {
-	// values
-	remoteRows, err := sheet.client.GetRows(sheet.ctx, sheet.fileID, sheet.title)
+func newSheetRefill(u *uploadSheet) (*sheetRefill, error) {
+	s := &sheetRefill{sheet: u, localRows: u.rows}
+
+	// fetch values
+	var err error
+	s.remoteRows, err = u.client.GetRows(u.ctx, u.fileID, u.title)
 	if err != nil {
 		return nil, err
 	}
 
-	// formulas, filters, formats, etc
-	spreadsheet, err := sheet.client.GetSpreadsheetWithGridData(sheet.ctx, sheet.fileID, sheet.title)
+	// fetch "grid data" - formulas, filters, formats, etc
+	spreadsheet, err := u.client.GetSpreadsheetWithGridData(u.ctx, u.fileID, u.title)
 	if err != nil {
 		return nil, err
 	}
-	remoteSheetData := spreadsheet.Data[sheet.id]
+	s.remoteSheetData = spreadsheet.Data[u.id]
+	s.remoteUserRows = userEnteredRows(s.remoteSheetData)
 
-	return &sheetRefill{
-		sheet:           sheet,
-		localRows:       sheet.rows,
-		remoteRows:      remoteRows,
-		remoteUserRows:  userEnteredRows(remoteSheetData),
-		remoteSheetData: remoteSheetData,
-	}, nil
+	return s, nil
 }
 
 //
