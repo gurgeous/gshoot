@@ -102,24 +102,36 @@ func (r *sheetRefill) mergedRows() (google.Rows, error) {
 
 func (r *sheetRefill) extend() error {
 	requests := []google.Request{}
-	remoteRows := r.remoteDataRowCount()
-	if len(r.sheet.rows) > remoteRows && remoteRows >= 2 {
+	nrows := r.remoteDataRowCount()
+	if len(r.sheet.rows) > nrows && nrows >= 2 {
+		// copy FORMATS
 		requests = append(requests, r.copyRequests(r.remoteCSVColumns(), 2, "PASTE_FORMAT")...)
 
-		formulaColumns, err := r.formulaColumns(remoteRows)
+		// copy FORMULAS
+		formulaColumns, err := r.formulaColumns(nrows)
 		if err != nil {
 			return err
 		}
-		requests = append(requests, r.copyRequests(formulaColumns, remoteRows, "PASTE_FORMULA")...)
+		requests = append(requests, r.copyRequests(formulaColumns, nrows, "PASTE_FORMULA")...)
 	}
+
+	// clear out the padding rows & cols
 	requests = append(requests, r.clearPaddingRequests()...)
 
+	// do it
 	_, err := r.sheet.client.BatchUpdate(r.sheet.ctx, r.sheet.fileID, requests)
-	return err
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
-// copyRequests copies one-column ranges from remote data rows to refilled rows.
-func (r *sheetRefill) copyRequests(columns []int, sourceEndRow int, pasteType string) []google.Request {
+//
+// build CopyPaste Requests for extending cols
+//
+
+func (r *sheetRefill) copyRequests(columns []int, endRow int, pasteType string) []google.Request {
 	requests := make([]google.Request, 0, len(columns))
 	for _, c := range columns {
 		requests = append(requests, google.Request{
@@ -127,7 +139,7 @@ func (r *sheetRefill) copyRequests(columns []int, sourceEndRow int, pasteType st
 				Source: google.GridRange{
 					SheetID:          r.sheet.id,
 					StartRowIndex:    1,
-					EndRowIndex:      sourceEndRow,
+					EndRowIndex:      endRow,
 					StartColumnIndex: c,
 					EndColumnIndex:   c + 1,
 				},
@@ -146,17 +158,21 @@ func (r *sheetRefill) copyRequests(columns []int, sourceEndRow int, pasteType st
 	return requests
 }
 
-// clearPaddingRequests clears formatting outside the refilled data area.
+//
+// clears formatting outside the refilled data area.
+//
+
 func (r *sheetRefill) clearPaddingRequests() []google.Request {
+	w, h := len(r.sheet.rows[0]), len(r.sheet.rows)
 	return []google.Request{
 		{
 			RepeatCell: &google.RepeatCellRequest{
 				Range: google.GridRange{
 					SheetID:          r.sheet.id,
-					StartRowIndex:    len(r.sheet.rows),
-					EndRowIndex:      len(r.sheet.rows) + gridPadding,
+					StartRowIndex:    h,
+					EndRowIndex:      h + gridPadding,
 					StartColumnIndex: 0,
-					EndColumnIndex:   len(r.sheet.rows[0]) + gridPadding,
+					EndColumnIndex:   w + gridPadding,
 				},
 				Cell:   google.CellData{UserEnteredFormat: &google.CellFormat{}},
 				Fields: "userEnteredFormat",
@@ -167,9 +183,9 @@ func (r *sheetRefill) clearPaddingRequests() []google.Request {
 				Range: google.GridRange{
 					SheetID:          r.sheet.id,
 					StartRowIndex:    0,
-					EndRowIndex:      len(r.sheet.rows),
-					StartColumnIndex: len(r.sheet.rows[0]),
-					EndColumnIndex:   len(r.sheet.rows[0]) + gridPadding,
+					EndRowIndex:      h,
+					StartColumnIndex: w,
+					EndColumnIndex:   w + gridPadding,
 				},
 				Cell:   google.CellData{UserEnteredFormat: &google.CellFormat{}},
 				Fields: "userEnteredFormat",
