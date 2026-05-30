@@ -158,16 +158,16 @@ func (s *refiller) copyRequests(columns []int, endRow int, pasteType string) []g
 //
 
 func (s *refiller) clearPaddingRequests() []google.Request {
-	w, h := len(s.sheet.rows[0]), len(s.sheet.rows)
+	nrows, ncols := len(s.sheet.rows[0]), len(s.sheet.rows)
 	return []google.Request{
 		{
 			RepeatCell: &google.RepeatCellRequest{
 				Range: google.GridRange{
 					SheetID:          s.sheet.id,
-					StartRowIndex:    h,
-					EndRowIndex:      h + gridPadding,
+					StartRowIndex:    ncols,
+					EndRowIndex:      ncols + gridPadding,
 					StartColumnIndex: 0,
-					EndColumnIndex:   w + gridPadding,
+					EndColumnIndex:   nrows + gridPadding,
 				},
 				Cell:   google.CellData{UserEnteredFormat: &google.CellFormat{}},
 				Fields: "userEnteredFormat",
@@ -178,9 +178,9 @@ func (s *refiller) clearPaddingRequests() []google.Request {
 				Range: google.GridRange{
 					SheetID:          s.sheet.id,
 					StartRowIndex:    0,
-					EndRowIndex:      h,
-					StartColumnIndex: w,
-					EndColumnIndex:   w + gridPadding,
+					EndRowIndex:      ncols,
+					StartColumnIndex: nrows,
+					EndColumnIndex:   nrows + gridPadding,
 				},
 				Cell:   google.CellData{UserEnteredFormat: &google.CellFormat{}},
 				Fields: "userEnteredFormat",
