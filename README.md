@@ -1,5 +1,7 @@
 TODO:
 
+- wipe should prompt or --force
+- improve peek output
 - smoke for up/down
 - non-tty behavior
 - this readme
