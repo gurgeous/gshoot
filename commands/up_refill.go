@@ -82,18 +82,16 @@ func (r *refillUpload) rows() (google.Rows, error) {
 
 	finalRowCount := max(len(r.existingRows), len(r.csvRows))
 	merged := make(google.Rows, finalRowCount)
-	for rowIndex := range merged {
-		merged[rowIndex] = make([]string, len(finalHeaders))
+	for ii := range merged {
+		merged[ii] = make([]string, len(finalHeaders))
 	}
-	for rowIndex, row := range r.existingUserRows {
-		for columnIndex, value := range row {
-			merged[rowIndex][columnIndex] = value
-		}
+	for ii, row := range r.existingUserRows {
+		copy(merged[ii], row)
 	}
 	for csvColumnIndex, header := range csvHeaders {
 		targetColumnIndex := byHeader[header]
-		for rowIndex, row := range r.csvRows {
-			merged[rowIndex][targetColumnIndex] = row[csvColumnIndex]
+		for ii, row := range r.csvRows {
+			merged[ii][targetColumnIndex] = row[csvColumnIndex]
 		}
 	}
 	return merged, nil
@@ -231,12 +229,12 @@ func (r *refillUpload) formulaColumns() []int {
 // formulaColumn reports whether a non-CSV column should be formula-extended.
 func (r *refillUpload) formulaColumn(columnIndex int) bool {
 	sawFormula := false
-	for rowIndex := 1; rowIndex < r.existingDataRowCount(); rowIndex++ {
-		value := r.existingRows[rowIndex][columnIndex]
+	for ii := 1; ii < r.existingDataRowCount(); ii++ {
+		value := r.existingRows[ii][columnIndex]
 		if value == "" {
 			continue
 		}
-		cell := r.existingSheetData.Rows[rowIndex].Values[columnIndex]
+		cell := r.existingSheetData.Rows[ii].Values[columnIndex]
 		if cell.UserEnteredValue == nil || cell.UserEnteredValue.FormulaValue == nil || *cell.UserEnteredValue.FormulaValue == "" {
 			return false
 		}

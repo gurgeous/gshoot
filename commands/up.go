@@ -14,13 +14,13 @@ import (
 
 // UpCmd uploads a CSV to Google Sheets.
 type UpCmd struct {
+	Sheet       string `help:"Destination sheet name."`
+	Refill      bool   `help:"Merge CSV data INTO the sheet."`
+	Replace     bool   `help:"Create or overwrite the destination sheet."`
 	Filter      bool   `help:"Add a standard Google Sheets filter."`
-	Layout      bool   `help:"Auto-size columns to fit cells."`
+	Layout      bool   `help:"Auto-size column width to fit cells."`
 	Numeric     bool   `help:"Format obvious numeric columns."`
 	Open        bool   `help:"Open the sheet URL when done."`
-	Refill      bool   `help:"Merge CSV data into the destination sheet."`
-	Replace     bool   `help:"Create or overwrite the destination sheet."`
-	Sheet       string `help:"Destination sheet name."`
 	Spreadsheet string `arg:"" name:"spreadsheet" help:"Spreadsheet name."`
 	CSVPath     string `arg:"" name:"csv" type:"path" help:"CSV file to upload."`
 }

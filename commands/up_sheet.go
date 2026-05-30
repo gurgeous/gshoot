@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -20,8 +21,9 @@ const (
 )
 
 var (
-	integerRE = regexp.MustCompile(`\A-?\d+\z`)
-	decimalRE = regexp.MustCompile(`\A-?\d+(?:\.\d+)?\z`)
+	integerRE     = regexp.MustCompile(`\A-?\d+\z`)
+	decimalRE     = regexp.MustCompile(`\A-?\d+(?:\.\d+)?\z`)
+	leadingZeroRE = regexp.MustCompile(`\A-?0\d`)
 )
 
 type uploadSheet struct {
@@ -306,6 +308,9 @@ func (s *uploadSheet) numericFormats() map[int]string {
 		if len(values) == 0 || util.AnyContains(values, ",") {
 			continue
 		}
+		if hasLeadingZeroNumber(values) {
+			continue
+		}
 		if util.AllMatch(values, integerRE) {
 			formats[targetColumns[columnIndex]] = "#,##0"
 			continue
@@ -316,6 +321,10 @@ func (s *uploadSheet) numericFormats() map[int]string {
 		formats[targetColumns[columnIndex]] = "#,##0." + strings.Repeat("0", util.DecimalPrecision(values))
 	}
 	return formats
+}
+
+func hasLeadingZeroNumber(values []string) bool {
+	return slices.ContainsFunc(values, leadingZeroRE.MatchString)
 }
 
 // csvTargetColumns maps CSV columns to upload target columns.

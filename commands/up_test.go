@@ -177,6 +177,37 @@ func TestUpCommandAppliesFilterNumericAndLayout(t *testing.T) {
 	assertBatchContains(t, batches, "updateDimensionProperties", `"pixelSize":140`)
 }
 
+func TestUpCommandNumericSkipsLeadingZeroColumns(t *testing.T) {
+	csvPath := writeCSV(t, "zip,ratio\n01234,0.123\n98765,0.5\n")
+	batches := []map[string]any{}
+
+	err, _, _ := testCommand(t, &UpCmd{
+		Spreadsheet: "Budget",
+		CSVPath:     csvPath,
+		Numeric:     true,
+	}, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/drive/v3/files":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"files": []map[string]string{{"id": "sheet-1", "name": "Budget"}},
+			})
+		case r.URL.Path == "/v4/spreadsheets/sheet-1":
+			writeSpreadsheet(w, "Sheet1", 0, nil)
+		case strings.HasPrefix(r.URL.Path, "/v4/spreadsheets/sheet-1/values/"):
+			_ = json.NewEncoder(w).Encode(map[string]any{"values": []any{}})
+		case r.URL.Path == "/v4/spreadsheets/sheet-1:batchUpdate":
+			batches = append(batches, readBatch(t, r))
+			writeBatchReply(w)
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	})
+
+	assert.NoError(t, err)
+	assertBatchContains(t, batches, "repeatCell", `"startColumnIndex":1`, `"pattern":"#,##0.000"`)
+	assertBatchMissing(t, batches, "repeatCell", `"startColumnIndex":0`)
+}
+
 func writeCSV(t *testing.T, content string) string {
 	t.Helper()
 
@@ -266,4 +297,26 @@ func assertBatchContains(t *testing.T, batches []map[string]any, requestName str
 		}
 	}
 	t.Fatalf("batch request %q missing snippets %v in %#v", requestName, snippets, batches)
+}
+
+func assertBatchMissing(t *testing.T, batches []map[string]any, requestName string, snippets ...string) {
+	t.Helper()
+
+	for _, batch := range batches {
+		raw, err := json.Marshal(batch)
+		assert.NoError(t, err)
+		text := string(raw)
+		if !strings.Contains(text, requestName) {
+			continue
+		}
+		found := true
+		for _, snippet := range snippets {
+			if !strings.Contains(text, snippet) {
+				found = false
+			}
+		}
+		if found {
+			t.Fatalf("batch request %q unexpectedly had snippets %v in %#v", requestName, snippets, batch)
+		}
+	}
 }
