@@ -107,8 +107,8 @@ func (c *UpCmd) upload(ctx context.Context, client *google.Client, dots *ux.Dots
 	//
 
 	dots.SetDescription(fmt.Sprintf("uploading %d rows to file '%s', sheet '%s'...", len(rows), file.Name, c.Sheet))
-	sheet := newUploadSheet(ctx, client, file.ID, spreadsheet, c, rows)
-	if err := sheet.ensure(); err != nil {
+	s := newUploadSheet(ctx, client, file.ID, spreadsheet, c, rows)
+	if err := s.ensure(); err != nil {
 		return nil, err
 	}
 
@@ -116,45 +116,33 @@ func (c *UpCmd) upload(ctx context.Context, client *google.Client, dots *ux.Dots
 	// --refill
 	//
 
-	var refill *sheetRefill
+	var refill *refiller
 	if c.Refill {
-		refill, err = newSheetRefill(sheet)
+		refill, err = newRefiller(s)
 		if err != nil {
 			return nil, err
 		}
-		sheet.rows, err = refill.mergedRows()
+		s.rows, err = refill.mergedRows()
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	//
-	// --replace
-	//
-
-	if c.Replace {
-		if err := sheet.clear(); err != nil {
-			return nil, err
+	pipeline := []struct { on  bool run func() error }{
+		{c.Replace, s.clear}, // --replace
+		{true, s.grow},       // add padding
+		{true, s.paste},      // paste local csv
+		{c.Refill, func() error { return refill.extend() }}, // --refill
+		{s.filter, s.addFilter},                             // --filter
+		{s.numeric, s.applyNumeric},                         // --numeric
+		{s.layout, s.applyLayout},                           // --layout
+	}
+	for _, p := range pipeline {
+		if p.on {
+			if err := p.run(); err != nil {
+				return nil, err
+			}
 		}
-	}
-
-	//
-	// apply various flags
-	//
-
-	if err := sheet.resize(); err != nil {
-		return nil, err
-	}
-	if err := sheet.paste(); err != nil {
-		return nil, err
-	}
-	if c.Refill {
-		if err := refill.extend(); err != nil {
-			return nil, err
-		}
-	}
-	if err := sheet.applyOptions(); err != nil {
-		return nil, err
 	}
 
 	//

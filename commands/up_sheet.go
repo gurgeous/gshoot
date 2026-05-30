@@ -138,8 +138,8 @@ func (s *uploadSheet) clear() error {
 	return err
 }
 
-// resize expands the target grid to fit data plus padding.
-func (s *uploadSheet) resize() error {
+// grow expands the target grid to fit data plus padding.
+func (s *uploadSheet) grow() error {
 	_, err := s.client.BatchUpdate(s.ctx, s.fileID, []google.Request{{
 		UpdateSheetProperties: &google.UpdateSheetPropertiesRequest{
 			Properties: google.SheetProperties{
@@ -172,26 +172,8 @@ func (s *uploadSheet) paste() error {
 	return err
 }
 
-// applyOptions applies filter, numeric, and layout options.
-func (s *uploadSheet) applyOptions() error {
-	if s.filter {
-		if err := s.applyFilter(); err != nil {
-			return err
-		}
-	}
-	if s.numeric {
-		if err := s.applyNumeric(); err != nil {
-			return err
-		}
-	}
-	if s.layout {
-		return s.applyLayout()
-	}
-	return nil
-}
-
-// applyFilter adds a standard filter over uploaded data.
-func (s *uploadSheet) applyFilter() error {
+// addFilter adds a standard filter over uploaded data.
+func (s *uploadSheet) addFilter() error {
 	_, err := s.client.BatchUpdate(s.ctx, s.fileID, []google.Request{{
 		SetBasicFilter: &google.SetBasicFilterRequest{
 			Filter: google.BasicFilter{
