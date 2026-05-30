@@ -29,7 +29,7 @@ type CLI struct {
 	Up      commands.UpCmd   `cmd:"" help:"Upload a CSV to Google Sheets."`
 	List    commands.ListCmd `cmd:"" help:"List your Google Sheets."`
 	Peek    commands.PeekCmd `cmd:"" help:"List sheets in a spreadsheet."`
-	Wipe    commands.WipeCmd `cmd:"" help:"Danger! Wipe all sheets and data from a spreadsheet."`
+	Wipe    commands.WipeCmd `cmd:"" help:"Wipe/delete all data from a spreadsheet."`
 }
 
 func main() {
