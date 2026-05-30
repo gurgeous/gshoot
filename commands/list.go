@@ -14,20 +14,11 @@ import (
 type ListCmd struct{}
 
 func (c *ListCmd) Run() error {
-	ctx := context.Background()
-	dots := ux.StartDots(os.Stderr, "connecting to Google Sheets...")
-	client, err := google.NewClient(ctx)
+	// fetch
+	files, err := c.run0()
 	if err != nil {
 		return err
 	}
-
-	dots.SetDescription("getting list of spreadsheets...")
-	files, err := client.ListSpreadsheetFiles(ctx, 20)
-	if err != nil {
-		return err
-	}
-	dots.SetDescription(fmt.Sprintf("%d most recent spreadsheets", len(files)))
-	dots.Stop()
 
 	// print
 	for i, file := range files {
@@ -44,4 +35,23 @@ func (c *ListCmd) Run() error {
 	}
 
 	return nil
+}
+
+func (c *ListCmd) run0() ([]*google.File, error) {
+	dots := ux.StartDots(os.Stderr, "connecting to Google Sheets...")
+	defer dots.Stop()
+
+	ctx := context.Background()
+	client, err := google.NewClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	dots.SetDescription("getting list of spreadsheets...")
+	files, err := client.ListSpreadsheetFiles(ctx, 20)
+	if err != nil {
+		return nil, err
+	}
+	dots.SetDescription(fmt.Sprintf("%d most recent spreadsheets", len(files)))
+	return files, nil
 }
