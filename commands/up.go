@@ -112,24 +112,24 @@ func (c *UpCmd) upload(ctx context.Context, client *google.Client, dots *ux.Dots
 		return nil, err
 	}
 
-	uploadRows := rows
-	var refill *refillUpload
+	//
+	// --refill
+	//
+
+	var refill *sheetRefill
 	if c.Refill {
-		refillData, err := newRefillUpload(ctx, client, file.ID, sheet.id, sheet.title, rows)
+		refill, err = newSheetRefill(sheet)
 		if err != nil {
 			return nil, err
 		}
-		merged, err := refillData.rows()
+		sheet.rows, err = refill.rows()
 		if err != nil {
 			return nil, err
 		}
-		refill = refillData
-		uploadRows = merged
 	}
-	sheet.rows = uploadRows
 
 	//
-	// apply various flags
+	// --replace
 	//
 
 	if c.Replace {
@@ -137,6 +137,11 @@ func (c *UpCmd) upload(ctx context.Context, client *google.Client, dots *ux.Dots
 			return nil, err
 		}
 	}
+
+	//
+	// apply various flags
+	//
+
 	if err := sheet.resize(); err != nil {
 		return nil, err
 	}
@@ -144,7 +149,7 @@ func (c *UpCmd) upload(ctx context.Context, client *google.Client, dots *ux.Dots
 		return nil, err
 	}
 	if c.Refill {
-		if err := refill.apply(sheet); err != nil {
+		if err := refill.apply(); err != nil {
 			return nil, err
 		}
 	}

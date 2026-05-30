@@ -4,7 +4,6 @@ package commands
 // preserving existing user-entered values, formats, and formula columns.
 
 import (
-	"context"
 	"fmt"
 	"sort"
 	"strings"
@@ -13,44 +12,29 @@ import (
 	"github.com/gurgeous/gshoot/util"
 )
 
-type refillUpload struct {
-	ctx               context.Context
-	client            *google.Client
-	fileID            string
-	sheetID           int64
-	sheetTitle        string
-	csvRows           google.Rows
-	existingRows      google.Rows
-	existingUserRows  google.Rows
-	existingSheetData *google.SheetData
+type sheetRefill struct {
+	sheet             *uploadSheet      // target sheet being refilled
+	csvRows           google.Rows       // original incoming CSV rows
+	existingRows      google.Rows       // existing displayed values
+	existingUserRows  google.Rows       // existing user-entered values
+	existingSheetData *google.SheetData // existing grid data for formats/formulas
 }
 
-// newRefillUpload loads existing sheet data needed for refill.
-func newRefillUpload(
-	ctx context.Context,
-	client *google.Client,
-	fileID string,
-	sheetID int64,
-	sheetTitle string,
-	csvRows google.Rows,
-) (*refillUpload, error) {
-	existingRows, err := client.GetRows(ctx, fileID, sheetTitle)
+// newSheetRefill loads existing sheet data needed for refill.
+func newSheetRefill(sheet *uploadSheet) (*sheetRefill, error) {
+	existingRows, err := sheet.client.GetRows(sheet.ctx, sheet.fileID, sheet.title)
 	if err != nil {
 		return nil, err
 	}
 
-	refreshed, err := client.GetSpreadsheetWithGridData(ctx, fileID, sheetTitle)
+	refreshed, err := sheet.client.GetSpreadsheetWithGridData(sheet.ctx, sheet.fileID, sheet.title)
 	if err != nil {
 		return nil, err
 	}
-	existingSheetData := refreshed.Data[sheetID]
-	return &refillUpload{
-		ctx:               ctx,
-		client:            client,
-		fileID:            fileID,
-		sheetID:           sheetID,
-		sheetTitle:        sheetTitle,
-		csvRows:           csvRows,
+	existingSheetData := refreshed.Data[sheet.id]
+	return &sheetRefill{
+		sheet:             sheet,
+		csvRows:           sheet.rows,
 		existingRows:      existingRows,
 		existingUserRows:  userEnteredRows(existingSheetData),
 		existingSheetData: existingSheetData,
@@ -58,7 +42,7 @@ func newRefillUpload(
 }
 
 // rows merges CSV rows into the existing sheet shape.
-func (r *refillUpload) rows() (google.Rows, error) {
+func (r *sheetRefill) rows() (google.Rows, error) {
 	if len(r.existingRows) == 0 {
 		return r.csvRows, nil
 	}
@@ -101,19 +85,19 @@ func (r *refillUpload) rows() (google.Rows, error) {
 }
 
 // apply copies refill formats, formulas, and clears padding formats.
-func (r *refillUpload) apply(sheet *uploadSheet) error {
-	if err := r.applyFormats(sheet); err != nil {
+func (r *sheetRefill) apply() error {
+	if err := r.applyFormats(); err != nil {
 		return err
 	}
-	if err := r.applyFormulas(sheet); err != nil {
+	if err := r.applyFormulas(); err != nil {
 		return err
 	}
-	return r.clearPaddingFormats(sheet)
+	return r.clearPaddingFormats()
 }
 
 // applyFormats copies existing data-row formats across refilled columns.
-func (r *refillUpload) applyFormats(sheet *uploadSheet) error {
-	if len(r.existingRows) < 2 || len(sheet.rows) <= 1 {
+func (r *sheetRefill) applyFormats() error {
+	if len(r.existingRows) < 2 || len(r.sheet.rows) <= 1 {
 		return nil
 	}
 	requests := []google.Request{}
@@ -121,16 +105,16 @@ func (r *refillUpload) applyFormats(sheet *uploadSheet) error {
 		requests = append(requests, google.Request{
 			CopyPaste: &google.CopyPasteRequest{
 				Source: google.GridRange{
-					SheetID:          sheet.id,
+					SheetID:          r.sheet.id,
 					StartRowIndex:    1,
 					EndRowIndex:      2,
 					StartColumnIndex: columnIndex,
 					EndColumnIndex:   columnIndex + 1,
 				},
 				Destination: google.GridRange{
-					SheetID:          sheet.id,
+					SheetID:          r.sheet.id,
 					StartRowIndex:    1,
-					EndRowIndex:      len(sheet.rows),
+					EndRowIndex:      len(r.sheet.rows),
 					StartColumnIndex: columnIndex,
 					EndColumnIndex:   columnIndex + 1,
 				},
@@ -142,14 +126,14 @@ func (r *refillUpload) applyFormats(sheet *uploadSheet) error {
 	if len(requests) == 0 {
 		return nil
 	}
-	_, err := r.client.BatchUpdate(r.ctx, r.fileID, requests)
+	_, err := r.sheet.client.BatchUpdate(r.sheet.ctx, r.sheet.fileID, requests)
 	return err
 }
 
 // applyFormulas extends non-CSV formula columns during refill.
-func (r *refillUpload) applyFormulas(sheet *uploadSheet) error {
+func (r *sheetRefill) applyFormulas() error {
 	existingRows := r.existingDataRowCount()
-	if len(sheet.rows) <= existingRows || existingRows < 2 {
+	if len(r.sheet.rows) <= existingRows || existingRows < 2 {
 		return nil
 	}
 	formulaColumns, err := r.formulaColumns(existingRows)
@@ -161,16 +145,16 @@ func (r *refillUpload) applyFormulas(sheet *uploadSheet) error {
 		requests = append(requests, google.Request{
 			CopyPaste: &google.CopyPasteRequest{
 				Source: google.GridRange{
-					SheetID:          sheet.id,
+					SheetID:          r.sheet.id,
 					StartRowIndex:    1,
 					EndRowIndex:      existingRows,
 					StartColumnIndex: columnIndex,
 					EndColumnIndex:   columnIndex + 1,
 				},
 				Destination: google.GridRange{
-					SheetID:          sheet.id,
+					SheetID:          r.sheet.id,
 					StartRowIndex:    1,
-					EndRowIndex:      len(sheet.rows),
+					EndRowIndex:      len(r.sheet.rows),
 					StartColumnIndex: columnIndex,
 					EndColumnIndex:   columnIndex + 1,
 				},
@@ -182,21 +166,21 @@ func (r *refillUpload) applyFormulas(sheet *uploadSheet) error {
 	if len(requests) == 0 {
 		return nil
 	}
-	_, err = r.client.BatchUpdate(r.ctx, r.fileID, requests)
+	_, err = r.sheet.client.BatchUpdate(r.sheet.ctx, r.sheet.fileID, requests)
 	return err
 }
 
 // clearPaddingFormats clears formatting outside the refilled data area.
-func (r *refillUpload) clearPaddingFormats(sheet *uploadSheet) error {
-	_, err := r.client.BatchUpdate(r.ctx, r.fileID, []google.Request{
+func (r *sheetRefill) clearPaddingFormats() error {
+	_, err := r.sheet.client.BatchUpdate(r.sheet.ctx, r.sheet.fileID, []google.Request{
 		{
 			RepeatCell: &google.RepeatCellRequest{
 				Range: google.GridRange{
-					SheetID:          sheet.id,
-					StartRowIndex:    len(sheet.rows),
-					EndRowIndex:      len(sheet.rows) + gridPadding,
+					SheetID:          r.sheet.id,
+					StartRowIndex:    len(r.sheet.rows),
+					EndRowIndex:      len(r.sheet.rows) + gridPadding,
 					StartColumnIndex: 0,
-					EndColumnIndex:   len(sheet.rows[0]) + gridPadding,
+					EndColumnIndex:   len(r.sheet.rows[0]) + gridPadding,
 				},
 				Cell:   google.CellData{UserEnteredFormat: &google.CellFormat{}},
 				Fields: "userEnteredFormat",
@@ -205,11 +189,11 @@ func (r *refillUpload) clearPaddingFormats(sheet *uploadSheet) error {
 		{
 			RepeatCell: &google.RepeatCellRequest{
 				Range: google.GridRange{
-					SheetID:          sheet.id,
+					SheetID:          r.sheet.id,
 					StartRowIndex:    0,
-					EndRowIndex:      len(sheet.rows),
-					StartColumnIndex: len(sheet.rows[0]),
-					EndColumnIndex:   len(sheet.rows[0]) + gridPadding,
+					EndRowIndex:      len(r.sheet.rows),
+					StartColumnIndex: len(r.sheet.rows[0]),
+					EndColumnIndex:   len(r.sheet.rows[0]) + gridPadding,
 				},
 				Cell:   google.CellData{UserEnteredFormat: &google.CellFormat{}},
 				Fields: "userEnteredFormat",
@@ -220,7 +204,7 @@ func (r *refillUpload) clearPaddingFormats(sheet *uploadSheet) error {
 }
 
 // formulaColumns returns non-CSV columns that contain formulas.
-func (r *refillUpload) formulaColumns(existingRows int) ([]int, error) {
+func (r *sheetRefill) formulaColumns(existingRows int) ([]int, error) {
 	existingCSV := map[int]bool{}
 	for _, columnIndex := range r.existingCSVColumns() {
 		existingCSV[columnIndex] = true
@@ -242,7 +226,7 @@ func (r *refillUpload) formulaColumns(existingRows int) ([]int, error) {
 }
 
 // formulaColumn reports whether a non-CSV column should be formula-extended.
-func (r *refillUpload) formulaColumn(columnIndex int, existingRows int) (bool, error) {
+func (r *sheetRefill) formulaColumn(columnIndex int, existingRows int) (bool, error) {
 	sawFormula := false
 	for ii := 1; ii < existingRows; ii++ {
 		value := r.existingRows[ii][columnIndex]
@@ -250,13 +234,13 @@ func (r *refillUpload) formulaColumn(columnIndex int, existingRows int) (bool, e
 			continue
 		}
 		if r.existingSheetData == nil {
-			return false, fmt.Errorf("missing grid data for sheet %s", r.sheetTitle)
+			return false, fmt.Errorf("missing grid data for sheet %s", r.sheet.title)
 		}
 		if ii >= len(r.existingSheetData.Rows) {
-			return false, fmt.Errorf("missing grid data for sheet %s row %d", r.sheetTitle, ii+1)
+			return false, fmt.Errorf("missing grid data for sheet %s row %d", r.sheet.title, ii+1)
 		}
 		if columnIndex >= len(r.existingSheetData.Rows[ii].Values) {
-			return false, fmt.Errorf("missing grid data for sheet %s row %d column %d", r.sheetTitle, ii+1, columnIndex+1)
+			return false, fmt.Errorf("missing grid data for sheet %s row %d column %d", r.sheet.title, ii+1, columnIndex+1)
 		}
 		cell := r.existingSheetData.Rows[ii].Values[columnIndex]
 		if cell.UserEnteredValue == nil || cell.UserEnteredValue.FormulaValue == nil || *cell.UserEnteredValue.FormulaValue == "" {
@@ -268,7 +252,7 @@ func (r *refillUpload) formulaColumn(columnIndex int, existingRows int) (bool, e
 }
 
 // existingDataRowCount returns the existing rows covered by the filter or data.
-func (r *refillUpload) existingDataRowCount() int {
+func (r *sheetRefill) existingDataRowCount() int {
 	count := len(r.existingRows)
 	if r.existingSheetData != nil && r.existingSheetData.BasicFilter != nil && r.existingSheetData.BasicFilter.Range.EndRowIndex > 0 {
 		count = r.existingSheetData.BasicFilter.Range.EndRowIndex
@@ -277,7 +261,7 @@ func (r *refillUpload) existingDataRowCount() int {
 }
 
 // existingCSVColumns returns existing sheet columns that also appear in the CSV.
-func (r *refillUpload) existingCSVColumns() []int {
+func (r *sheetRefill) existingCSVColumns() []int {
 	csvHeaders := map[string]bool{}
 	for _, header := range r.csvRows[0] {
 		csvHeaders[header] = true
@@ -308,7 +292,7 @@ func userEnteredRows(data *google.SheetData) google.Rows {
 }
 
 // validateHeaders rejects duplicate non-empty headers.
-func (r *refillUpload) validateHeaders(headers []string, label string) error {
+func (r *sheetRefill) validateHeaders(headers []string, label string) error {
 	counts := map[string]int{}
 	for _, header := range headers {
 		if header != "" {

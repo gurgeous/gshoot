@@ -16,32 +16,32 @@ import (
 )
 
 const (
-	defaultUploadSheet = "gsheet_up"
-	gridPadding        = 2
-	sheetPrefix        = "gsheet_"
-	layoutPadding      = 20
+	defaultUploadSheet = "gsheet_up" // default sheet name for refill/replace
+	gridPadding        = 2           // empty rows/columns kept around uploaded data
+	sheetPrefix        = "gsheet_"   // prefix for generated upload sheet names
+	layoutPadding      = 20          // extra pixels added after auto-sizing columns
 )
 
 var (
-	integerRE     = regexp.MustCompile(`\A-?\d+\z`)
-	decimalRE     = regexp.MustCompile(`\A-?\d+(?:\.\d+)?\z`)
-	leadingZeroRE = regexp.MustCompile(`\A-?0\d`)
+	integerRE     = regexp.MustCompile(`\A-?\d+\z`)           // whole-number detector for numeric formatting
+	decimalRE     = regexp.MustCompile(`\A-?\d+(?:\.\d+)?\z`) // decimal detector for numeric formatting
+	leadingZeroRE = regexp.MustCompile(`\A-?0\d`)             // numeric-looking value that should remain text
 )
 
 type uploadSheet struct {
-	ctx         context.Context
-	client      *google.Client
-	fileID      string
-	spreadsheet *google.Spreadsheet
-	title       string
-	id          int64
-	rows        google.Rows
-	refill      bool
-	replace     bool
-	sheetName   string
-	filter      bool
-	numeric     bool
-	layout      bool
+	ctx         context.Context     // request context for Google calls
+	client      *google.Client      // Google API client
+	fileID      string              // spreadsheet file ID
+	spreadsheet *google.Spreadsheet // current spreadsheet metadata
+	title       string              // target sheet title
+	id          int64               // target sheet ID after ensure
+	rows        google.Rows         // rows to paste into the target sheet
+	refill      bool                // paste values only and preserve formulas
+	replace     bool                // clear or create the destination sheet
+	sheetName   string              // explicit destination sheet name
+	filter      bool                // apply a basic filter after upload
+	numeric     bool                // format obvious numeric columns
+	layout      bool                // auto-size columns with padding
 }
 
 // newUploadSheet creates a target sheet mutator.
