@@ -35,6 +35,9 @@ func (c *UpCmd) Run() error {
 	// read csv
 	//
 
+	dots := ux.StartDots(os.Stderr, "reading csv...")
+	defer dots.Stop()
+
 	rows, err := c.readCSV()
 	if err != nil {
 		return err
@@ -44,10 +47,8 @@ func (c *UpCmd) Run() error {
 	// init
 	//
 
+	dots.SetDescription("connecting to Google Sheets...")
 	ctx := context.Background()
-	dots := ux.StartDots(os.Stderr, "connecting to Google Sheets...")
-	defer dots.Stop()
-
 	client, err := google.NewClient(ctx)
 	if err != nil {
 		return err
@@ -57,18 +58,13 @@ func (c *UpCmd) Run() error {
 	// upload
 	//
 
-	runner := &upRunner{
-		cmd:    c,
-		ctx:    ctx,
-		client: client,
-		rows:   rows,
-	}
-	if err := runner.upload(dots); err != nil {
+	file, err := c.upload(ctx, client, dots, rows)
+	if err != nil {
 		return err
 	}
 
-	// show url & open
-	url := util.SpreadsheetURL(runner.file.ID) + "/edit"
+	// print url and maybe open
+	url := util.SpreadsheetURL(file.ID) + "/edit"
 	fmt.Println(url)
 	if c.Open {
 		util.OpenBrowserURL(url)
@@ -76,18 +72,8 @@ func (c *UpCmd) Run() error {
 	return nil
 }
 
-type upRunner struct {
-	cmd         *UpCmd              // parsed CLI options
-	ctx         context.Context     // upload request context
-	client      *google.Client      // Google API client
-	file        *google.File        // target File
-	spreadsheet *google.Spreadsheet // target Spreadsheet
-	rows        google.Rows         // CSV rows from disk
-	sheet       *uploadSheet        // target sheet mutator
-}
-
 // upload runs the complete upload workflow.
-func (u *upRunner) upload(dots *ux.Dots) error {
+func (c *UpCmd) upload(ctx context.Context, client *google.Client, dots *ux.Dots, rows google.Rows) (*google.File, error) {
 	var err error
 
 	//
@@ -95,97 +81,84 @@ func (u *upRunner) upload(dots *ux.Dots) error {
 	//
 
 	dots.SetDescription("finding spreadsheet file...")
-	u.file, err = u.client.FindSpreadsheet(u.ctx, u.cmd.Spreadsheet)
+	file, err := client.FindSpreadsheet(ctx, c.Spreadsheet)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if u.file == nil {
-		dots.SetDescription(fmt.Sprintf("creating new spreadsheet '%s'...", u.cmd.Spreadsheet))
-		u.file, err = u.client.CreateSpreadsheet(u.ctx, u.cmd.Spreadsheet)
+	if file == nil {
+		dots.SetDescription(fmt.Sprintf("creating new spreadsheet '%s'...", c.Spreadsheet))
+		file, err = client.CreateSpreadsheet(ctx, c.Spreadsheet)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	//
-	// get Spreadsheet metadata
+	// get Spreadsheet from that file
 	//
 
-	u.spreadsheet, err = u.client.GetSpreadsheet(u.ctx, u.file.ID)
+	dots.SetDescription("fetching spreadsheet metadata...")
+	spreadsheet, err := client.GetSpreadsheet(ctx, file.ID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	u.sheet = newUploadSheet(u.ctx, u.client, u.file.ID, u.spreadsheet, u.cmd, u.rows)
+	//
+	// find/create sheet
+	//
 
-	dots.SetDescription(fmt.Sprintf("uploading %d rows to file '%s', sheet '%s'...", len(u.rows), u.file.Name, u.sheet.title))
-	if err := u.sheet.ensure(u.cmd); err != nil {
-		return err
+	dots.SetDescription(fmt.Sprintf("uploading %d rows to file '%s', sheet '%s'...", len(rows), file.Name, c.Sheet))
+	sheet := newUploadSheet(ctx, client, file.ID, spreadsheet, c, rows)
+	if err := sheet.ensure(c); err != nil {
+		return nil, err
 	}
 
-	uploadRows := u.rows
+	uploadRows := rows
 	var refill *refillUpload
-	if u.cmd.Refill {
-		refillData, err := newRefillUpload(u.ctx, u.client, u.file.ID, u.sheet.id, u.sheet.title, u.rows)
+	if c.Refill {
+		refillData, err := newRefillUpload(ctx, client, file.ID, sheet.id, sheet.title, rows)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		merged, err := refillData.rows()
 		if err != nil {
-			return err
+			return nil, err
 		}
 		refill = refillData
 		uploadRows = merged
 	}
-	u.sheet.rows = uploadRows
+	sheet.rows = uploadRows
 
-	if u.cmd.Replace {
-		if err := u.sheet.clear(); err != nil {
-			return err
+	//
+	// apply our options
+	//
+
+	if c.Replace {
+		if err := sheet.clear(); err != nil {
+			return nil, err
 		}
 	}
-	if err := u.sheet.resize(); err != nil {
-		return err
+	if err := sheet.resize(); err != nil {
+		return nil, err
 	}
-	if err := u.sheet.paste(); err != nil {
-		return err
+	if err := sheet.paste(); err != nil {
+		return nil, err
 	}
-	if refill != nil {
-		if err := refill.apply(u.sheet); err != nil {
-			return err
+	if c.Refill {
+		if err := refill.apply(sheet); err != nil {
+			return nil, err
 		}
 	}
-	return u.sheet.applyOptions(u.cmd)
+	if err := sheet.applyOptions(c); err != nil {
+		return nil, err
+	}
+	return file, nil
 }
 
-// findOrCreateFile finds the target spreadsheet or creates it.
-func (u *upRunner) findOrCreateFile(dots *ux.Dots) error {
-	dots.SetDescription("finding spreadsheet...")
-	file, err := u.client.FindSpreadsheet(u.ctx, u.cmd.Spreadsheet)
-	if err != nil {
-		return err
-	}
-	if file != nil {
-		u.file = file
-		return nil
-	}
-
-	dots.SetDescription(fmt.Sprintf("creating '%s'...", u.cmd.Spreadsheet))
-	u.file, err = u.client.CreateSpreadsheet(u.ctx, u.cmd.Spreadsheet)
-	return err
-}
-
-// loadSpreadsheet fetches sheet metadata for the selected file.
-func (u *upRunner) loadSpreadsheet() error {
-	spreadsheet, err := u.client.GetSpreadsheet(u.ctx, u.file.ID)
-	if err != nil {
-		return err
-	}
-	u.spreadsheet = spreadsheet
-	return nil
-}
-
+//
 // readCSV reads and rectangularizes the input CSV.
+//
+
 func (c *UpCmd) readCSV() (google.Rows, error) {
 	file, err := os.Open(c.CSVPath)
 	if err != nil {
