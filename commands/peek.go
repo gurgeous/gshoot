@@ -36,7 +36,7 @@ func (c *PeekCmd) run0() ([]*google.Sheet, error) {
 	}
 	defer cmd.stop()
 
-	cmd.dots.SetDescription("peeking sheets...")
+	cmd.dots.SayPeekSheets(cmd.file.Name)
 	sheets, err := cmd.client.GetSheets(cmd.ctx, cmd.file.ID)
 	if err != nil {
 		return nil, err

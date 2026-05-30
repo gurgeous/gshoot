@@ -34,6 +34,7 @@ func (c *ListCmd) Run() error {
 func (c *ListCmd) run0() ([]*google.File, error) {
 	dots := ux.StartDots(os.Stderr)
 	defer dots.Stop()
+	dots.SayConnectGoogle()
 
 	ctx := context.Background()
 	client, err := google.NewClient(ctx)
@@ -41,12 +42,12 @@ func (c *ListCmd) run0() ([]*google.File, error) {
 		return nil, err
 	}
 
-	dots.SetDescription("getting list of files...")
+	dots.SayListFiles()
 	files, err := client.ListSpreadsheetFiles(ctx, 20)
 	if err != nil {
 		return nil, err
 	}
 
-	dots.SetDescription(fmt.Sprintf("%d most recent spreadsheets", len(files)))
+	dots.SayListedSpreadsheets(len(files))
 	return files, nil
 }

@@ -49,7 +49,7 @@ func (c *DownCmd) run0() (google.Rows, error) {
 	// find sheet
 	//
 
-	cmd.dots.SetDescription("finding sheet...")
+	cmd.dots.SayFindSheet(c.Sheet)
 	sheet, err := cmd.client.FindSheet(cmd.ctx, cmd.file.ID, c.Sheet)
 	if err != nil {
 		return nil, err
@@ -62,14 +62,14 @@ func (c *DownCmd) run0() (google.Rows, error) {
 	// download
 	//
 
-	cmd.dots.SetDescription("downloading rows...")
+	cmd.dots.SayDownloadRows(cmd.file.Name)
 	rows, err := cmd.client.GetRows(cmd.ctx, cmd.file.ID, sheet.Title)
 	if err != nil {
 		return nil, err
 	}
 	isStdout := c.Output == "" || c.Output == "-"
 	if !isStdout {
-		cmd.dots.SetDescription(fmt.Sprintf("saving %d rows to %s...", len(rows), c.Output))
+		cmd.dots.SaySaveRows(len(rows), c.Output)
 	}
 	return rows, nil
 }

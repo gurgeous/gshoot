@@ -68,7 +68,7 @@ func (c *UpCmd) upload(cmd *srun, rows google.Rows) (*google.File, error) {
 	// get Spreadsheet for that File
 	//
 
-	cmd.dots.SetDescription("fetching spreadsheet metadata...")
+	cmd.dots.SayFetchSpreadsheet(cmd.file.Name)
 	spreadsheet, err := cmd.client.GetSpreadsheet(cmd.ctx, cmd.file.ID)
 	if err != nil {
 		return nil, err
@@ -78,7 +78,7 @@ func (c *UpCmd) upload(cmd *srun, rows google.Rows) (*google.File, error) {
 	// find/create target sheet
 	//
 
-	cmd.dots.SetDescription(fmt.Sprintf("uploading %d rows to file '%s', sheet '%s'...", len(rows), cmd.file.Name, c.Sheet))
+	cmd.dots.SayUploadRows(len(rows), cmd.file.Name, c.Sheet)
 	s := newUploader(cmd.ctx, cmd.client, cmd.file, spreadsheet, c, rows)
 	s.id, err = s.resolveTargetSheet()
 	if err != nil {

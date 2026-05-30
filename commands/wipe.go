@@ -1,9 +1,5 @@
 package commands
 
-import (
-	"fmt"
-)
-
 // WipeCmd resets a spreadsheet to one blank Sheet1.
 type WipeCmd struct {
 	Spreadsheet string `arg:"" name:"spreadsheet" help:"Spreadsheet name."`
@@ -17,12 +13,10 @@ func (c *WipeCmd) Run() error {
 	}
 	defer cmd.stop()
 
-	cmd.dots.SetDescription("wiping spreadsheet...")
+	cmd.dots.SayWipeSpreadsheet(cmd.file.Name)
 	if err := cmd.client.WipeSpreadsheet(cmd.ctx, cmd.file.ID); err != nil {
 		return err
 	}
-	cmd.dots.SetDescription("wiped " + cmd.file.Name)
-
-	fmt.Println("wiped " + cmd.file.Name)
+	cmd.dots.SayWipedSpreadsheet(cmd.file.Name)
 	return nil
 }

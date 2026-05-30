@@ -26,6 +26,7 @@ type srun struct {
 func srunStart(opts srunOptions) (*srun, error) {
 	ctx := context.Background()
 	dots := ux.StartDots(os.Stderr)
+	dots.SayConnectGoogle()
 
 	client, err := google.NewClient(ctx)
 	if err != nil {
@@ -35,10 +36,10 @@ func srunStart(opts srunOptions) (*srun, error) {
 
 	var file *google.File
 	if opts.create {
-		dots.SetDescription(fmt.Sprintf("find or create spreadsheet '%s'...", opts.spreadsheet))
+		dots.SayFindOrCreateSpreadsheet(opts.spreadsheet)
 		file, err = client.FindOrCreateSpreadsheetFile(ctx, opts.spreadsheet)
 	} else {
-		dots.SetDescription("finding spreadsheet file...")
+		dots.SayFindSpreadsheet(opts.spreadsheet)
 		file, err = client.FindSpreadsheetFile(ctx, opts.spreadsheet)
 	}
 	if err != nil {
