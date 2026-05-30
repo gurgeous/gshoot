@@ -122,7 +122,7 @@ func main() {
 			boom(msg)
 			fmt.Fprintln(os.Stderr)
 			manager.ShowStatus()
-			return
+			os.Exit(1)
 		}
 	}
 
