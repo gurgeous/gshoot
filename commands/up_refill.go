@@ -51,17 +51,17 @@ func newSheetRefill(sheet *uploadSheet) (*sheetRefill, error) {
 // merge!
 //
 
-func (r *sheetRefill) mergedRows() (google.Rows, error) {
-	if len(r.remoteRows) == 0 {
-		return r.localRows, nil
+func (s *sheetRefill) mergedRows() (google.Rows, error) {
+	if len(s.remoteRows) == 0 {
+		return s.localRows, nil
 	}
 
 	// build final array of headers
-	localHeaders, remoteHeaders := r.localRows[0], r.remoteRows[0]
-	if err := r.validateHeaders(localHeaders, "csv"); err != nil {
+	localHeaders, remoteHeaders := s.localRows[0], s.remoteRows[0]
+	if err := s.validateHeaders(localHeaders, "csv"); err != nil {
 		return nil, err
 	}
-	if err := r.validateHeaders(remoteHeaders, "existing sheet"); err != nil {
+	if err := s.validateHeaders(remoteHeaders, "existing sheet"); err != nil {
 		return nil, err
 	}
 	headers := append([]string(nil), remoteHeaders...)
@@ -75,20 +75,20 @@ func (r *sheetRefill) mergedRows() (google.Rows, error) {
 	// now merge rows
 	//
 
-	merged := make(google.Rows, max(len(r.remoteRows), len(r.localRows)))
+	merged := make(google.Rows, max(len(s.remoteRows), len(s.localRows)))
 	for r := range merged {
 		merged[r] = make([]string, len(headers))
 	}
 
 	// append remote
-	for ii, row := range r.remoteUserRows {
+	for ii, row := range s.remoteUserRows {
 		copy(merged[ii], row)
 	}
 
 	// append local (w/ header remap)
 	for lc, header := range localHeaders {
 		c := util.IndexOfString(headers, header)
-		for r, local := range r.localRows {
+		for r, local := range s.localRows {
 			merged[r][c] = local[lc]
 		}
 	}
@@ -100,26 +100,23 @@ func (r *sheetRefill) mergedRows() (google.Rows, error) {
 // extend formats, formulas, and clears padding formats.
 //
 
-func (r *sheetRefill) extend() error {
+func (s *sheetRefill) extend() error {
 	requests := []google.Request{}
-	nrows := r.remoteDataRowCount()
-	if len(r.sheet.rows) > nrows && nrows >= 2 {
+	nrows := s.remoteDataRowCount()
+	if len(s.sheet.rows) > nrows && nrows >= 2 {
 		// copy FORMATS
-		requests = append(requests, r.copyRequests(r.remoteCSVColumns(), 2, "PASTE_FORMAT")...)
+		requests = append(requests, s.copyRequests(s.sharedRemoteColumns(), 2, "PASTE_FORMAT")...)
 
 		// copy FORMULAS
-		formulaColumns, err := r.formulaColumns(nrows)
-		if err != nil {
-			return err
-		}
-		requests = append(requests, r.copyRequests(formulaColumns, nrows, "PASTE_FORMULA")...)
+		formulaColumns := s.formulaColumns(nrows)
+		requests = append(requests, s.copyRequests(formulaColumns, nrows, "PASTE_FORMULA")...)
 	}
 
 	// clear out the padding rows & cols
-	requests = append(requests, r.clearPaddingRequests()...)
+	requests = append(requests, s.clearPaddingRequests()...)
 
 	// do it
-	_, err := r.sheet.client.BatchUpdate(r.sheet.ctx, r.sheet.fileID, requests)
+	_, err := s.sheet.client.BatchUpdate(s.sheet.ctx, s.sheet.fileID, requests)
 	if err != nil {
 		return err
 	}
@@ -131,22 +128,22 @@ func (r *sheetRefill) extend() error {
 // build CopyPaste Requests for extending cols
 //
 
-func (r *sheetRefill) copyRequests(columns []int, endRow int, pasteType string) []google.Request {
+func (s *sheetRefill) copyRequests(columns []int, endRow int, pasteType string) []google.Request {
 	requests := make([]google.Request, 0, len(columns))
 	for _, c := range columns {
 		requests = append(requests, google.Request{
 			CopyPaste: &google.CopyPasteRequest{
 				Source: google.GridRange{
-					SheetID:          r.sheet.id,
+					SheetID:          s.sheet.id,
 					StartRowIndex:    1,
 					EndRowIndex:      endRow,
 					StartColumnIndex: c,
 					EndColumnIndex:   c + 1,
 				},
 				Destination: google.GridRange{
-					SheetID:          r.sheet.id,
+					SheetID:          s.sheet.id,
 					StartRowIndex:    1,
-					EndRowIndex:      len(r.sheet.rows),
+					EndRowIndex:      len(s.sheet.rows),
 					StartColumnIndex: c,
 					EndColumnIndex:   c + 1,
 				},
@@ -162,13 +159,13 @@ func (r *sheetRefill) copyRequests(columns []int, endRow int, pasteType string) 
 // clears formatting outside the refilled data area.
 //
 
-func (r *sheetRefill) clearPaddingRequests() []google.Request {
-	w, h := len(r.sheet.rows[0]), len(r.sheet.rows)
+func (s *sheetRefill) clearPaddingRequests() []google.Request {
+	w, h := len(s.sheet.rows[0]), len(s.sheet.rows)
 	return []google.Request{
 		{
 			RepeatCell: &google.RepeatCellRequest{
 				Range: google.GridRange{
-					SheetID:          r.sheet.id,
+					SheetID:          s.sheet.id,
 					StartRowIndex:    h,
 					EndRowIndex:      h + gridPadding,
 					StartColumnIndex: 0,
@@ -181,7 +178,7 @@ func (r *sheetRefill) clearPaddingRequests() []google.Request {
 		{
 			RepeatCell: &google.RepeatCellRequest{
 				Range: google.GridRange{
-					SheetID:          r.sheet.id,
+					SheetID:          s.sheet.id,
 					StartRowIndex:    0,
 					EndRowIndex:      h,
 					StartColumnIndex: w,
@@ -195,67 +192,61 @@ func (r *sheetRefill) clearPaddingRequests() []google.Request {
 }
 
 // formulaColumns returns non-CSV columns that contain formulas.
-func (r *sheetRefill) formulaColumns(remoteRows int) ([]int, error) {
-	remoteCSV := map[int]bool{}
-	for _, c := range r.remoteCSVColumns() {
-		remoteCSV[c] = true
+func (s *sheetRefill) formulaColumns(remoteRows int) []int {
+	set := map[int]bool{}
+	for _, c := range s.sharedRemoteColumns() {
+		set[c] = true
 	}
+
 	columns := []int{}
-	for c := range r.remoteRows[0] {
-		if remoteCSV[c] {
+	for c := range s.remoteRows[0] {
+		if set[c] {
 			continue
 		}
-		formulaColumn, err := r.formulaColumn(c, remoteRows)
-		if err != nil {
-			return nil, err
-		}
-		if formulaColumn {
+		if s.formulaColumn(c, remoteRows) {
 			columns = append(columns, c)
 		}
 	}
-	return columns, nil
+	return columns
 }
 
 // formulaColumn reports whether a non-CSV column should be formula-extended.
-func (r *sheetRefill) formulaColumn(columnIndex int, remoteRows int) (bool, error) {
+func (s *sheetRefill) formulaColumn(c int, remoteRows int) bool {
 	sawFormula := false
-	for ii := 1; ii < remoteRows; ii++ {
-		value := r.remoteRows[ii][columnIndex]
+	for r := 1; r < remoteRows; r++ {
+		value := s.remoteRows[r][c]
 		if value == "" {
 			continue
 		}
-		if ii >= len(r.remoteSheetData.Rows) {
-			return false, fmt.Errorf("missing grid data for sheet %s row %d", r.sheet.title, ii+1)
+		if r >= len(s.remoteSheetData.Rows) || c >= len(s.remoteSheetData.Rows[r].Values) {
+			return false
 		}
-		if columnIndex >= len(r.remoteSheetData.Rows[ii].Values) {
-			return false, fmt.Errorf("missing grid data for sheet %s row %d column %d", r.sheet.title, ii+1, columnIndex+1)
-		}
-		cell := r.remoteSheetData.Rows[ii].Values[columnIndex]
+		cell := s.remoteSheetData.Rows[r].Values[c]
 		if cell.UserEnteredValue == nil || cell.UserEnteredValue.FormulaValue == nil || *cell.UserEnteredValue.FormulaValue == "" {
-			return false, nil
+			return false
 		}
 		sawFormula = true
 	}
-	return sawFormula, nil
+	return sawFormula
 }
 
 // remoteDataRowCount returns remote rows covered by the filter or data.
-func (r *sheetRefill) remoteDataRowCount() int {
-	count := len(r.remoteRows)
-	if r.remoteSheetData.BasicFilter != nil && r.remoteSheetData.BasicFilter.Range.EndRowIndex > 0 {
-		count = r.remoteSheetData.BasicFilter.Range.EndRowIndex
+func (s *sheetRefill) remoteDataRowCount() int {
+	count := len(s.remoteRows)
+	if s.remoteSheetData.BasicFilter != nil && s.remoteSheetData.BasicFilter.Range.EndRowIndex > 0 {
+		count = s.remoteSheetData.BasicFilter.Range.EndRowIndex
 	}
-	return min(count, len(r.remoteRows))
+	return min(count, len(s.remoteRows))
 }
 
-// remoteCSVColumns returns remote columns that also appear in the CSV.
-func (r *sheetRefill) remoteCSVColumns() []int {
+// returns columns that are both local and remote
+func (s *sheetRefill) sharedRemoteColumns() []int {
 	csvHeaders := map[string]bool{}
-	for _, header := range r.localRows[0] {
+	for _, header := range s.localRows[0] {
 		csvHeaders[header] = true
 	}
 	columns := []int{}
-	for c, header := range r.remoteRows[0] {
+	for c, header := range s.remoteRows[0] {
 		if csvHeaders[header] {
 			columns = append(columns, c)
 		}
@@ -281,7 +272,7 @@ func userEnteredRows(data *google.SheetData) google.Rows {
 }
 
 // validateHeaders rejects duplicate headers.
-func (r *sheetRefill) validateHeaders(headers []string, label string) error {
+func (s *sheetRefill) validateHeaders(headers []string, label string) error {
 	counts := map[string]int{}
 	for _, header := range headers {
 		if header != "" {
