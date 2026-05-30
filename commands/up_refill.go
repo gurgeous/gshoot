@@ -280,7 +280,7 @@ func userEnteredRows(data *google.SheetData) google.Rows {
 		}
 		rows = append(rows, values)
 	}
-	return google.Rectangularize(rows)
+	return google.Rows(util.CSVRectangularize(rows))
 }
 
 // validateHeaders rejects duplicate non-empty headers.

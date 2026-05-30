@@ -2,7 +2,6 @@ package commands
 
 import (
 	"context"
-	"encoding/csv"
 	"errors"
 	"fmt"
 	"os"
@@ -38,7 +37,7 @@ func (c *UpCmd) Run() error {
 	dots := ux.StartDots(os.Stderr, "reading csv...")
 	defer dots.Stop()
 
-	rows, err := c.readCSV()
+	rows, err := util.CSVRead(c.CSVPath)
 	if err != nil {
 		return err
 	}
@@ -58,7 +57,7 @@ func (c *UpCmd) Run() error {
 	// upload
 	//
 
-	file, err := c.upload(ctx, client, dots, rows)
+	file, err := c.upload(ctx, client, dots, google.Rows(rows))
 	if err != nil {
 		return err
 	}
@@ -94,7 +93,7 @@ func (c *UpCmd) upload(ctx context.Context, client *google.Client, dots *ux.Dots
 	}
 
 	//
-	// get Spreadsheet from that file
+	// get Spreadsheet for that File
 	//
 
 	dots.SetDescription("fetching spreadsheet metadata...")
@@ -130,7 +129,7 @@ func (c *UpCmd) upload(ctx context.Context, client *google.Client, dots *ux.Dots
 	sheet.rows = uploadRows
 
 	//
-	// apply our options
+	// apply various flags
 	//
 
 	if c.Replace {
@@ -152,31 +151,10 @@ func (c *UpCmd) upload(ctx context.Context, client *google.Client, dots *ux.Dots
 	if err := sheet.applyOptions(c); err != nil {
 		return nil, err
 	}
+
+	//
+	// success!
+	//
+
 	return file, nil
-}
-
-//
-// readCSV reads and rectangularizes the input CSV.
-//
-
-func (c *UpCmd) readCSV() (google.Rows, error) {
-	file, err := os.Open(c.CSVPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("not found: %s", c.CSVPath)
-		}
-		return nil, fmt.Errorf("open csv: %w", err)
-	}
-	defer file.Close()
-
-	reader := csv.NewReader(file)
-	reader.FieldsPerRecord = -1
-	rows, err := reader.ReadAll()
-	if err != nil {
-		return nil, err
-	}
-	if len(rows) == 0 {
-		return nil, fmt.Errorf("csv is empty: %s", c.CSVPath)
-	}
-	return google.Rectangularize(rows), nil
 }

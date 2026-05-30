@@ -169,6 +169,26 @@ func Truncate(s string, length int) string {
 // csv
 //
 
+// CSVRead reads CSV rows and pads them to a rectangular shape.
+func CSVRead(path string) ([][]string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	reader := csv.NewReader(file)
+	reader.FieldsPerRecord = -1
+	rows, err := reader.ReadAll()
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, fmt.Errorf("csv is empty: %s", path)
+	}
+	return CSVRectangularize(rows), nil
+}
+
 func CSVWrite(w io.Writer, rows [][]string) error {
 	writer := csv.NewWriter(w)
 	for _, row := range rows {
@@ -178,6 +198,24 @@ func CSVWrite(w io.Writer, rows [][]string) error {
 	}
 	writer.Flush()
 	return nil
+}
+
+// CSVRectangularize pads rows so every row has the same column count.
+func CSVRectangularize(rows [][]string) [][]string {
+	cols := 0
+	for _, row := range rows {
+		cols = max(cols, len(row))
+	}
+
+	out := make([][]string, 0, len(rows))
+	for _, src := range rows {
+		dst := append([]string(nil), src...)
+		if len(dst) < cols {
+			dst = append(dst, make([]string, cols-len(dst))...)
+		}
+		out = append(out, dst)
+	}
+	return out
 }
 
 // CSVString renders rows as CSV text.
