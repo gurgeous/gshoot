@@ -31,18 +31,31 @@ func (c *UpCmd) Run() error {
 		return errors.New("use either --refill or --replace")
 	}
 
+	//
+	// read csv
+	//
+
 	rows, err := c.readCSV()
 	if err != nil {
 		return err
 	}
 
+	//
+	// init
+	//
+
 	ctx := context.Background()
 	dots := ux.StartDots(os.Stderr, "connecting to Google Sheets...")
+	defer dots.Stop()
 
 	client, err := google.NewClient(ctx)
 	if err != nil {
 		return err
 	}
+
+	//
+	// upload
+	//
 
 	runner := &upRunner{
 		cmd:    c,
@@ -54,7 +67,7 @@ func (c *UpCmd) Run() error {
 		return err
 	}
 
-	dots.Stop()
+	// show url & open
 	url := util.SpreadsheetURL(runner.file.ID) + "/edit"
 	fmt.Println(url)
 	if c.Open {
@@ -63,23 +76,43 @@ func (c *UpCmd) Run() error {
 	return nil
 }
 
-// REVIEW: add a suffix comment for each ivar
 type upRunner struct {
 	cmd         *UpCmd              // parsed CLI options
 	ctx         context.Context     // upload request context
 	client      *google.Client      // Google API client
-	file        *google.File        // target spreadsheet file
-	spreadsheet *google.Spreadsheet // target spreadsheet metadata
+	file        *google.File        // target File
+	spreadsheet *google.Spreadsheet // target Spreadsheet
 	rows        google.Rows         // CSV rows from disk
 	sheet       *uploadSheet        // target sheet mutator
 }
 
 // upload runs the complete upload workflow.
 func (u *upRunner) upload(dots *ux.Dots) error {
-	if err := u.findOrCreateFile(dots); err != nil {
+	var err error
+
+	//
+	// find/create File
+	//
+
+	dots.SetDescription("finding spreadsheet file...")
+	u.file, err = u.client.FindSpreadsheet(u.ctx, u.cmd.Spreadsheet)
+	if err != nil {
 		return err
 	}
-	if err := u.loadSpreadsheet(); err != nil {
+	if u.file == nil {
+		dots.SetDescription(fmt.Sprintf("creating new spreadsheet '%s'...", u.cmd.Spreadsheet))
+		u.file, err = u.client.CreateSpreadsheet(u.ctx, u.cmd.Spreadsheet)
+		if err != nil {
+			return err
+		}
+	}
+
+	//
+	// get Spreadsheet metadata
+	//
+
+	u.spreadsheet, err = u.client.GetSpreadsheet(u.ctx, u.file.ID)
+	if err != nil {
 		return err
 	}
 
@@ -125,7 +158,6 @@ func (u *upRunner) upload(dots *ux.Dots) error {
 	return u.sheet.applyOptions(u.cmd)
 }
 
-// REVIEW: move this to google client
 // findOrCreateFile finds the target spreadsheet or creates it.
 func (u *upRunner) findOrCreateFile(dots *ux.Dots) error {
 	dots.SetDescription("finding spreadsheet...")
@@ -143,7 +175,6 @@ func (u *upRunner) findOrCreateFile(dots *ux.Dots) error {
 	return err
 }
 
-// REVIEW: why dos this exist?
 // loadSpreadsheet fetches sheet metadata for the selected file.
 func (u *upRunner) loadSpreadsheet() error {
 	spreadsheet, err := u.client.GetSpreadsheet(u.ctx, u.file.ID)
