@@ -46,7 +46,8 @@ type Dots struct {
 }
 
 // StartDots displays progress and returns a controller.
-func StartDots(w io.Writer, description string) *Dots {
+func StartDots(w io.Writer) *Dots {
+	description := "connecting..."
 	d := &Dots{
 		w:           w,
 		description: description,

@@ -25,7 +25,7 @@ type srun struct {
 // srunStart connects to Google and opens a spreadsheet file by name.
 func srunStart(opts srunOptions) (*srun, error) {
 	ctx := context.Background()
-	dots := ux.StartDots(os.Stderr, "connecting to Google Sheets...")
+	dots := ux.StartDots(os.Stderr)
 
 	client, err := google.NewClient(ctx)
 	if err != nil {

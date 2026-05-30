@@ -20,10 +20,11 @@ func (c *PeekCmd) Run() error {
 		return err
 	}
 	for ii, sheet := range sheets {
+		num := ux.Muted.Render(fmt.Sprintf("%2d.", ii+1))
 		rows := ux.Success.Render(util.FormatInt(sheet.GridProperties.RowCount))
 		cols := ux.Success.Render(util.FormatInt(sheet.GridProperties.ColumnCount))
-		mul := ux.Muted.Render("x")
-		fmt.Printf("%2d. %-20s %s %s %s\n", ii+1, sheet.Title, rows, mul, cols)
+		x := ux.Muted.Render("x")
+		fmt.Printf("%s %-25s %s %s %s\n", num, sheet.Title, rows, x, cols)
 	}
 	return nil
 }
@@ -35,11 +36,11 @@ func (c *PeekCmd) run0() ([]*google.Sheet, error) {
 	}
 	defer cmd.stop()
 
-	cmd.dots.SetDescription("getting sheet list...")
+	cmd.dots.SetDescription("peeking sheets...")
 	sheets, err := cmd.client.GetSheets(cmd.ctx, cmd.file.ID)
 	if err != nil {
 		return nil, err
 	}
-	cmd.dots.SetDescription(fmt.Sprintf("%d sheets in %s", len(sheets), cmd.file.Name))
+
 	return sheets, nil
 }
