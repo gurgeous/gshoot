@@ -122,7 +122,7 @@ func (c *UpCmd) upload(ctx context.Context, client *google.Client, dots *ux.Dots
 		if err != nil {
 			return nil, err
 		}
-		sheet.rows, err = refill.rows()
+		sheet.rows, err = refill.mergedRows()
 		if err != nil {
 			return nil, err
 		}

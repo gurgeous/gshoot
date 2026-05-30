@@ -14,24 +14,30 @@ import (
 
 type sheetRefill struct {
 	sheet             *uploadSheet      // target sheet being refilled
-	csvRows           google.Rows       // original incoming CSV rows
+	csvRows           google.Rows       // csv rows from disk
 	existingRows      google.Rows       // existing displayed values
 	existingUserRows  google.Rows       // existing user-entered values
 	existingSheetData *google.SheetData // existing grid data for formats/formulas
 }
 
-// newSheetRefill loads existing sheet data needed for refill.
+//
+// loads existing sheet data before we refill
+//
+
 func newSheetRefill(sheet *uploadSheet) (*sheetRefill, error) {
+	// values
 	existingRows, err := sheet.client.GetRows(sheet.ctx, sheet.fileID, sheet.title)
 	if err != nil {
 		return nil, err
 	}
 
-	refreshed, err := sheet.client.GetSpreadsheetWithGridData(sheet.ctx, sheet.fileID, sheet.title)
+	// formulas, filters, formats, etc
+	spreadsheet, err := sheet.client.GetSpreadsheetWithGridData(sheet.ctx, sheet.fileID, sheet.title)
 	if err != nil {
 		return nil, err
 	}
-	existingSheetData := refreshed.Data[sheet.id]
+	existingSheetData := spreadsheet.Data[sheet.id]
+
 	return &sheetRefill{
 		sheet:             sheet,
 		csvRows:           sheet.rows,
@@ -41,8 +47,8 @@ func newSheetRefill(sheet *uploadSheet) (*sheetRefill, error) {
 	}, nil
 }
 
-// rows merges CSV rows into the existing sheet shape.
-func (r *sheetRefill) rows() (google.Rows, error) {
+// mergedRows returns the final rows to paste for refill.
+func (r *sheetRefill) mergedRows() (google.Rows, error) {
 	if len(r.existingRows) == 0 {
 		return r.csvRows, nil
 	}
@@ -233,9 +239,6 @@ func (r *sheetRefill) formulaColumn(columnIndex int, existingRows int) (bool, er
 		if value == "" {
 			continue
 		}
-		if r.existingSheetData == nil {
-			return false, fmt.Errorf("missing grid data for sheet %s", r.sheet.title)
-		}
 		if ii >= len(r.existingSheetData.Rows) {
 			return false, fmt.Errorf("missing grid data for sheet %s row %d", r.sheet.title, ii+1)
 		}
@@ -254,7 +257,7 @@ func (r *sheetRefill) formulaColumn(columnIndex int, existingRows int) (bool, er
 // existingDataRowCount returns the existing rows covered by the filter or data.
 func (r *sheetRefill) existingDataRowCount() int {
 	count := len(r.existingRows)
-	if r.existingSheetData != nil && r.existingSheetData.BasicFilter != nil && r.existingSheetData.BasicFilter.Range.EndRowIndex > 0 {
+	if r.existingSheetData.BasicFilter != nil && r.existingSheetData.BasicFilter.Range.EndRowIndex > 0 {
 		count = r.existingSheetData.BasicFilter.Range.EndRowIndex
 	}
 	return min(count, len(r.existingRows))
@@ -277,12 +280,9 @@ func (r *sheetRefill) existingCSVColumns() []int {
 
 // userEnteredRows extracts user-entered strings from grid data.
 func userEnteredRows(data *google.SheetData) google.Rows {
-	if data == nil {
-		return nil
-	}
-	rows := google.Rows{}
+	rows := make(google.Rows, 0, len(data.Rows))
 	for _, row := range data.Rows {
-		values := []string{}
+		values := make([]string, 0, len(row.Values))
 		for _, cell := range row.Values {
 			values = append(values, cell.UserEnteredString())
 		}
