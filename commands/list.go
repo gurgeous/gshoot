@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/gurgeous/gshoot/app"
 	"github.com/gurgeous/gshoot/google"
 	"github.com/gurgeous/gshoot/util"
 	"github.com/gurgeous/gshoot/ux"
@@ -13,7 +12,7 @@ import (
 
 type ListCmd struct{}
 
-func (c *ListCmd) Run(a *app.App) error {
+func (c *ListCmd) Run(a *App) error {
 	// fetch
 	files, err := c.run0()
 	if err != nil {

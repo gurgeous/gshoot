@@ -3,7 +3,6 @@ package commands
 import (
 	"context"
 
-	"github.com/gurgeous/gshoot/app"
 	"github.com/gurgeous/gshoot/auth"
 	"github.com/gurgeous/gshoot/ux"
 )
@@ -31,7 +30,7 @@ type (
 // login
 //
 
-func (c *AuthLoginCmd) Run(a *app.App) error {
+func (c *AuthLoginCmd) Run(a *App) error {
 	manager, err := auth.NewManager()
 	if err != nil {
 		return err
@@ -48,18 +47,18 @@ func (c *AuthLoginCmd) Run(a *app.App) error {
 
 	// can't proceed with login without client secrets
 	if !manager.HasClientSecrets() {
-		manager.ShowStatus(a)
+		manager.ShowStatus()
 		return nil
 	}
 
-	return manager.Login(context.Background(), a)
+	return manager.Login(context.Background(), a.Smoke)
 }
 
 //
 // logout
 //
 
-func (c *AuthLogoutCmd) Run(*app.App) error {
+func (c *AuthLogoutCmd) Run(*App) error {
 	client, err := auth.NewManager()
 	if err != nil {
 		return err
@@ -72,11 +71,11 @@ func (c *AuthLogoutCmd) Run(*app.App) error {
 // status
 //
 
-func (c *AuthStatusCmd) Run(a *app.App) error {
+func (c *AuthStatusCmd) Run(_ *App) error {
 	manager, err := auth.NewManager()
 	if err != nil {
 		return err
 	}
-	manager.ShowStatus(a)
+	manager.ShowStatus()
 	return nil
 }

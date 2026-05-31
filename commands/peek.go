@@ -3,7 +3,6 @@ package commands
 import (
 	"fmt"
 
-	"github.com/gurgeous/gshoot/app"
 	"github.com/gurgeous/gshoot/google"
 	"github.com/gurgeous/gshoot/util"
 	"github.com/gurgeous/gshoot/ux"
@@ -15,7 +14,7 @@ type PeekCmd struct {
 }
 
 // Run prints one sheet name per line.
-func (c *PeekCmd) Run(a *app.App) error {
+func (c *PeekCmd) Run(a *App) error {
 	sheets, err := c.run0()
 	if err != nil {
 		return err

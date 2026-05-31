@@ -1,4 +1,4 @@
-package app
+package commands
 
 import (
 	"bufio"
@@ -17,25 +17,30 @@ import (
 //
 
 type App struct {
-	Out *colorprofile.Writer `env:"-"` // styled stdout, potentially downsampled
-	Err *colorprofile.Writer `env:"-"` // styled stderr, potentially downsampled
-
+	// env
 	Smoke bool   `env:"GSHOOT_SMOKE"` // use deterministic smoke-test behavior
 	Theme string `env:"GSHOOT_THEME"` // force light or dark UI theme
+
+	// styled streams, potentially downsampled
+	Out *colorprofile.Writer `env:"-"`
+	Err *colorprofile.Writer `env:"-"`
 }
 
-// New initializes process-wide app state.
-func New() *App {
-	a, err := cenv.ParseAs[App]()
+// NewApp initializes process-wide app state.
+func NewApp() *App {
+	// init env
+	app, err := cenv.ParseAs[App]()
 	if err != nil {
-		a = App{}
+		app = App{}
 	}
 
-	ux.Init(a.Theme)
-	a.Out = colorprofile.NewWriter(os.Stdout, os.Environ())
-	a.Err = colorprofile.NewWriter(os.Stderr, os.Environ())
+	// setup ux
+	ux.Init(app.Theme)
 
-	return &a
+	// now setup styled (downsampled) streams
+	app.Out = colorprofile.NewWriter(os.Stdout, os.Environ())
+	app.Err = colorprofile.NewWriter(os.Stderr, os.Environ())
+	return &app
 }
 
 //

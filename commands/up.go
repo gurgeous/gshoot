@@ -3,7 +3,6 @@ package commands
 import (
 	"errors"
 
-	"github.com/gurgeous/gshoot/app"
 	"github.com/gurgeous/gshoot/google"
 	"github.com/gurgeous/gshoot/util"
 )
@@ -22,7 +21,7 @@ type UpCmd struct {
 }
 
 // Run uploads the configured CSV.
-func (c *UpCmd) Run(a *app.App) (err error) {
+func (c *UpCmd) Run(a *App) (err error) {
 	if c.Refill && c.Replace {
 		return errors.New("use either --refill or --replace")
 	}

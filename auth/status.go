@@ -1,14 +1,16 @@
 package auth
 
 import (
-	"github.com/gurgeous/gshoot/app"
+	"os"
+
+	lipgloss "charm.land/lipgloss/v2"
 	"github.com/gurgeous/gshoot/util"
 	"github.com/gurgeous/gshoot/ux"
 )
 
 // ShowStatus writes a short auth status summary.
-func (m *Manager) ShowStatus(a *app.App) {
-	a.Println(ux.Success.Render("--- gshoot auth status ---"))
+func (m *Manager) ShowStatus() {
+	_, _ = lipgloss.Fprintln(os.Stdout, ux.Success.Render("--- gshoot auth status ---"))
 
 	// calculate intro text
 	intro := "Authenticating with Google Sheets is quite tricky. Don't blame me, I have no idea why they made it so hard!"
@@ -19,18 +21,18 @@ func (m *Manager) ShowStatus(a *app.App) {
 		intro += "\n\n*{\"installed\":{ <secret stuff> }}*"
 		intro += "\n\nOnce you have that file from Google, import it into gshoot:\n\n**$ gshoot auth login --client-secret <client_secret_XXXXXXXXX.json>**"
 	}
-	a.Println()
-	a.Println(ux.Markdown(intro))
+	_, _ = lipgloss.Fprintln(os.Stdout)
+	_, _ = lipgloss.Fprintln(os.Stdout, ux.Markdown(intro))
 
 	if m.HasClientSecrets() {
-		a.Println()
-		a.Println("Client secrets file: " + missing(m.ClientPath))
-		a.Println("Token file:          " + missing(m.TokenPath))
+		_, _ = lipgloss.Fprintln(os.Stdout)
+		_, _ = lipgloss.Fprintln(os.Stdout, "Client secrets file: "+missing(m.ClientPath))
+		_, _ = lipgloss.Fprintln(os.Stdout, "Token file:          "+missing(m.TokenPath))
 	}
 
-	a.Println()
+	_, _ = lipgloss.Fprintln(os.Stdout)
 	outro := "See our [Github README](" + AuthReadmeURL + ") for full instructions."
-	a.Println(ux.Markdown(outro))
+	_, _ = lipgloss.Fprintln(os.Stdout, ux.Markdown(outro))
 }
 
 // missing formats one status line for an auth file path.

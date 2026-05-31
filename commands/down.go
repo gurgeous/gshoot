@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/gurgeous/gshoot/app"
 	"github.com/gurgeous/gshoot/google"
 	"github.com/gurgeous/gshoot/util"
 )
@@ -15,7 +14,7 @@ type DownCmd struct {
 	Sheet       string `arg:"" optional:"" name:"sheet" help:"Sheet name."`
 }
 
-func (c *DownCmd) Run(_ *app.App) error {
+func (c *DownCmd) Run(_ *App) error {
 	// fetch
 	rows, err := c.run0()
 	if err != nil {

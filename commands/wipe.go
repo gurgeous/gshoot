@@ -1,7 +1,5 @@
 package commands
 
-import "github.com/gurgeous/gshoot/app"
-
 // WipeCmd resets a spreadsheet to one blank Sheet1.
 type WipeCmd struct {
 	Force       bool   `short:"f" help:"Skip confirmation."`
@@ -9,7 +7,7 @@ type WipeCmd struct {
 }
 
 // Run wipes the selected spreadsheet, creating it if needed.
-func (c *WipeCmd) Run(a *app.App) (err error) {
+func (c *WipeCmd) Run(a *App) (err error) {
 	if !c.Force {
 		a.Confirm("wipe spreadsheet '" + c.Spreadsheet + "'?")
 	}

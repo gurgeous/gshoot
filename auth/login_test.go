@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gurgeous/gshoot/app"
 	"github.com/gurgeous/gshoot/util"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/oauth2"
@@ -60,13 +59,13 @@ func TestLoginRunsBrowserFlow(t *testing.T) {
 	manager, err := NewManager()
 	assert.NoError(t, err)
 
-	a, output := captureApp(t)
+	output := captureStdout(t)
 	authURLCh := stubOpenBrowser(t)
 	sawTokenExchange := stubTokenExchange(t)
 
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- manager.Login(context.Background(), a)
+		errCh <- manager.Login(context.Background(), false)
 	}()
 
 	select {
@@ -92,8 +91,8 @@ func TestLoginRunsBrowserFlow(t *testing.T) {
 	assert.True(t, sawTokenExchange())
 }
 
-// captureApp captures App output with the real App constructor.
-func captureApp(t *testing.T) (*app.App, func() (string, string)) {
+// captureStdout captures process stdout and stderr.
+func captureStdout(t *testing.T) func() (string, string) {
 	t.Helper()
 
 	stdoutFile, err := os.Create(filepath.Join(t.TempDir(), "stdout"))
@@ -103,15 +102,13 @@ func captureApp(t *testing.T) (*app.App, func() (string, string)) {
 
 	origStdout, origStderr := os.Stdout, os.Stderr
 	os.Stdout, os.Stderr = stdoutFile, stderrFile
-	a := app.New()
-	os.Stdout, os.Stderr = origStdout, origStderr
-
 	t.Cleanup(func() {
+		os.Stdout, os.Stderr = origStdout, origStderr
 		assert.NoError(t, stdoutFile.Close())
 		assert.NoError(t, stderrFile.Close())
 	})
 
-	return a, func() (string, string) {
+	return func() (string, string) {
 		t.Helper()
 
 		_, err := stdoutFile.Seek(0, 0)
