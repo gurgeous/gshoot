@@ -1,14 +1,17 @@
 package commands
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/gurgeous/gshoot/auth"
 	"github.com/gurgeous/gshoot/util"
 	"github.com/gurgeous/gshoot/ux"
 )
 
 // ShowAuthStatus writes a short auth status summary.
-func (a *App) ShowAuthStatus(m *auth.Manager) {
-	a.Println(ux.Success.Render("--- gshoot auth status ---"))
+func ShowAuthStatus(m *auth.Manager) {
+	fmt.Fprintln(os.Stdout, ux.Success.Render("--- gshoot auth status ---"))
 
 	intro := "Authenticating with Google Sheets is quite tricky. Don't blame me, I have no idea why they made it so hard!"
 	if !m.HasClientSecrets() {
@@ -18,18 +21,18 @@ func (a *App) ShowAuthStatus(m *auth.Manager) {
 		intro += "\n\n*{\"installed\":{ <secret stuff> }}*"
 		intro += "\n\nOnce you have that file from Google, import it into gshoot:\n\n**$ gshoot auth login --client-secret <client_secret_XXXXXXXXX.json>**"
 	}
-	a.Println()
-	a.Println(ux.Markdown(intro))
+	fmt.Fprintln(os.Stdout)
+	fmt.Fprintln(os.Stdout, ux.Markdown(intro))
 
 	if m.HasClientSecrets() {
-		a.Println()
-		a.Println("Client secrets file: " + authFileStatus(m.ClientPath))
-		a.Println("Token file:          " + authFileStatus(m.TokenPath))
+		fmt.Fprintln(os.Stdout)
+		fmt.Fprintln(os.Stdout, "Client secrets file: "+authFileStatus(m.ClientPath))
+		fmt.Fprintln(os.Stdout, "Token file:          "+authFileStatus(m.TokenPath))
 	}
 
-	a.Println()
+	fmt.Fprintln(os.Stdout)
 	outro := "See our [Github README](" + auth.AuthReadmeURL + ") for full instructions."
-	a.Println(ux.Markdown(outro))
+	fmt.Fprintln(os.Stdout, ux.Markdown(outro))
 }
 
 // authFileStatus formats one auth file path status line.

@@ -1,12 +1,14 @@
 package ux
 
 import (
+	"image/color"
 	"os"
 	"regexp"
 	"sort"
 	"strings"
 
 	lipgloss "charm.land/lipgloss/v2"
+	"github.com/charmbracelet/colorprofile"
 	"github.com/gurgeous/gshoot/util"
 )
 
@@ -21,6 +23,8 @@ var (
 
 // Init sets up styles from config and terminal background.
 func Init(theme string) {
+	profile := colorprofile.Detect(os.Stdout, os.Environ())
+
 	// if we are initing with a theme, use that. otherwise detect from termbg
 	var fn lipgloss.LightDarkFunc
 	if theme != "" {
@@ -31,7 +35,7 @@ func Init(theme string) {
 
 	// tiny helper for clearing up boilerplate
 	fg := func(light, dark string) lipgloss.Style {
-		return lipgloss.NewStyle().Foreground(fn(lipgloss.Color(light), lipgloss.Color(dark)))
+		return lipgloss.NewStyle().Foreground(downsampleColor(profile, fn(lipgloss.Color(light), lipgloss.Color(dark))))
 	}
 
 	// styles
@@ -40,7 +44,26 @@ func Init(theme string) {
 	Success = fg(Tailwind.Green.C700, Tailwind.Green.C400).Bold(true)
 	Warn = fg(Tailwind.Amber.C700, Tailwind.Amber.C400).Bold(true)
 	Error = fg(Tailwind.Red.C700, Tailwind.Red.C400).Bold(true)
-	Fatal = lipgloss.NewStyle().Foreground(lipgloss.Color("#fff")).Background(lipgloss.Color(Tailwind.Red.C700)).Bold(true)
+	Fatal = lipgloss.NewStyle().
+		Foreground(downsampleColor(profile, lipgloss.Color("#fff"))).
+		Background(downsampleColor(profile, lipgloss.Color(Tailwind.Red.C700))).
+		Bold(true)
+}
+
+// downsampleColor converts colors to the detected terminal profile.
+func downsampleColor(profile colorprofile.Profile, c color.Color) color.Color {
+	switch profile {
+	case colorprofile.TrueColor:
+		return c
+	case colorprofile.ANSI256, colorprofile.ANSI:
+		converted := profile.Convert(c)
+		if converted != nil {
+			return converted
+		}
+	case colorprofile.Unknown, colorprofile.NoTTY, colorprofile.ASCII:
+		return lipgloss.NoColor{}
+	}
+	return lipgloss.NoColor{}
 }
 
 //

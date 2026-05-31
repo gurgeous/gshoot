@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/alecthomas/kong"
+	"github.com/gurgeous/gshoot/app"
 	"github.com/gurgeous/gshoot/auth"
 	"github.com/gurgeous/gshoot/commands"
 	"github.com/gurgeous/gshoot/gmv"
@@ -52,7 +53,7 @@ func main() {
 	// init real early, this setups up color styles
 	//
 
-	a := commands.NewApp()
+	app.Init()
 
 	//
 	// show welcome?
@@ -65,12 +66,12 @@ func main() {
 
 	if (isFirstRun && isNaked) || isWelcome {
 		// show welcome movie, then auth status
-		if a.Smoke {
-			a.Println("welcome")
+		if app.Env.Smoke {
+			fmt.Fprintln(os.Stdout, "welcome")
 		} else {
 			_ = gmv.Demo(context.Background())
 		}
-		a.ShowAuthStatus(mustNewManager(a))
+		commands.ShowAuthStatus(mustNewManager())
 		return
 	}
 
@@ -89,7 +90,7 @@ func main() {
 		kong.Description("Magically upload/download CSVs from Google Sheets."),
 		kong.Help(ux.HelpPrinter),
 		kong.ConfigureHelp(kong.HelpOptions{Compact: true}),
-		kong.Writers(a.Out, a.Err),
+		kong.Writers(os.Stdout, os.Stderr),
 		kong.Vars{
 			"version":       version,
 			"versionNumber": Version,
@@ -100,9 +101,9 @@ func main() {
 		var parseErr *kong.ParseError
 		if errors.As(err, &parseErr) && parseErr.Context != nil {
 			_ = parseErr.Context.PrintUsage(false)
-			a.Println()
+			fmt.Fprintln(os.Stdout)
 		}
-		a.Fatal(err.Error())
+		util.Fatal(ux.Fatal.Render(fmt.Sprintf("gshoot: %-64s", err.Error())))
 	}
 
 	//
@@ -110,7 +111,7 @@ func main() {
 	//
 
 	if !strings.HasPrefix(ctx.Command(), "auth") {
-		manager := mustNewManager(a)
+		manager := mustNewManager()
 		if !manager.LoggedIn() {
 			var msg string
 			if manager.HasClientSecrets() {
@@ -120,9 +121,9 @@ func main() {
 				// don't say "gshoot auth login" because of --client-secret
 				msg = "you must authenticate first"
 			}
-			a.Boom(msg)
-			a.Eprintln()
-			a.ShowAuthStatus(manager)
+			util.Boom(ux.Fatal.Render(fmt.Sprintf("gshoot: %-64s", msg)))
+			fmt.Fprintln(os.Stderr)
+			commands.ShowAuthStatus(manager)
 			os.Exit(1)
 		}
 	}
@@ -131,15 +132,15 @@ func main() {
 	// run
 	//
 
-	if err := ctx.Run(a); err != nil {
-		a.Fatal(err.Error())
+	if err := ctx.Run(); err != nil {
+		util.Fatal(ux.Fatal.Render(fmt.Sprintf("gshoot: %-64s", err.Error())))
 	}
 }
 
-func mustNewManager(a *commands.App) *auth.Manager {
+func mustNewManager() *auth.Manager {
 	manager, err := auth.NewManager()
 	if err != nil {
-		a.Fatal(err.Error())
+		util.Fatal(ux.Fatal.Render(fmt.Sprintf("gshoot: %-64s", err.Error())))
 	}
 	return manager
 }

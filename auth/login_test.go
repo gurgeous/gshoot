@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gurgeous/gshoot/app"
 	"github.com/gurgeous/gshoot/util"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/oauth2"
@@ -102,6 +103,7 @@ func captureStdout(t *testing.T) func() (string, string) {
 
 	origStdout, origStderr := os.Stdout, os.Stderr
 	os.Stdout, os.Stderr = stdoutFile, stderrFile
+	app.Init()
 	t.Cleanup(func() {
 		os.Stdout, os.Stderr = origStdout, origStderr
 		assert.NoError(t, stdoutFile.Close())

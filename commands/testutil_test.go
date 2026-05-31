@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gurgeous/gshoot/app"
 	"github.com/gurgeous/gshoot/auth"
 	"github.com/gurgeous/gshoot/util"
 	"github.com/stretchr/testify/assert"
@@ -65,7 +66,7 @@ func TestMain(m *testing.M) {
 
 // kong commands look like this
 type runnable interface {
-	Run(*App) error
+	Run() error
 }
 
 type authFilesOptions struct {
@@ -105,7 +106,7 @@ func testCommandWithSetup(t *testing.T, cmd runnable, handler http.HandlerFunc, 
 	}
 	origStdout, origStderr := os.Stdout, os.Stderr
 	os.Stdout, os.Stderr = stdoutFile, stderrFile
-	a := NewApp()
+	app.Init()
 	t.Cleanup(func() {
 		os.Stdout, os.Stderr = origStdout, origStderr
 	})
@@ -115,7 +116,7 @@ func testCommandWithSetup(t *testing.T, cmd runnable, handler http.HandlerFunc, 
 	defer func() { googleAPIHandler = invalid }()
 
 	// run
-	runErr := cmd.Run(a)
+	runErr := cmd.Run()
 
 	//
 

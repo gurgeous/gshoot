@@ -3,6 +3,7 @@ package commands
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/gurgeous/gshoot/google"
 	"github.com/gurgeous/gshoot/util"
@@ -11,9 +12,9 @@ import (
 
 type ListCmd struct{}
 
-func (c *ListCmd) Run(a *App) error {
+func (c *ListCmd) Run() error {
 	// fetch
-	files, err := c.run0(a)
+	files, err := c.run0()
 	if err != nil {
 		return err
 	}
@@ -23,15 +24,15 @@ func (c *ListCmd) Run(a *App) error {
 		num := ux.Muted.Render(fmt.Sprintf("%2d.", i+1))
 		name := fmt.Sprintf("%-30s", util.Truncate(file.Name, 30))
 		date := ux.Muted.Render(util.DateAndTimeStr(file.ModifiedByMeTime))
-		link := a.Hyperlink(util.SpreadsheetURL(file.ID), name)
-		a.Printf(" %s %s     %s\n", num, link, date)
+		link := util.Hyperlink(util.SpreadsheetURL(file.ID), name)
+		fmt.Fprintf(os.Stdout, " %s %s     %s\n", num, link, date)
 	}
 
 	return nil
 }
 
-func (c *ListCmd) run0(a *App) (files []*google.File, err error) {
-	progress := ux.StartProgress(a.Err, "connecting to Google Sheets...")
+func (c *ListCmd) run0() (files []*google.File, err error) {
+	progress := ux.StartProgress(os.Stderr, "connecting to Google Sheets...")
 	defer func() {
 		if err == nil {
 			progress.Stop()

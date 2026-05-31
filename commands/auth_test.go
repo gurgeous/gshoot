@@ -43,7 +43,7 @@ func TestAuthStatus(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Contains(t, stdout, "auth status")
 	assert.Contains(t, stdout, "client secrets")
-	assert.Contains(t, stdout, "Github README")
+	assert.Contains(t, stdout, "full instructions")
 	assert.Contains(t, auth.AuthReadmeURL, "github.com/gurgeous/gshoot#authentication")
 	assert.NotContains(t, stdout, "<b>")
 	assert.NotContains(t, stdout, "</b>")
