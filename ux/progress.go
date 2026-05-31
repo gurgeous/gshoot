@@ -5,7 +5,6 @@ import (
 	"io"
 	"time"
 
-	lipgloss "charm.land/lipgloss/v2"
 	"github.com/gurgeous/gshoot/util"
 	"github.com/schollz/progressbar/v3"
 )
@@ -43,7 +42,7 @@ func StartProgress(w io.Writer, description string) *Progress {
 
 	// fallback
 	if !p.tty {
-		_, _ = lipgloss.Fprintln(w, description)
+		_, _ = fmt.Fprintln(w, description)
 		return p
 	}
 
@@ -79,7 +78,7 @@ func StartProgress(w io.Writer, description string) *Progress {
 			case success := <-p.stopCh:
 				_ = p.bar.Finish()
 				if success {
-					_, _ = lipgloss.Fprintf(w, "%s %s\n", Success.Render("✓"), Brand.Render(p.description))
+					_, _ = fmt.Fprintf(w, "%s %s\n", Success.Render("✓"), Brand.Render(p.description))
 				}
 				util.SetCursorVisible(w, true)
 				return
@@ -103,7 +102,7 @@ func (p *Progress) Cancel() {
 func (p *Progress) finish(success bool) {
 	if !p.tty {
 		if success {
-			_, _ = lipgloss.Fprintf(p.w, "%s %s\n", Success.Render("✓"), p.description)
+			_, _ = fmt.Fprintf(p.w, "%s %s\n", Success.Render("✓"), p.description)
 		}
 		return
 	}
@@ -115,7 +114,7 @@ func (p *Progress) finish(success bool) {
 func (p *Progress) set(description string) {
 	p.description = description
 	if !p.tty {
-		_, _ = lipgloss.Fprintln(p.w, p.description)
+		_, _ = fmt.Fprintln(p.w, p.description)
 		return
 	}
 	p.bar.Describe(Brand.Render(p.description))
