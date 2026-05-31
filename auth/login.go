@@ -40,7 +40,7 @@ func (m *Manager) Login(ctx context.Context, smoke bool, out io.Writer) error {
 	}
 	_, _ = fmt.Fprintln(out)
 	_, _ = fmt.Fprintln(out, ux.Success.Render("gshoot: success! oauth token copied to "+m.TokenPath))
-	_, _ = fmt.Fprintln(out, "gshoot should work now, have fun!")
+	_, _ = fmt.Fprintln(out, "gshoot: should work now, have fun!")
 
 	return nil
 }
