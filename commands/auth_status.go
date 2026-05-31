@@ -1,16 +1,15 @@
-package auth
+package commands
 
 import (
-	"github.com/gurgeous/gshoot/app"
+	"github.com/gurgeous/gshoot/auth"
 	"github.com/gurgeous/gshoot/util"
 	"github.com/gurgeous/gshoot/ux"
 )
 
-// ShowStatus writes a short auth status summary.
-func (m *Manager) ShowStatus(a *app.App) {
+// ShowAuthStatus writes a short auth status summary.
+func (a *App) ShowAuthStatus(m *auth.Manager) {
 	a.Println(ux.Success.Render("--- gshoot auth status ---"))
 
-	// calculate intro text
 	intro := "Authenticating with Google Sheets is quite tricky. Don't blame me, I have no idea why they made it so hard!"
 	if !m.HasClientSecrets() {
 		intro += "\n\nFor starters, we need your *client secrets file*. When you register to use the Google Docs API, Google will give you this file. We use the client secrets file to access Google APIs and get oauth started. When you download it from google it has a crazy name like:"
@@ -24,17 +23,17 @@ func (m *Manager) ShowStatus(a *app.App) {
 
 	if m.HasClientSecrets() {
 		a.Println()
-		a.Println("Client secrets file: " + missing(m.ClientPath))
-		a.Println("Token file:          " + missing(m.TokenPath))
+		a.Println("Client secrets file: " + authFileStatus(m.ClientPath))
+		a.Println("Token file:          " + authFileStatus(m.TokenPath))
 	}
 
 	a.Println()
-	outro := "See our [Github README](" + AuthReadmeURL + ") for full instructions."
+	outro := "See our [Github README](" + auth.AuthReadmeURL + ") for full instructions."
 	a.Println(ux.Markdown(outro))
 }
 
-// missing formats one status line for an auth file path.
-func missing(path string) string {
+// authFileStatus formats one auth file path status line.
+func authFileStatus(path string) string {
 	missing := !util.FileExists(path)
 	var state string
 	if missing {

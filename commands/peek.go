@@ -3,7 +3,6 @@ package commands
 import (
 	"fmt"
 
-	"github.com/gurgeous/gshoot/app"
 	"github.com/gurgeous/gshoot/google"
 	"github.com/gurgeous/gshoot/util"
 	"github.com/gurgeous/gshoot/ux"
@@ -15,8 +14,8 @@ type PeekCmd struct {
 }
 
 // Run prints one sheet name per line.
-func (c *PeekCmd) Run(a *app.App) error {
-	sheets, err := c.run0()
+func (c *PeekCmd) Run(a *App) error {
+	sheets, err := c.run0(a)
 	if err != nil {
 		return err
 	}
@@ -30,14 +29,14 @@ func (c *PeekCmd) Run(a *app.App) error {
 	return nil
 }
 
-func (c *PeekCmd) run0() (sheets []*google.Sheet, err error) {
-	cmd, err := srunStart(srunOptions{spreadsheet: c.Spreadsheet})
+func (c *PeekCmd) run0(a *App) (sheets []*google.Sheet, err error) {
+	cmd, err := srunStart(a.Err, srunOptions{spreadsheet: c.Spreadsheet})
 	if err != nil {
 		return nil, err
 	}
 	defer func() { cmd.stop(err) }()
 
-	cmd.dots.SayPeekSheets(cmd.file.Name)
+	cmd.progress.SayPeekSheets(cmd.file.Name)
 	sheets, err = cmd.client.GetSheets(cmd.ctx, cmd.file.ID)
 	if err != nil {
 		return nil, err

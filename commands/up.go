@@ -3,7 +3,6 @@ package commands
 import (
 	"errors"
 
-	"github.com/gurgeous/gshoot/app"
 	"github.com/gurgeous/gshoot/google"
 	"github.com/gurgeous/gshoot/util"
 )
@@ -22,7 +21,7 @@ type UpCmd struct {
 }
 
 // Run uploads the configured CSV.
-func (c *UpCmd) Run(a *app.App) (err error) {
+func (c *UpCmd) Run(a *App) (err error) {
 	if c.Refill && c.Replace {
 		return errors.New("use either --refill or --replace")
 	}
@@ -36,7 +35,7 @@ func (c *UpCmd) Run(a *app.App) (err error) {
 	// init
 	//
 
-	cmd, err := srunStart(srunOptions{spreadsheet: c.Spreadsheet, create: true})
+	cmd, err := srunStart(a.Err, srunOptions{spreadsheet: c.Spreadsheet, create: true})
 	if err != nil {
 		return err
 	}
@@ -68,7 +67,7 @@ func (c *UpCmd) upload(cmd *srun, rows google.Rows) (*google.File, error) {
 	// get Spreadsheet for that File
 	//
 
-	cmd.dots.SayFetchSpreadsheet(cmd.file.Name)
+	cmd.progress.SayFetchSpreadsheet(cmd.file.Name)
 	spreadsheet, err := cmd.client.GetSpreadsheet(cmd.ctx, cmd.file.ID)
 	if err != nil {
 		return nil, err
@@ -78,7 +77,7 @@ func (c *UpCmd) upload(cmd *srun, rows google.Rows) (*google.File, error) {
 	// find/create target sheet
 	//
 
-	cmd.dots.SayUploadRows(len(rows), cmd.file.Name, c.Sheet)
+	cmd.progress.SayUploadRows(len(rows), cmd.file.Name, c.Sheet)
 	s := newUploader(cmd.ctx, cmd.client, cmd.file, spreadsheet, c, rows)
 	s.id, err = s.resolveTargetSheet()
 	if err != nil {

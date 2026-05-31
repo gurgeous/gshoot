@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/alecthomas/kong"
-	"github.com/gurgeous/gshoot/app"
 	"github.com/gurgeous/gshoot/auth"
 	"github.com/gurgeous/gshoot/commands"
 	"github.com/gurgeous/gshoot/gmv"
@@ -53,7 +52,7 @@ func main() {
 	// init real early, this setups up color styles
 	//
 
-	a := app.New()
+	a := commands.NewApp()
 
 	//
 	// show welcome?
@@ -71,7 +70,7 @@ func main() {
 		} else {
 			_ = gmv.Demo(context.Background())
 		}
-		mustNewManager(a).ShowStatus(a)
+		a.ShowAuthStatus(mustNewManager(a))
 		return
 	}
 
@@ -90,7 +89,7 @@ func main() {
 		kong.Description("Magically upload/download CSVs from Google Sheets."),
 		kong.Help(ux.HelpPrinter),
 		kong.ConfigureHelp(kong.HelpOptions{Compact: true}),
-		kong.Writers(os.Stdout, os.Stderr),
+		kong.Writers(a.Out, a.Err),
 		kong.Vars{
 			"version":       version,
 			"versionNumber": Version,
@@ -123,7 +122,7 @@ func main() {
 			}
 			a.Boom(msg)
 			a.Eprintln()
-			manager.ShowStatus(a)
+			a.ShowAuthStatus(manager)
 			os.Exit(1)
 		}
 	}
@@ -137,7 +136,7 @@ func main() {
 	}
 }
 
-func mustNewManager(a *app.App) *auth.Manager {
+func mustNewManager(a *commands.App) *auth.Manager {
 	manager, err := auth.NewManager()
 	if err != nil {
 		a.Fatal(err.Error())

@@ -3,7 +3,7 @@ package commands
 import (
 	"context"
 	"fmt"
-	"os"
+	"io"
 
 	"github.com/gurgeous/gshoot/google"
 	"github.com/gurgeous/gshoot/ux"
@@ -16,52 +16,52 @@ type srunOptions struct {
 
 // srun is the shared runtime state for spreadsheet commands.
 type srun struct {
-	ctx    context.Context // request context for Google calls
-	client *google.Client  // authenticated Google API client
-	dots   *ux.Dots        // progress indicator for the command
-	file   *google.File    // resolved spreadsheet file
+	ctx      context.Context // request context for Google calls
+	client   *google.Client  // authenticated Google API client
+	progress *ux.Progress    // progress indicator for the command
+	file     *google.File    // resolved spreadsheet file
 }
 
 // srunStart connects to Google and opens a spreadsheet file by name.
-func srunStart(opts srunOptions) (*srun, error) {
+func srunStart(w io.Writer, opts srunOptions) (*srun, error) {
 	ctx := context.Background()
-	dots := ux.StartDots(os.Stderr, "connecting to Google Sheets...")
+	progress := ux.StartProgress(w, "connecting to Google Sheets...")
 
 	client, err := google.NewClient(ctx)
 	if err != nil {
-		dots.Cancel()
+		progress.Cancel()
 		return nil, err
 	}
 
 	var file *google.File
 	if opts.create {
-		dots.SayFindOrCreateSpreadsheet(opts.spreadsheet)
+		progress.SayFindOrCreateSpreadsheet(opts.spreadsheet)
 		file, err = client.FindOrCreateSpreadsheetFile(ctx, opts.spreadsheet)
 	} else {
-		dots.SayFindSpreadsheet(opts.spreadsheet)
+		progress.SayFindSpreadsheet(opts.spreadsheet)
 		file, err = client.FindSpreadsheetFile(ctx, opts.spreadsheet)
 	}
 	if err != nil {
-		dots.Cancel()
+		progress.Cancel()
 		return nil, err
 	}
 	if file == nil {
-		dots.Cancel()
+		progress.Cancel()
 		return nil, fmt.Errorf("could not find spreadsheet file named '%s'", opts.spreadsheet)
 	}
 
 	return &srun{
-		ctx:    ctx,
-		client: client,
-		dots:   dots,
-		file:   file,
+		ctx:      ctx,
+		client:   client,
+		progress: progress,
+		file:     file,
 	}, nil
 }
 
 func (c *srun) stop(err error) {
 	if err == nil {
-		c.dots.Stop()
+		c.progress.Stop()
 		return
 	}
-	c.dots.Cancel()
+	c.progress.Cancel()
 }

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/gurgeous/gshoot/app"
 	"github.com/gurgeous/gshoot/google"
 	"github.com/gurgeous/gshoot/util"
 )
@@ -15,9 +14,9 @@ type DownCmd struct {
 	Sheet       string `arg:"" optional:"" name:"sheet" help:"Sheet name."`
 }
 
-func (c *DownCmd) Run(_ *app.App) error {
+func (c *DownCmd) Run(a *App) error {
 	// fetch
-	rows, err := c.run0()
+	rows, err := c.run0(a)
 	if err != nil {
 		return err
 	}
@@ -35,12 +34,12 @@ func (c *DownCmd) Run(_ *app.App) error {
 	return util.CSVWrite(writer, rows)
 }
 
-func (c *DownCmd) run0() (rows google.Rows, err error) {
+func (c *DownCmd) run0(a *App) (rows google.Rows, err error) {
 	//
 	// init
 	//
 
-	cmd, err := srunStart(srunOptions{spreadsheet: c.Spreadsheet})
+	cmd, err := srunStart(a.Err, srunOptions{spreadsheet: c.Spreadsheet})
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +49,7 @@ func (c *DownCmd) run0() (rows google.Rows, err error) {
 	// find sheet
 	//
 
-	cmd.dots.SayFindSheet(c.Sheet)
+	cmd.progress.SayFindSheet(c.Sheet)
 	sheet, err := cmd.client.FindSheet(cmd.ctx, cmd.file.ID, c.Sheet)
 	if err != nil {
 		return nil, err
@@ -63,14 +62,14 @@ func (c *DownCmd) run0() (rows google.Rows, err error) {
 	// download
 	//
 
-	cmd.dots.SayDownloadRows(cmd.file.Name)
+	cmd.progress.SayDownloadRows(cmd.file.Name)
 	rows, err = cmd.client.GetRows(cmd.ctx, cmd.file.ID, sheet.Title)
 	if err != nil {
 		return nil, err
 	}
 	isStdout := c.Output == "" || c.Output == "-"
 	if !isStdout {
-		cmd.dots.SaySaveRows(len(rows), c.Output)
+		cmd.progress.SaySaveRows(len(rows), c.Output)
 	}
 	return rows, nil
 }

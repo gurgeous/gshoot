@@ -84,7 +84,7 @@ func (l *Loopback) Start() error {
 			l.errCh <- errors.New("oauth callback missing code")
 			return
 		}
-		fmt.Fprintln(w, "gshoot login complete, you can close this tab.") //nolint:forbidigo // HTTP response
+		fmt.Fprintln(w, "gshoot login complete, you can close this tab.") // HTTP response
 		l.codeCh <- code
 	})
 
