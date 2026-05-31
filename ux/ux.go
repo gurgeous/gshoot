@@ -10,8 +10,6 @@ import (
 	"github.com/gurgeous/gshoot/util"
 )
 
-const AppName = "gshoot"
-
 var (
 	Brand   lipgloss.Style // blue
 	Success lipgloss.Style // green
