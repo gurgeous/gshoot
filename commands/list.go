@@ -34,7 +34,6 @@ func (c *ListCmd) Run(a *app.App) error {
 
 func (c *ListCmd) run0() (files []*google.File, err error) {
 	dots := ux.StartDots(os.Stderr, "connecting to Google Sheets...")
-	dots.SayConnectGoogle()
 	defer func() {
 		if err == nil {
 			dots.Stop()

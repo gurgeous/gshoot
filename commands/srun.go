@@ -27,6 +27,7 @@ func srunStart(opts srunOptions) (*srun, error) {
 	ctx := context.Background()
 	dots := ux.StartDots(os.Stderr, "connecting to Google Sheets...")
 
+	client, err := google.NewClient(ctx)
 	if err != nil {
 		dots.Cancel()
 		return nil, err
