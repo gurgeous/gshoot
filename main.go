@@ -70,7 +70,7 @@ func main() {
 		} else {
 			_ = gmv.Demo(context.Background())
 		}
-		mustNewManager(a).ShowStatus(a.Out)
+		a.ShowAuthStatus(mustNewManager(a))
 		return
 	}
 
@@ -122,7 +122,7 @@ func main() {
 			}
 			a.Boom(msg)
 			a.Eprintln()
-			manager.ShowStatus(a.Out)
+			a.ShowAuthStatus(manager)
 			os.Exit(1)
 		}
 	}

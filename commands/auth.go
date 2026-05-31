@@ -47,7 +47,7 @@ func (c *AuthLoginCmd) Run(a *App) error {
 
 	// can't proceed with login without client secrets
 	if !manager.HasClientSecrets() {
-		manager.ShowStatus(a.Out)
+		a.ShowAuthStatus(manager)
 		return nil
 	}
 
@@ -76,6 +76,6 @@ func (c *AuthStatusCmd) Run(a *App) error {
 	if err != nil {
 		return err
 	}
-	manager.ShowStatus(a.Out)
+	a.ShowAuthStatus(manager)
 	return nil
 }

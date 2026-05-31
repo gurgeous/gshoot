@@ -16,10 +16,10 @@ type srunOptions struct {
 
 // srun is the shared runtime state for spreadsheet commands.
 type srun struct {
-	ctx    context.Context // request context for Google calls
-	client *google.Client  // authenticated Google API client
-	progress   *ux.Progress        // progress indicator for the command
-	file   *google.File    // resolved spreadsheet file
+	ctx      context.Context // request context for Google calls
+	client   *google.Client  // authenticated Google API client
+	progress *ux.Progress    // progress indicator for the command
+	file     *google.File    // resolved spreadsheet file
 }
 
 // srunStart connects to Google and opens a spreadsheet file by name.
@@ -51,10 +51,10 @@ func srunStart(w io.Writer, opts srunOptions) (*srun, error) {
 	}
 
 	return &srun{
-		ctx:    ctx,
-		client: client,
-		progress:   progress,
-		file:   file,
+		ctx:      ctx,
+		client:   client,
+		progress: progress,
+		file:     file,
 	}, nil
 }
 
