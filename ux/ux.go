@@ -38,18 +38,18 @@ func Init(theme string) {
 	profile := colorprofile.Detect(os.Stdout, os.Environ())
 
 	// calculate our styles, taking into account term profile and theme
-	Brand = style(profile, fn(Tailwind.Blue.C600, Tailwind.Blue.C400), true)
-	Muted = style(profile, fn(Tailwind.Gray.C400, Tailwind.Gray.C600), false)
-	Success = style(profile, fn(Tailwind.Green.C700, Tailwind.Green.C400), true)
-	Warn = style(profile, fn(Tailwind.Amber.C700, Tailwind.Amber.C400), true)
-	Error = style(profile, fn(Tailwind.Red.C700, Tailwind.Red.C400), true)
-	Fatal = style(profile, lipgloss.Color("#fff"), true).
+	Brand = textStyle(profile, fn(Tailwind.Blue.C600, Tailwind.Blue.C400), true)
+	Muted = textStyle(profile, fn(Tailwind.Gray.C400, Tailwind.Gray.C600), false)
+	Success = textStyle(profile, fn(Tailwind.Green.C700, Tailwind.Green.C400), true)
+	Warn = textStyle(profile, fn(Tailwind.Amber.C700, Tailwind.Amber.C400), true)
+	Error = textStyle(profile, fn(Tailwind.Red.C700, Tailwind.Red.C400), true)
+	Fatal = textStyle(profile, lipgloss.Color("#fff"), true).
 		Background(downsample(profile, lipgloss.Color(Tailwind.Red.C700))).
 		Bold(true)
 }
 
-// style builds a fg text style for the active terminal profile.
-func style(profile colorprofile.Profile, c color.Color, bold bool) lipgloss.Style {
+// textStyle builds a fg text style for the active terminal profile.
+func textStyle(profile colorprofile.Profile, c color.Color, bold bool) lipgloss.Style {
 	return lipgloss.NewStyle().
 		Foreground(downsample(profile, c)).
 		Bold(bold)
