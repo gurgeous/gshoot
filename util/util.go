@@ -125,17 +125,6 @@ func Confirm(prompt string) {
 	}
 }
 
-// Boom writes a fatal error banner to stderr.
-func Boom(msg string) {
-	_, _ = fmt.Fprintln(os.Stderr, msg)
-}
-
-// Fatal writes a fatal error banner and exits.
-func Fatal(msg string) {
-	Boom(msg)
-	os.Exit(1)
-}
-
 // IsTty reports whether the writer wraps a terminal file descriptor.
 func IsTty(w io.Writer) bool {
 	file, ok := w.(*os.File)

@@ -103,7 +103,7 @@ func main() {
 			_ = parseErr.Context.PrintUsage(false)
 			fmt.Fprintln(os.Stdout)
 		}
-		util.Fatal(ux.Fatal.Render(fmt.Sprintf("gshoot: %-64s", err.Error())))
+		fatal(err.Error())
 	}
 
 	//
@@ -121,7 +121,7 @@ func main() {
 				// don't say "gshoot auth login" because of --client-secret
 				msg = "you must authenticate first"
 			}
-			util.Boom(ux.Fatal.Render(fmt.Sprintf("gshoot: %-64s", msg)))
+			boom(msg)
 			fmt.Fprintln(os.Stderr)
 			commands.ShowAuthStatus(manager)
 			os.Exit(1)
@@ -133,14 +133,23 @@ func main() {
 	//
 
 	if err := ctx.Run(); err != nil {
-		util.Fatal(ux.Fatal.Render(fmt.Sprintf("gshoot: %-64s", err.Error())))
+		fatal(err.Error())
 	}
 }
 
 func mustNewManager() *auth.Manager {
 	manager, err := auth.NewManager()
 	if err != nil {
-		util.Fatal(ux.Fatal.Render(fmt.Sprintf("gshoot: %-64s", err.Error())))
+		fatal(err.Error())
 	}
 	return manager
+}
+
+func boom(msg string) {
+	fmt.Fprintln(os.Stderr, ux.Fatal.Render(fmt.Sprintf("gshoot: %-64s", msg)))
+}
+
+func fatal(msg string) {
+	boom(msg)
+	os.Exit(1)
 }
