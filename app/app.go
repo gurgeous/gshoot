@@ -3,84 +3,88 @@ package app
 import (
 	"bufio"
 	"fmt"
-	"io"
 	"os"
 
+	cenv "github.com/caarlos0/env/v11"
+
 	"github.com/charmbracelet/colorprofile"
-	"github.com/gurgeous/gshoot/env"
 	"github.com/gurgeous/gshoot/util"
 	"github.com/gurgeous/gshoot/ux"
 )
 
-// App owns process-wide config and I/O streams.
+//
+// App owns config and styled i/o
+//
+
 type App struct {
-	Config env.Config // environment config
+	Out *colorprofile.Writer `env:"-"` // styled stdout, potentially downsampled
+	Err *colorprofile.Writer `env:"-"` // styled stderr, potentially downsampled
 
-	// raw
-	stdin  *os.File
-	stdout io.Writer
-	stderr io.Writer
-
-	// potentially downsampled (eats ansi escapes)
-	out *colorprofile.Writer
-	err *colorprofile.Writer
+	Smoke bool   `env:"GSHOOT_SMOKE"` // use deterministic smoke-test behavior
+	Theme string `env:"GSHOOT_THEME"` // force light or dark UI theme
 }
 
 // New initializes process-wide app state.
 func New() *App {
-	cfg := env.NewConfig()
-	ux.Init(cfg)
-
-	return &App{
-		Config: cfg,
-		stdin:  os.Stdin,
-		stdout: os.Stdout,
-		stderr: os.Stderr,
-		out:    colorprofile.NewWriter(os.Stdout, os.Environ()),
-		err:    colorprofile.NewWriter(os.Stderr, os.Environ()),
+	a, err := cenv.ParseAs[App]()
+	if err != nil {
+		a = App{}
 	}
+
+	ux.Init(a.Theme)
+	a.Out = colorprofile.NewWriter(os.Stdout, os.Environ())
+	a.Err = colorprofile.NewWriter(os.Stderr, os.Environ())
+
+	return &a
 }
 
-// Println writes stdout text through lipgloss.
+//
+// styled output helpers
+//
+
 func (a *App) Println(args ...any) {
-	_, _ = fmt.Fprintln(a.out, args...)
+	_, _ = fmt.Fprintln(a.Out, args...)
 }
 
-// Printf writes formatted stdout text through lipgloss.
 func (a *App) Printf(format string, args ...any) {
-	_, _ = fmt.Fprintf(a.out, format, args...)
+	_, _ = fmt.Fprintf(a.Out, format, args...)
 }
 
-// Eprintln writes stderr text through lipgloss.
 func (a *App) Eprintln(args ...any) {
-	_, _ = fmt.Fprintln(a.err, args...)
+	_, _ = fmt.Fprintln(a.Err, args...)
 }
 
-// RawStdout returns stdout without lipgloss downsampling.
-func (a *App) RawStdout() io.Writer {
-	return a.stdout
+func (a *App) Eprintf(format string, args ...any) {
+	_, _ = fmt.Fprintf(a.Err, format, args...)
 }
 
-// RawStderr returns stderr without lipgloss downsampling.
-func (a *App) RawStderr() io.Writer {
-	return a.stderr
-}
+//
+// misc
+//
 
 // Hyperlink returns an OSC8 hyperlink when stdout is a TTY.
 func (a *App) Hyperlink(link, name string) string {
-	if !util.IsTty(a.stdout) {
+	if !util.IsTty(os.Stdout) {
 		return name
 	}
 	return util.RenderHyperlink(link, name)
 }
 
+//
+// confirm/book/fatal
+//
+
 // Confirm asks a y/N question and exits when declined.
 func (a *App) Confirm(prompt string) {
-	_, _ = fmt.Fprintf(a.err, "%s %s ", ux.Warn.Render(prompt), ux.Muted.Render("(y/n)"))
-	line, _ := bufio.NewReader(a.stdin).ReadString('\n')
+	_, _ = fmt.Fprintf(a.Err, "%s %s ", ux.Warn.Render(prompt), ux.Muted.Render("(y/n)"))
+	if !util.IsTty(os.Stdin) {
+		os.Exit(1)
+	}
+
+	line, _ := bufio.NewReader(os.Stdin).ReadString('\n')
 	ok := len(line) > 0 && (line[0] == 'y' || line[0] == 'Y')
 	if !ok {
-		os.Exit(0)
+		os.Exit(1)
 	}
 }
 

@@ -36,7 +36,7 @@ func (c *UpCmd) Run(a *app.App) (err error) {
 	// init
 	//
 
-	cmd, err := srunStart(a, srunOptions{spreadsheet: c.Spreadsheet, create: true})
+	cmd, err := srunStart(srunOptions{spreadsheet: c.Spreadsheet, create: true})
 	if err != nil {
 		return err
 	}

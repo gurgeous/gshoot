@@ -66,10 +66,10 @@ func main() {
 
 	if (isFirstRun && isNaked) || isWelcome {
 		// show movie, then auth status
-		if a.Config.Smoke {
+		if a.Smoke {
 			a.Println("welcome")
 		} else {
-			_ = gmv.Demo(context.Background(), a.Config, a.RawStdout())
+			_ = gmv.Demo(context.Background())
 		}
 		mustNewManager(a).ShowStatus(a)
 		return
@@ -90,7 +90,7 @@ func main() {
 		kong.Description("Magically upload/download CSVs from Google Sheets."),
 		kong.Help(ux.HelpPrinter),
 		kong.ConfigureHelp(kong.HelpOptions{Compact: true}),
-		kong.Writers(a.RawStdout(), a.RawStderr()),
+		kong.Writers(os.Stdout, os.Stderr),
 		kong.Vars{
 			"version":       version,
 			"versionNumber": Version,

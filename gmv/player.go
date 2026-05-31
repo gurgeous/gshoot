@@ -15,19 +15,18 @@ import (
 
 	lipgloss "charm.land/lipgloss/v2"
 	xansi "github.com/charmbracelet/x/ansi"
-	"github.com/gurgeous/gshoot/env"
 	"github.com/gurgeous/gshoot/util"
 	"github.com/gurgeous/gshoot/ux"
 )
 
 // NewPlayer initializes the built-in GMV player.
-func NewPlayer(card string, showStats bool, envCfg env.Config, stdout io.Writer) (*Player, error) {
+func NewPlayer(card string, showStats bool) (*Player, error) {
 	movie, err := loadMovie()
 	if err != nil {
 		return nil, err
 	}
 
-	cfg := newConfig(envCfg, stdout)
+	cfg := newConfig()
 	renderedCard := downsample(card, cfg.colorProfile())
 	termSize := util.TerminalSize(movie.Size)
 	return &Player{
@@ -72,7 +71,7 @@ func (p *Player) Play(ctx context.Context) error {
 }
 
 // Demo plays the built-in GMV with sample first-run text.
-func Demo(ctx context.Context, envCfg env.Config, stdout io.Writer) error {
+func Demo(ctx context.Context) error {
 	text := ("Welcome to gshoot. Looks like your " +
 		ux.Brand.Render("Google Sheets oauth") +
 		" isn't setup yet. This is tricky with Google Sheets, sorry about that. Don't blame us!\n\n" +
@@ -85,7 +84,7 @@ func Demo(ctx context.Context, envCfg env.Config, stdout io.Writer) error {
 		BorderForeground(lipgloss.Color("#60a5fa")).
 		Padding(1, 3).
 		Render(text)
-	p, err := NewPlayer(card, true, envCfg, stdout)
+	p, err := NewPlayer(card, true)
 	if err != nil {
 		return err
 	}

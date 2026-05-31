@@ -55,7 +55,7 @@ func (m *Manager) Logout() {
 
 // browserLoginFlow performs the browser round trip and code exchange.
 func browserLoginFlow(ctx context.Context, a *app.App, client *OClient) (*oauth2.Token, error) {
-	if a.Config.Smoke {
+	if a.Smoke {
 		return &oauth2.Token{
 			AccessToken:  "smoke-access-token",
 			RefreshToken: "smoke-refresh-token",

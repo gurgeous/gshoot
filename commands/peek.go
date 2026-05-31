@@ -16,7 +16,7 @@ type PeekCmd struct {
 
 // Run prints one sheet name per line.
 func (c *PeekCmd) Run(a *app.App) error {
-	sheets, err := c.run0(a)
+	sheets, err := c.run0()
 	if err != nil {
 		return err
 	}
@@ -30,8 +30,8 @@ func (c *PeekCmd) Run(a *app.App) error {
 	return nil
 }
 
-func (c *PeekCmd) run0(a *app.App) (sheets []*google.Sheet, err error) {
-	cmd, err := srunStart(a, srunOptions{spreadsheet: c.Spreadsheet})
+func (c *PeekCmd) run0() (sheets []*google.Sheet, err error) {
+	cmd, err := srunStart(srunOptions{spreadsheet: c.Spreadsheet})
 	if err != nil {
 		return nil, err
 	}

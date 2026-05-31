@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	lipgloss "charm.land/lipgloss/v2"
-	"github.com/gurgeous/gshoot/env"
 	"github.com/gurgeous/gshoot/util"
 )
 
@@ -28,9 +27,9 @@ func init() {
 }
 
 // Init sets up styles from config and terminal background.
-func Init(cfg env.Config) {
-	if cfg.Theme != "" {
-		setStyles(lipgloss.LightDark(cfg.Theme != "light"))
+func Init(theme string) {
+	if theme != "" {
+		setStyles(lipgloss.LightDark(theme != "light"))
 		return
 	}
 
@@ -56,7 +55,7 @@ func setStyles(fn lipgloss.LightDarkFunc) {
 }
 
 //
-// styleText
+// Restyle
 //
 
 type RestyleRule struct {
@@ -106,7 +105,10 @@ func Restyle(str string, styles []RestyleRule) string {
 	return buf.String()
 }
 
-// Markdown renders the tiny markdown subset used in CLI prose.
+//
+// Markdown renders a tiny markdown subset
+//
+
 func Markdown(str string) string {
 	linkRe := regexp.MustCompile(`\[([^\]]+)\]\(([^)]+)\)`) // markdown link
 	boldRe := regexp.MustCompile(`\*\*([^*]+)\*\*`)         // markdown bold

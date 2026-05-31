@@ -107,7 +107,9 @@ func testCommandWithSetup(t *testing.T, cmd runnable, handler http.HandlerFunc, 
 	origStdout, origStderr := os.Stdout, os.Stderr
 	os.Stdout, os.Stderr = stdoutFile, stderrFile
 	a := app.New()
-	os.Stdout, os.Stderr = origStdout, origStderr
+	t.Cleanup(func() {
+		os.Stdout, os.Stderr = origStdout, origStderr
+	})
 
 	// stub google api
 	googleAPIHandler = handler

@@ -3,8 +3,8 @@ package commands
 import (
 	"context"
 	"fmt"
+	"os"
 
-	"github.com/gurgeous/gshoot/app"
 	"github.com/gurgeous/gshoot/google"
 	"github.com/gurgeous/gshoot/ux"
 )
@@ -23,9 +23,9 @@ type srun struct {
 }
 
 // srunStart connects to Google and opens a spreadsheet file by name.
-func srunStart(a *app.App, opts srunOptions) (*srun, error) {
+func srunStart(opts srunOptions) (*srun, error) {
 	ctx := context.Background()
-	dots := ux.StartDots(a.RawStderr(), "connecting to Google Sheets...")
+	dots := ux.StartDots(os.Stderr, "connecting to Google Sheets...")
 	dots.SayConnectGoogle()
 
 	client, err := google.NewClient(ctx)
