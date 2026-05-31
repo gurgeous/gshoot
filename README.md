@@ -1,2 +1,5 @@
 - this readme
   - auth docs in readme
+- take another run at auth status
+  - consider showing "logged out", "oauth required", "logged in" (with colors)
+  - consider removing "Authenticating is tricky" if logged in

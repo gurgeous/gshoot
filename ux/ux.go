@@ -24,30 +24,35 @@ var (
 // Init sets up styles from config and terminal background.
 func Init(theme string) {
 	// if we are initing with a theme, use that. otherwise detect from termbg
-	var fn lipgloss.LightDarkFunc
+	var lightDark lipgloss.LightDarkFunc
 	if theme != "" {
-		fn = lipgloss.LightDark(theme != "light")
+		lightDark = lipgloss.LightDark(theme != "light")
 	} else {
-		fn = lipgloss.LightDark(lipgloss.HasDarkBackground(os.Stdin, os.Stdout))
+		lightDark = lipgloss.LightDark(lipgloss.HasDarkBackground(os.Stdin, os.Stdout))
+	}
+	fn := func(light, dark string) color.Color {
+		return lightDark(lipgloss.Color(light), lipgloss.Color(dark))
 	}
 
+	// is the terminal 256? 16M? No color?
 	profile := colorprofile.Detect(os.Stdout, os.Environ())
 
-	// tiny helper for clearing up boilerplate
-	fg := func(light, dark string) lipgloss.Style {
-		return lipgloss.NewStyle().Foreground(downsample(profile, fn(lipgloss.Color(light), lipgloss.Color(dark))))
-	}
-
-	// styles
-	Brand = fg(Tailwind.Blue.C600, Tailwind.Blue.C400).Bold(true)
-	Muted = fg(Tailwind.Gray.C400, Tailwind.Gray.C600)
-	Success = fg(Tailwind.Green.C700, Tailwind.Green.C400).Bold(true)
-	Warn = fg(Tailwind.Amber.C700, Tailwind.Amber.C400).Bold(true)
-	Error = fg(Tailwind.Red.C700, Tailwind.Red.C400).Bold(true)
-	Fatal = lipgloss.NewStyle().
-		Foreground(downsample(profile, lipgloss.Color("#fff"))).
+	// calculate our styles, taking into account term profile and theme
+	Brand = style(profile, fn(Tailwind.Blue.C600, Tailwind.Blue.C400), true)
+	Muted = style(profile, fn(Tailwind.Gray.C400, Tailwind.Gray.C600), false)
+	Success = style(profile, fn(Tailwind.Green.C700, Tailwind.Green.C400), true)
+	Warn = style(profile, fn(Tailwind.Amber.C700, Tailwind.Amber.C400), true)
+	Error = style(profile, fn(Tailwind.Red.C700, Tailwind.Red.C400), true)
+	Fatal = style(profile, lipgloss.Color("#fff"), true).
 		Background(downsample(profile, lipgloss.Color(Tailwind.Red.C700))).
 		Bold(true)
+}
+
+// style builds a fg text style for the active terminal profile.
+func style(profile colorprofile.Profile, c color.Color, bold bool) lipgloss.Style {
+	return lipgloss.NewStyle().
+		Foreground(downsample(profile, c)).
+		Bold(bold)
 }
 
 // downsample converts colors to the detected terminal profile.
