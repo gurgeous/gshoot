@@ -1,8 +1,5 @@
 package gmv
 
-// Movie loads the embedded GMV sprite sheet.
-// A GMV is a paletted PNG plus tiny tEXt metadata; decoded movies keep palette indexes for cheap terminal sampling.
-
 import (
 	"bytes"
 	_ "embed"
@@ -13,6 +10,11 @@ import (
 	"image/color"
 	"image/png"
 )
+
+//
+// Movie loads the embedded GMV sprite sheet and metadata. Decoded movies keep
+// palette indexes for cheap terminal sampling.
+//
 
 // builtinGMV is the bundled first-run animation.
 //

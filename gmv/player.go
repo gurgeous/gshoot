@@ -1,8 +1,5 @@
 package gmv
 
-// Player is the outer GMV playback loop.
-// It owns raw mode, key exit, resize handling, pingpong timing, and stdout writes.
-
 import (
 	"bytes"
 	"context"
@@ -19,7 +16,11 @@ import (
 	"github.com/gurgeous/gshoot/ux"
 )
 
-// NewPlayer initializes the built-in GMV player.
+//
+// Player is the outer GMV playback loop. It owns raw mode, key exit, resize
+// handling, timing, and stdout writes.
+//
+
 func NewPlayer(card string, showStats bool) (*Player, error) {
 	movie, err := loadMovie()
 	if err != nil {

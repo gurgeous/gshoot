@@ -21,6 +21,10 @@ import (
 	"golang.org/x/term"
 )
 
+//
+// Small shared utilities for CLI output, files, CSV, and terminal state.
+//
+
 const (
 	ESC      = "\x1b"
 	CSI      = ESC + "["

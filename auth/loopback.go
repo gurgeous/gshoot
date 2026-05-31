@@ -12,9 +12,12 @@ import (
 	"github.com/gurgeous/gshoot/util"
 )
 
+//
+// Temporary localhost OAuth callback server
+//
+
 const oauthReadHeaderTimeout = 5 * time.Second
 
-// Loopback owns the temporary localhost OAuth callback server.
 type Loopback struct {
 	RedirectURL string // redirect URL sent to Google after binding an ephemeral port
 	CallbackURL string // local callback URL shown to the user

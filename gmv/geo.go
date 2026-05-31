@@ -1,9 +1,10 @@
 package gmv
 
-// Geo aliases Go image geometry for terminal-space math.
-// GMV uses points, sizes, and rectangles to place images without custom coordinate types.
-
 import "image"
+
+//
+// Geo aliases Go image geometry for terminal-space math.
+//
 
 type (
 	point = image.Point

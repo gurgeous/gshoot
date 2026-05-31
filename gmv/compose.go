@@ -1,7 +1,9 @@
 package gmv
 
-// Compose is the renderer's image assembly step.
-// It samples the movie into the next terminal image, then overlays card and stats images before diffing.
+//
+// Compose is the renderer's image assembly step. It samples the movie, then
+// overlays card and stats images before diffing.
+//
 
 // drawFrame samples the movie background into the next frame.
 func (r *renderer) drawFrame(fr int) {

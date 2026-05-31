@@ -1,8 +1,5 @@
 package gmv
 
-// ANSI centralizes terminal color conversion for GMV rendering.
-// It caches emitted color escapes so the renderer can compare pixels and send fewer SGR bytes.
-
 import (
 	"bytes"
 	"image/color"
@@ -10,6 +7,10 @@ import (
 	lipgloss "charm.land/lipgloss/v2"
 	"github.com/charmbracelet/colorprofile"
 )
+
+//
+// ANSI centralizes terminal color conversion for GMV rendering.
+//
 
 const (
 	FG    = "\x1b[38;2;" // truecolor foreground SGR sequence.

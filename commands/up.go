@@ -9,7 +9,10 @@ import (
 	"github.com/gurgeous/gshoot/util"
 )
 
-// UpCmd uploads a CSV to Google Sheets.
+//
+// Upload a CSV to Google Sheets.
+//
+
 type UpCmd struct {
 	Sheet       string `help:"Destination sheet name."`
 	Refill      bool   `help:"Merge CSV data INTO the sheet."`
@@ -22,7 +25,6 @@ type UpCmd struct {
 	CSVPath     string `arg:"" name:"csv" type:"path" help:"CSV file to upload."`
 }
 
-// Run uploads the configured CSV.
 func (c *UpCmd) Run() (err error) {
 	if c.Refill && c.Replace {
 		return errors.New("use either --refill or --replace")

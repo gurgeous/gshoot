@@ -17,6 +17,10 @@ import (
 	"github.com/gurgeous/gshoot/ux"
 )
 
+//
+// Main entrypoint, Kong setup, and command preflight.
+//
+
 var (
 	Version   = ""
 	CommitSHA = ""

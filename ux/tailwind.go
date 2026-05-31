@@ -1,6 +1,7 @@
 package ux
 
-// Tailwind colors, see https://ansi.md.
+// Tailwind color palette constants.
+// See https://ansi.md.
 //
 //nolint:goconst // Tailwind palettes intentionally repeat literal color values.
 var Tailwind = TailwindColors{

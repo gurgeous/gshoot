@@ -10,6 +10,10 @@ import (
 	"github.com/gurgeous/gshoot/ux"
 )
 
+//
+// List Google spreadsheet files.
+//
+
 type ListCmd struct{}
 
 func (c *ListCmd) Run() error {

@@ -8,7 +8,10 @@ import (
 	"github.com/alecthomas/kong"
 )
 
-// HelpPrinter renders Kong help with gshoot's ANSI color rules.
+//
+// Kong help rendering with gshoot color rules.
+//
+
 func HelpPrinter(options kong.HelpOptions, ctx *kong.Context) error {
 	// render vanilla kong help into tmp buf
 	var buf bytes.Buffer

@@ -9,6 +9,10 @@ import (
 	"github.com/gurgeous/gshoot/ux"
 )
 
+//
+// Shared spreadsheet command startup and progress lifecycle.
+//
+
 type srunOptions struct {
 	spreadsheet string // spreadsheet file name
 	create      bool   // create spreadsheet file when missing

@@ -14,6 +14,10 @@ import (
 	"github.com/gurgeous/gshoot/util"
 )
 
+//
+// Small Google Drive and Sheets API client.
+//
+
 const spreadsheetMimeType = "application/vnd.google-apps.spreadsheet"
 
 const (
