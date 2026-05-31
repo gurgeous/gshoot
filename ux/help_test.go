@@ -14,6 +14,10 @@ type testCLI struct {
 	Verbose bool `short:"v" help:"Print more output."`
 }
 
+func init() {
+	Init("dark")
+}
+
 func TestHelpPrinterWritesKongHelp(t *testing.T) {
 	var cli testCLI
 	var out bytes.Buffer

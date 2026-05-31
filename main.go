@@ -50,7 +50,7 @@ func main() {
 	}
 
 	//
-	// init
+	// init real early, this setups up color styles
 	//
 
 	a := app.New()
@@ -65,7 +65,7 @@ func main() {
 	isWelcome := len(args) == 1 && args[0] == "welcome"
 
 	if (isFirstRun && isNaked) || isWelcome {
-		// show movie, then auth status
+		// show welcome movie, then auth status
 		if a.Smoke {
 			a.Println("welcome")
 		} else {
@@ -75,14 +75,14 @@ func main() {
 		return
 	}
 
+	//
+	// Kong (note that kong handles --help and --version internally)
+	//
+
 	// fake --help when naked
 	if isNaked {
 		args = append(args, "--help")
 	}
-
-	//
-	// Kong (note that kong handles --help and --version internally)
-	//
 
 	parser := kong.Must(
 		&CLI{},

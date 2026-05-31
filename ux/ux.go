@@ -19,14 +19,9 @@ var (
 	Fatal   lipgloss.Style // white on red
 )
 
-func init() {
-	// Default to dark. We can look at the terminal to get a better answer.
-	Init("dark")
-}
-
 // Init sets up styles from config and terminal background.
 func Init(theme string) {
-	// fn used for light/dark switching
+	// if we are initing with a theme, use that. otherwise detect from termbg
 	var fn lipgloss.LightDarkFunc
 	if theme != "" {
 		fn = lipgloss.LightDark(theme != "light")
@@ -39,16 +34,13 @@ func Init(theme string) {
 		return lipgloss.NewStyle().Foreground(fn(lipgloss.Color(light), lipgloss.Color(dark)))
 	}
 
-	// text styles
+	// styles
 	Brand = fg(Tailwind.Blue.C600, Tailwind.Blue.C400).Bold(true)
 	Muted = fg(Tailwind.Gray.C400, Tailwind.Gray.C600)
 	Success = fg(Tailwind.Green.C700, Tailwind.Green.C400).Bold(true)
 	Warn = fg(Tailwind.Amber.C700, Tailwind.Amber.C400).Bold(true)
 	Error = fg(Tailwind.Red.C700, Tailwind.Red.C400).Bold(true)
-	Fatal = lipgloss.NewStyle().Foreground(lipgloss.Color("white")).Background(lipgloss.Color(Tailwind.Red.C700)).Bold(true)
-
-	// dots
-	dotsWithColor = renderDots()
+	Fatal = lipgloss.NewStyle().Foreground(lipgloss.Color("#fff")).Background(lipgloss.Color(Tailwind.Red.C700)).Bold(true)
 }
 
 //

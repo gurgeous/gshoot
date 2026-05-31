@@ -19,18 +19,6 @@ const (
 	dots     = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 )
 
-// dotsWithColor holds Brand-rendered spinner frames.
-var dotsWithColor []string
-
-// renderDots applies the current Brand style to spinner frames.
-func renderDots() []string {
-	items := make([]string, 0, len(dots))
-	for _, ch := range dots {
-		items = append(items, Warn.Render(string(ch)))
-	}
-	return items
-}
-
 //
 // dots start
 //
@@ -61,6 +49,12 @@ func StartDots(w io.Writer, description string) *Dots {
 
 	// hide cursor
 	util.SetCursorVisible(w, false)
+
+	// render dots
+	dotsWithColor := make([]string, 0, len(dots))
+	for _, ch := range dots {
+		dotsWithColor = append(dotsWithColor, Warn.Render(string(ch)))
+	}
 
 	d.bar = progressbar.NewOptions(-1,
 		progressbar.OptionClearOnFinish(),
