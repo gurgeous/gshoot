@@ -3,7 +3,6 @@ package commands
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/gurgeous/gshoot/google"
 	"github.com/gurgeous/gshoot/util"
@@ -14,7 +13,7 @@ type ListCmd struct{}
 
 func (c *ListCmd) Run(a *App) error {
 	// fetch
-	files, err := c.run0()
+	files, err := c.run0(a)
 	if err != nil {
 		return err
 	}
@@ -31,13 +30,13 @@ func (c *ListCmd) Run(a *App) error {
 	return nil
 }
 
-func (c *ListCmd) run0() (files []*google.File, err error) {
-	dots := ux.StartDots(os.Stderr, "connecting to Google Sheets...")
+func (c *ListCmd) run0(a *App) (files []*google.File, err error) {
+	progress := ux.StartProgress(a.Err, "connecting to Google Sheets...")
 	defer func() {
 		if err == nil {
-			dots.Stop()
+			progress.Stop()
 		} else {
-			dots.Cancel()
+			progress.Cancel()
 		}
 	}()
 
@@ -47,12 +46,12 @@ func (c *ListCmd) run0() (files []*google.File, err error) {
 		return nil, err
 	}
 
-	dots.SayListFiles()
+	progress.SayListFiles()
 	files, err = client.ListSpreadsheetFiles(ctx, 20)
 	if err != nil {
 		return nil, err
 	}
 
-	dots.SayListedSpreadsheets(len(files))
+	progress.SayListedSpreadsheets(len(files))
 	return files, nil
 }

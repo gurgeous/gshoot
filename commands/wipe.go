@@ -12,16 +12,16 @@ func (c *WipeCmd) Run(a *App) (err error) {
 		a.Confirm("wipe spreadsheet '" + c.Spreadsheet + "'?")
 	}
 
-	cmd, err := srunStart(srunOptions{spreadsheet: c.Spreadsheet, create: true})
+	cmd, err := srunStart(a.Err, srunOptions{spreadsheet: c.Spreadsheet, create: true})
 	if err != nil {
 		return err
 	}
 	defer func() { cmd.stop(err) }()
 
-	cmd.dots.SayWipeSpreadsheet(cmd.file.Name)
+	cmd.progress.SayWipeSpreadsheet(cmd.file.Name)
 	if err = cmd.client.WipeSpreadsheet(cmd.ctx, cmd.file.ID); err != nil {
 		return err
 	}
-	cmd.dots.SayWipedSpreadsheet(cmd.file.Name)
+	cmd.progress.SayWipedSpreadsheet(cmd.file.Name)
 	return nil
 }

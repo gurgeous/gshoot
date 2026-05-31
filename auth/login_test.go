@@ -65,7 +65,7 @@ func TestLoginRunsBrowserFlow(t *testing.T) {
 
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- manager.Login(context.Background(), false)
+		errCh <- manager.Login(context.Background(), false, os.Stdout)
 	}()
 
 	select {

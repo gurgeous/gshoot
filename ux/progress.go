@@ -16,15 +16,15 @@ import (
 
 const (
 	interval = 50 * time.Millisecond
-	dots     = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+	progress     = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 )
 
 //
-// dots start
+// progress start
 //
 
-// Dots controls an in-progress dots spinner.
-type Dots struct {
+// Progress controls an in-progress progress spinner.
+type Progress struct {
 	w           io.Writer
 	bar         *progressbar.ProgressBar
 	stopCh      chan bool
@@ -33,9 +33,9 @@ type Dots struct {
 	tty         bool
 }
 
-// StartDots displays progress and returns a controller.
-func StartDots(w io.Writer, description string) *Dots {
-	d := &Dots{
+// StartProgress displays progress and returns a controller.
+func StartProgress(w io.Writer, description string) *Progress {
+	d := &Progress{
 		w:           w,
 		description: description,
 		tty:         util.IsTty(w),
@@ -51,9 +51,9 @@ func StartDots(w io.Writer, description string) *Dots {
 	util.SetCursorVisible(w, false)
 
 	// render dots
-	dotsWithColor := make([]string, 0, len(dots))
-	for _, ch := range dots {
-		dotsWithColor = append(dotsWithColor, Warn.Render(string(ch)))
+	progressWithColor := make([]string, 0, len(progress))
+	for _, ch := range progress {
+		progressWithColor = append(progressWithColor, Warn.Render(string(ch)))
 	}
 
 	d.bar = progressbar.NewOptions(-1,
@@ -61,7 +61,7 @@ func StartDots(w io.Writer, description string) *Dots {
 		progressbar.OptionEnableColorCodes(true),
 		progressbar.OptionSetDescription(Brand.Render(d.description)),
 		progressbar.OptionSetWriter(w),
-		progressbar.OptionSpinnerCustom(dotsWithColor),
+		progressbar.OptionSpinnerCustom(progressWithColor),
 		progressbar.OptionThrottle(interval),
 	)
 
@@ -91,16 +91,16 @@ func StartDots(w io.Writer, description string) *Dots {
 }
 
 // Stop stops the spinner and prints the final description.
-func (d *Dots) Stop() {
+func (d *Progress) Stop() {
 	d.finish(true)
 }
 
 // Cancel stops the spinner without printing success.
-func (d *Dots) Cancel() {
+func (d *Progress) Cancel() {
 	d.finish(false)
 }
 
-func (d *Dots) finish(success bool) {
+func (d *Progress) finish(success bool) {
 	if !d.tty {
 		if success {
 			_, _ = lipgloss.Fprintf(d.w, "%s %s\n", Success.Render("✓"), d.description)
@@ -112,7 +112,7 @@ func (d *Dots) finish(success bool) {
 }
 
 // set changes the current description.
-func (d *Dots) set(description string) {
+func (d *Progress) set(description string) {
 	d.description = description
 	if !d.tty {
 		_, _ = lipgloss.Fprintln(d.w, d.description)
@@ -129,11 +129,11 @@ func (d *Dots) set(description string) {
 // files
 //
 
-func (d *Dots) SayListFiles() {
+func (d *Progress) SayListFiles() {
 	d.set("listing spreadsheet files...")
 }
 
-func (d *Dots) SayListedSpreadsheets(n int) {
+func (d *Progress) SayListedSpreadsheets(n int) {
 	d.set(fmt.Sprintf("%d most recent spreadsheets", n))
 }
 
@@ -141,23 +141,23 @@ func (d *Dots) SayListedSpreadsheets(n int) {
 // spreadsheets
 //
 
-func (d *Dots) SayFetchSpreadsheet(spreadsheet string) {
+func (d *Progress) SayFetchSpreadsheet(spreadsheet string) {
 	d.set(fmt.Sprintf("fetching spreadsheet file %s...", spreadsheet))
 }
 
-func (d *Dots) SayFindSpreadsheet(spreadsheet string) {
+func (d *Progress) SayFindSpreadsheet(spreadsheet string) {
 	d.set(fmt.Sprintf("finding spreadsheet file '%s'...", spreadsheet))
 }
 
-func (d *Dots) SayFindOrCreateSpreadsheet(name string) {
+func (d *Progress) SayFindOrCreateSpreadsheet(name string) {
 	d.set(fmt.Sprintf("finding or creating spreadsheet file '%s'...", name))
 }
 
-func (d *Dots) SayWipeSpreadsheet(spreadsheet string) {
+func (d *Progress) SayWipeSpreadsheet(spreadsheet string) {
 	d.set(fmt.Sprintf("wiping spreadsheet file %s...", spreadsheet))
 }
 
-func (d *Dots) SayWipedSpreadsheet(spreadsheet string) {
+func (d *Progress) SayWipedSpreadsheet(spreadsheet string) {
 	d.set(fmt.Sprintf("wiped spreadsheet file %s", spreadsheet))
 }
 
@@ -165,7 +165,7 @@ func (d *Dots) SayWipedSpreadsheet(spreadsheet string) {
 // sheets
 //
 
-func (d *Dots) SayFindSheet(sheet string) {
+func (d *Progress) SayFindSheet(sheet string) {
 	if sheet == "" {
 		d.set("finding first sheet...")
 		return
@@ -173,11 +173,11 @@ func (d *Dots) SayFindSheet(sheet string) {
 	d.set(fmt.Sprintf("finding sheet '%s'...", sheet))
 }
 
-func (d *Dots) SayPeekSheets(file string) {
+func (d *Progress) SayPeekSheets(file string) {
 	d.set(fmt.Sprintf("peeking in %s...", file))
 }
 
-func (d *Dots) SayUploadRows(n int, file, sheet string) {
+func (d *Progress) SayUploadRows(n int, file, sheet string) {
 	if sheet == "" {
 		d.set(fmt.Sprintf("uploading %d rows to %s...", n, file))
 		return
@@ -189,10 +189,10 @@ func (d *Dots) SayUploadRows(n int, file, sheet string) {
 // rows
 //
 
-func (d *Dots) SayDownloadRows(spreadsheet string) {
+func (d *Progress) SayDownloadRows(spreadsheet string) {
 	d.set(fmt.Sprintf("downloading rows from %s...", spreadsheet))
 }
 
-func (d *Dots) SaySaveRows(n int, path string) {
+func (d *Progress) SaySaveRows(n int, path string) {
 	d.set(fmt.Sprintf("saving %d rows to %s...", n, path))
 }

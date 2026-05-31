@@ -47,11 +47,11 @@ func (c *AuthLoginCmd) Run(a *App) error {
 
 	// can't proceed with login without client secrets
 	if !manager.HasClientSecrets() {
-		manager.ShowStatus()
+		manager.ShowStatus(a.Out)
 		return nil
 	}
 
-	return manager.Login(context.Background(), a.Smoke)
+	return manager.Login(context.Background(), a.Smoke, a.Out)
 }
 
 //
@@ -71,11 +71,11 @@ func (c *AuthLogoutCmd) Run(*App) error {
 // status
 //
 
-func (c *AuthStatusCmd) Run(_ *App) error {
+func (c *AuthStatusCmd) Run(a *App) error {
 	manager, err := auth.NewManager()
 	if err != nil {
 		return err
 	}
-	manager.ShowStatus()
+	manager.ShowStatus(a.Out)
 	return nil
 }

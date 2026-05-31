@@ -70,7 +70,7 @@ func main() {
 		} else {
 			_ = gmv.Demo(context.Background())
 		}
-		mustNewManager(a).ShowStatus()
+		mustNewManager(a).ShowStatus(a.Out)
 		return
 	}
 
@@ -89,7 +89,7 @@ func main() {
 		kong.Description("Magically upload/download CSVs from Google Sheets."),
 		kong.Help(ux.HelpPrinter),
 		kong.ConfigureHelp(kong.HelpOptions{Compact: true}),
-		kong.Writers(os.Stdout, os.Stderr),
+		kong.Writers(a.Out, a.Err),
 		kong.Vars{
 			"version":       version,
 			"versionNumber": Version,
@@ -122,7 +122,7 @@ func main() {
 			}
 			a.Boom(msg)
 			a.Eprintln()
-			manager.ShowStatus()
+			manager.ShowStatus(a.Out)
 			os.Exit(1)
 		}
 	}
