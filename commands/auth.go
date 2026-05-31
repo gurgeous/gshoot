@@ -2,7 +2,10 @@ package commands
 
 import (
 	"context"
+	"fmt"
+	"os"
 
+	"github.com/gurgeous/gshoot/app"
 	"github.com/gurgeous/gshoot/auth"
 	"github.com/gurgeous/gshoot/ux"
 )
@@ -30,7 +33,7 @@ type (
 // login
 //
 
-func (c *AuthLoginCmd) Run(a *App) error {
+func (c *AuthLoginCmd) Run() error {
 	manager, err := auth.NewManager()
 	if err != nil {
 		return err
@@ -41,24 +44,24 @@ func (c *AuthLoginCmd) Run(a *App) error {
 		if err = manager.SaveOClient(c.ClientSecretPath); err != nil {
 			return err
 		}
-		a.Println(ux.Success.Render("gshoot: copied to " + manager.ClientPath))
-		a.Println()
+		fmt.Fprintln(os.Stdout, ux.Success.Render("gshoot: copied to "+manager.ClientPath))
+		fmt.Fprintln(os.Stdout)
 	}
 
 	// can't proceed with login without client secrets
 	if !manager.HasClientSecrets() {
-		a.ShowAuthStatus(manager)
+		ShowAuthStatus(manager)
 		return nil
 	}
 
-	return manager.Login(context.Background(), a.Smoke, a.Out)
+	return manager.Login(context.Background(), app.Env.Smoke, os.Stdout)
 }
 
 //
 // logout
 //
 
-func (c *AuthLogoutCmd) Run(*App) error {
+func (c *AuthLogoutCmd) Run() error {
 	client, err := auth.NewManager()
 	if err != nil {
 		return err
@@ -71,11 +74,11 @@ func (c *AuthLogoutCmd) Run(*App) error {
 // status
 //
 
-func (c *AuthStatusCmd) Run(a *App) error {
+func (c *AuthStatusCmd) Run() error {
 	manager, err := auth.NewManager()
 	if err != nil {
 		return err
 	}
-	a.ShowAuthStatus(manager)
+	ShowAuthStatus(manager)
 	return nil
 }

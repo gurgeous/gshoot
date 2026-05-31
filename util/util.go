@@ -1,6 +1,7 @@
 package util
 
 import (
+	"bufio"
 	"crypto/rand"
 	"encoding/csv"
 	"encoding/hex"
@@ -100,6 +101,28 @@ func SetCursorVisible(w io.Writer, visible bool) {
 // RenderHyperlink returns an OSC8 hyperlink string.
 func RenderHyperlink(link, name string) string {
 	return OSC + "8;;" + link + ST + name + OSC + "8;;" + ST
+}
+
+// Hyperlink returns an OSC8 hyperlink when stdout is a TTY.
+func Hyperlink(link, name string) string {
+	if !IsTty(os.Stdout) {
+		return name
+	}
+	return RenderHyperlink(link, name)
+}
+
+// Confirm asks a y/N question and exits when declined.
+func Confirm(prompt string) {
+	_, _ = fmt.Fprint(os.Stderr, prompt, " ")
+	if !IsTty(os.Stdin) {
+		os.Exit(1)
+	}
+
+	line, _ := bufio.NewReader(os.Stdin).ReadString('\n')
+	ok := len(line) > 0 && (line[0] == 'y' || line[0] == 'Y')
+	if !ok {
+		os.Exit(1)
+	}
 }
 
 // IsTty reports whether the writer wraps a terminal file descriptor.

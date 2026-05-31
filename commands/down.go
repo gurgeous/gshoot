@@ -14,9 +14,9 @@ type DownCmd struct {
 	Sheet       string `arg:"" optional:"" name:"sheet" help:"Sheet name."`
 }
 
-func (c *DownCmd) Run(a *App) error {
+func (c *DownCmd) Run() error {
 	// fetch
-	rows, err := c.run0(a)
+	rows, err := c.run0()
 	if err != nil {
 		return err
 	}
@@ -34,12 +34,12 @@ func (c *DownCmd) Run(a *App) error {
 	return util.CSVWrite(writer, rows)
 }
 
-func (c *DownCmd) run0(a *App) (rows google.Rows, err error) {
+func (c *DownCmd) run0() (rows google.Rows, err error) {
 	//
 	// init
 	//
 
-	cmd, err := srunStart(a.Err, srunOptions{spreadsheet: c.Spreadsheet})
+	cmd, err := srunStart(os.Stderr, srunOptions{spreadsheet: c.Spreadsheet})
 	if err != nil {
 		return nil, err
 	}

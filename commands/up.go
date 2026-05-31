@@ -2,6 +2,8 @@ package commands
 
 import (
 	"errors"
+	"fmt"
+	"os"
 
 	"github.com/gurgeous/gshoot/google"
 	"github.com/gurgeous/gshoot/util"
@@ -21,7 +23,7 @@ type UpCmd struct {
 }
 
 // Run uploads the configured CSV.
-func (c *UpCmd) Run(a *App) (err error) {
+func (c *UpCmd) Run() (err error) {
 	if c.Refill && c.Replace {
 		return errors.New("use either --refill or --replace")
 	}
@@ -35,7 +37,7 @@ func (c *UpCmd) Run(a *App) (err error) {
 	// init
 	//
 
-	cmd, err := srunStart(a.Err, srunOptions{spreadsheet: c.Spreadsheet, create: true})
+	cmd, err := srunStart(os.Stderr, srunOptions{spreadsheet: c.Spreadsheet, create: true})
 	if err != nil {
 		return err
 	}
@@ -52,7 +54,7 @@ func (c *UpCmd) Run(a *App) (err error) {
 
 	// print url and maybe open
 	url := util.SpreadsheetURL(file.ID) + "/edit"
-	a.Println(url)
+	fmt.Fprintln(os.Stdout, url)
 	if c.Open {
 		util.OpenBrowserURL(url)
 	}
