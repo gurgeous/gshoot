@@ -22,9 +22,9 @@ banner() {
 
   # reset the scratch spreadsheet to a single blank sheet
   banner "wipe $SHEET..."
-  run "$BIN" wipe "$SHEET"
+  run "$BIN" wipe -f "$SHEET"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"wiped $SHEET"* ]]
+  [[ "$output" == *"wiped spreadsheet file $SHEET"* ]]
 
   # confirm list and peek can see the reset spreadsheet
   banner "list..."
@@ -35,7 +35,7 @@ banner() {
   banner "peek..."
   run "$BIN" peek "$SHEET"
   [ "$status" -eq 0 ]
-  [[ "$output" == "Sheet1 "* ]]
+  [[ "$output" == *"Sheet1 "* ]]
 
   # replace upload should round-trip through download
   banner "up --replace..."

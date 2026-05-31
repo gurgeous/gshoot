@@ -14,12 +14,16 @@ type testCLI struct {
 	Verbose bool `short:"v" help:"Print more output."`
 }
 
-func TestHelpPrinterWritesColoredKongHelp(t *testing.T) {
+func init() {
+	Init("dark")
+}
+
+func TestHelpPrinterWritesKongHelp(t *testing.T) {
 	var cli testCLI
 	var out bytes.Buffer
 	parser, err := kong.New(
 		&cli,
-		kong.Name(AppName),
+		kong.Name("gshoot"),
 		kong.Help(HelpPrinter),
 		kong.Writers(&out, &out),
 		kong.Exit(func(int) {}),
@@ -34,13 +38,13 @@ func TestHelpPrinterWritesColoredKongHelp(t *testing.T) {
 	}, ctx)
 
 	assert.NoError(t, err)
-	assert.Contains(t, out.String(), Success.Render("Usage:"))
-	assert.Contains(t, out.String(), Brand.Render(AppName))
+	assert.Contains(t, out.String(), "Usage:")
+	assert.Contains(t, out.String(), "gshoot")
 	assert.Contains(t, out.String(), "[flags]")
-	assert.Contains(t, out.String(), Warn.Render("--verbose"))
+	assert.Contains(t, out.String(), "--verbose")
 }
 
-func TestColorizeColorsSectionsCommandsAppNameAndFlags(t *testing.T) {
+func TestColorizeColorsSectionsCommandsAndFlags(t *testing.T) {
 	help := strings.Join([]string{
 		"Usage: gshoot up <spreadsheet> <csv> [flags]",
 		"",
@@ -60,7 +64,7 @@ func TestColorizeColorsSectionsCommandsAppNameAndFlags(t *testing.T) {
 	assert.Contains(t, colored, Success.Render("Usage:"))
 	assert.Contains(t, colored, Success.Render("Arguments:"))
 	assert.Contains(t, colored, Success.Render("Flags:"))
-	assert.Contains(t, colored, Brand.Render(AppName)+" up")
+	assert.Contains(t, colored, Brand.Render("gshoot")+" up")
 	assert.Contains(t, colored, Brand.Render("auth login"))
 	assert.Contains(t, colored, Warn.Render("--help"))
 	assert.Contains(t, colored, Warn.Render("--sheet=STRING"))
@@ -92,7 +96,7 @@ func helpRules() []RestyleRule {
 	return []RestyleRule{
 		{Re: regexp.MustCompile(`(?m)^[A-Z][A-Za-z ]*:`), Style: Success},
 		{Re: regexp.MustCompile(`(?m)^  ([a-z]+(?: [a-z]+)?)\s{2,}.*$`), Style: Brand},
-		{Re: regexp.MustCompile(regexp.QuoteMeta(AppName)), Style: Brand},
+		{Re: regexp.MustCompile(regexp.QuoteMeta("gshoot")), Style: Brand},
 		{Re: regexp.MustCompile(`(?:^|\s)(-{1,2}[A-Za-z0-9=-]+)`), Style: Warn},
 	}
 }

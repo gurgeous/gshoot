@@ -2,9 +2,9 @@ package ux
 
 import (
 	"bytes"
-	"fmt"
 	"regexp"
 
+	lipgloss "charm.land/lipgloss/v2"
 	"github.com/alecthomas/kong"
 )
 
@@ -24,10 +24,10 @@ func HelpPrinter(options kong.HelpOptions, ctx *kong.Context) error {
 	styles := []RestyleRule{
 		{Re: regexp.MustCompile(`(?m)^[A-Z][A-Za-z ]*:`), Style: Success},              // `Usage:`
 		{Re: regexp.MustCompile(`(?m)^  ([a-z]+(?: [a-z]+)?)\s{2,}.*$`), Style: Brand}, // `  auth login ...`
-		{Re: regexp.MustCompile(regexp.QuoteMeta(AppName)), Style: Brand},              // gshoot
+		{Re: regexp.MustCompile(regexp.QuoteMeta("gshoot")), Style: Brand},             // gshoot
 		{Re: regexp.MustCompile(`(?:^|\s)(-{1,2}[A-Za-z0-9=-]+)`), Style: Warn},        // --xxxx=
 	}
 	help := Restyle(buf.String(), styles)
-	fmt.Fprint(ctx.Stdout, help)
+	_, _ = lipgloss.Fprint(ctx.Stdout, help)
 	return nil
 }

@@ -2,12 +2,11 @@ package auth
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"time"
 
 	"charm.land/lipgloss/v2"
-	"github.com/gurgeous/gshoot/env"
+	"github.com/gurgeous/gshoot/app"
 	"github.com/gurgeous/gshoot/util"
 	"github.com/gurgeous/gshoot/ux"
 	"golang.org/x/oauth2"
@@ -20,13 +19,13 @@ import (
 
 var openBrowser = util.OpenBrowserURL
 
-func (m *Manager) Login(ctx context.Context) error {
+func (m *Manager) Login(ctx context.Context, a *app.App) error {
 	//
 	// browser login flow
 	//
 
 	// send the user off to google.com, get an oauth token using our client secret
-	token, err := browserLoginFlow(ctx, m.client)
+	token, err := browserLoginFlow(ctx, a, m.client)
 	if err != nil {
 		return err
 	}
@@ -38,9 +37,9 @@ func (m *Manager) Login(ctx context.Context) error {
 	if err := m.SaveOAuthToken(token); err != nil {
 		return err
 	}
-	fmt.Println()
-	fmt.Println(ux.Success.Render("gshoot: success! oauth token copied to " + m.TokenPath))
-	fmt.Println("gshoot should work now, have fun!")
+	a.Println()
+	a.Println(ux.Success.Render("gshoot: success! oauth token copied to " + m.TokenPath))
+	a.Println("gshoot should work now, have fun!")
 
 	return nil
 }
@@ -55,8 +54,8 @@ func (m *Manager) Logout() {
 }
 
 // browserLoginFlow performs the browser round trip and code exchange.
-func browserLoginFlow(ctx context.Context, client *OClient) (*oauth2.Token, error) {
-	if env.NewConfig().Smoke {
+func browserLoginFlow(ctx context.Context, a *app.App, client *OClient) (*oauth2.Token, error) {
+	if a.Smoke {
 		return &oauth2.Token{
 			AccessToken:  "smoke-access-token",
 			RefreshToken: "smoke-refresh-token",
@@ -93,12 +92,12 @@ func browserLoginFlow(ctx context.Context, client *OClient) (*oauth2.Token, erro
 	//
 
 	intro := "Now you will need to click through the OAuth thing at Google. I will open this magic Google URL in your browser. If I can't open your browser, you can click or copy/paste to open it manually. Here is the URL:"
-	fmt.Println(lipgloss.Wrap(intro, 72, " "))
-	fmt.Println()
-	fmt.Println(ux.Success.Render(authURL))
-	fmt.Println(ux.Muted.Render("(only works if you can run a browser, see README for headless tips)"))
-	fmt.Println()
-	fmt.Println(ux.Brand.Render("gshoot is now waiting for you to finish OAuth so we can continue..."))
+	a.Println(lipgloss.Wrap(intro, 72, " "))
+	a.Println()
+	a.Println(ux.Success.Render(authURL))
+	a.Println(ux.Muted.Render("(only works if you can run a browser, see README for headless tips)"))
+	a.Println()
+	a.Println(ux.Brand.Render("gshoot is now waiting for you to finish OAuth so we can continue..."))
 	openBrowser(authURL)
 
 	//

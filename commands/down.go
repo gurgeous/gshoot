@@ -1,13 +1,12 @@
 package commands
 
 import (
-	"context"
 	"fmt"
 	"os"
 
+	"github.com/gurgeous/gshoot/app"
 	"github.com/gurgeous/gshoot/google"
 	"github.com/gurgeous/gshoot/util"
-	"github.com/gurgeous/gshoot/ux"
 )
 
 type DownCmd struct {
@@ -16,12 +15,14 @@ type DownCmd struct {
 	Sheet       string `arg:"" optional:"" name:"sheet" help:"Sheet name."`
 }
 
-func (c *DownCmd) Run() error {
+func (c *DownCmd) Run(_ *app.App) error {
+	// fetch
 	rows, err := c.run0()
 	if err != nil {
 		return err
 	}
 
+	// print
 	writer := os.Stdout
 	if c.Output != "" && c.Output != "-" {
 		file, err := os.Create(c.Output)
@@ -34,39 +35,23 @@ func (c *DownCmd) Run() error {
 	return util.CSVWrite(writer, rows)
 }
 
-func (c *DownCmd) run0() (google.Rows, error) {
+func (c *DownCmd) run0() (rows google.Rows, err error) {
 	//
 	// init
 	//
 
-	ctx := context.Background()
-	dots := ux.StartDots(os.Stderr, "connecting to Google Sheets...")
-	defer dots.Stop()
-
-	client, err := google.NewClient(ctx)
+	cmd, err := srunStart(srunOptions{spreadsheet: c.Spreadsheet})
 	if err != nil {
 		return nil, err
 	}
-
-	//
-	// find spreadsheet file
-	//
-
-	dots.SetDescription("finding spreadsheet file...")
-	spreadsheet, err := client.FindSpreadsheetFile(ctx, c.Spreadsheet)
-	if err != nil {
-		return nil, err
-	}
-	if spreadsheet == nil {
-		return nil, fmt.Errorf("could not find spreadsheet file named '%s'", c.Spreadsheet)
-	}
+	defer func() { cmd.stop(err) }()
 
 	//
 	// find sheet
 	//
 
-	dots.SetDescription("finding sheet...")
-	sheet, err := client.FindSheet(ctx, spreadsheet.ID, c.Sheet)
+	cmd.dots.SayFindSheet(c.Sheet)
+	sheet, err := cmd.client.FindSheet(cmd.ctx, cmd.file.ID, c.Sheet)
 	if err != nil {
 		return nil, err
 	}
@@ -78,14 +63,14 @@ func (c *DownCmd) run0() (google.Rows, error) {
 	// download
 	//
 
-	dots.SetDescription("downloading rows...")
-	rows, err := client.GetRows(ctx, spreadsheet.ID, sheet.Title)
+	cmd.dots.SayDownloadRows(cmd.file.Name)
+	rows, err = cmd.client.GetRows(cmd.ctx, cmd.file.ID, sheet.Title)
 	if err != nil {
 		return nil, err
 	}
 	isStdout := c.Output == "" || c.Output == "-"
 	if !isStdout {
-		dots.SetDescription(fmt.Sprintf("saving %d rows to %s...", len(rows), c.Output))
+		cmd.dots.SaySaveRows(len(rows), c.Output)
 	}
 	return rows, nil
 }

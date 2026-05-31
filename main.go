@@ -9,9 +9,9 @@ import (
 	"strings"
 
 	"github.com/alecthomas/kong"
+	"github.com/gurgeous/gshoot/app"
 	"github.com/gurgeous/gshoot/auth"
 	"github.com/gurgeous/gshoot/commands"
-	"github.com/gurgeous/gshoot/env"
 	"github.com/gurgeous/gshoot/gmv"
 	"github.com/gurgeous/gshoot/util"
 	"github.com/gurgeous/gshoot/ux"
@@ -29,7 +29,7 @@ type CLI struct {
 	Up      commands.UpCmd   `cmd:"" help:"Upload a CSV to Google Sheets."`
 	List    commands.ListCmd `cmd:"" help:"List your Google Sheets."`
 	Peek    commands.PeekCmd `cmd:"" help:"List sheets in a spreadsheet."`
-	Wipe    commands.WipeCmd `cmd:"" help:"Danger! Wipe all sheets and data from a spreadsheet."`
+	Wipe    commands.WipeCmd `cmd:"" help:"Wipe/delete all data from a spreadsheet."`
 }
 
 func main() {
@@ -50,11 +50,10 @@ func main() {
 	}
 
 	//
-	// init
+	// init real early, this setups up color styles
 	//
 
-	ux.Init()
-	envCfg := env.NewConfig()
+	a := app.New()
 
 	//
 	// show welcome?
@@ -66,24 +65,24 @@ func main() {
 	isWelcome := len(args) == 1 && args[0] == "welcome"
 
 	if (isFirstRun && isNaked) || isWelcome {
-		// show movie, then auth status
-		if envCfg.Smoke {
-			fmt.Println("welcome")
+		// show welcome movie, then auth status
+		if a.Smoke {
+			a.Println("welcome")
 		} else {
 			_ = gmv.Demo(context.Background())
 		}
-		mustNewManager().ShowStatus()
+		mustNewManager(a).ShowStatus(a)
 		return
-	}
-
-	// fake --help when naked
-	if isNaked {
-		args = append(args, "--help")
 	}
 
 	//
 	// Kong (note that kong handles --help and --version internally)
 	//
+
+	// fake --help when naked
+	if isNaked {
+		args = append(args, "--help")
+	}
 
 	parser := kong.Must(
 		&CLI{},
@@ -91,6 +90,7 @@ func main() {
 		kong.Description("Magically upload/download CSVs from Google Sheets."),
 		kong.Help(ux.HelpPrinter),
 		kong.ConfigureHelp(kong.HelpOptions{Compact: true}),
+		kong.Writers(os.Stdout, os.Stderr),
 		kong.Vars{
 			"version":       version,
 			"versionNumber": Version,
@@ -101,9 +101,9 @@ func main() {
 		var parseErr *kong.ParseError
 		if errors.As(err, &parseErr) && parseErr.Context != nil {
 			_ = parseErr.Context.PrintUsage(false)
-			fmt.Fprintln(os.Stdout)
+			a.Println()
 		}
-		fatal(err.Error())
+		a.Fatal(err.Error())
 	}
 
 	//
@@ -111,7 +111,7 @@ func main() {
 	//
 
 	if !strings.HasPrefix(ctx.Command(), "auth") {
-		manager := mustNewManager()
+		manager := mustNewManager(a)
 		if !manager.LoggedIn() {
 			var msg string
 			if manager.HasClientSecrets() {
@@ -121,9 +121,9 @@ func main() {
 				// don't say "gshoot auth login" because of --client-secret
 				msg = "you must authenticate first"
 			}
-			boom(msg)
-			fmt.Fprintln(os.Stderr)
-			manager.ShowStatus()
+			a.Boom(msg)
+			a.Eprintln()
+			manager.ShowStatus(a)
 			os.Exit(1)
 		}
 	}
@@ -132,24 +132,15 @@ func main() {
 	// run
 	//
 
-	if err := ctx.Run(); err != nil {
-		fatal(err.Error())
+	if err := ctx.Run(a); err != nil {
+		a.Fatal(err.Error())
 	}
 }
 
-func mustNewManager() *auth.Manager {
+func mustNewManager(a *app.App) *auth.Manager {
 	manager, err := auth.NewManager()
 	if err != nil {
-		fatal(err.Error())
+		a.Fatal(err.Error())
 	}
 	return manager
-}
-
-func boom(msg string) {
-	fmt.Fprintln(os.Stderr, ux.Fatal.Render(fmt.Sprintf("gshoot: %-64s", msg)))
-}
-
-func fatal(msg string) {
-	boom(msg)
-	os.Exit(1)
 }

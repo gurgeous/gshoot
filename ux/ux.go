@@ -7,11 +7,8 @@ import (
 	"strings"
 
 	lipgloss "charm.land/lipgloss/v2"
-	"github.com/gurgeous/gshoot/env"
 	"github.com/gurgeous/gshoot/util"
 )
-
-const AppName = "gshoot"
 
 var (
 	Brand   lipgloss.Style // blue
@@ -22,42 +19,32 @@ var (
 	Fatal   lipgloss.Style // white on red
 )
 
-// Default to dark. Later, we can look at the terminal to get a better answer.
-func init() {
-	setStyles(lipgloss.LightDark(true))
-}
-
-// setup styles from GSHOOT_THEME or HasDarkBackground.
-func Init() {
-	cfg := env.NewConfig()
-	if cfg.Theme != "" {
-		setStyles(lipgloss.LightDark(cfg.Theme != "light"))
-		return
+// Init sets up styles from config and terminal background.
+func Init(theme string) {
+	// if we are initing with a theme, use that. otherwise detect from termbg
+	var fn lipgloss.LightDarkFunc
+	if theme != "" {
+		fn = lipgloss.LightDark(theme != "light")
+	} else {
+		fn = lipgloss.LightDark(lipgloss.HasDarkBackground(os.Stdin, os.Stdout))
 	}
 
-	setStyles(lipgloss.LightDark(lipgloss.HasDarkBackground(os.Stdin, os.Stdout)))
-}
-
-// setStyles rebuilds global styles for one light/dark profile.
-func setStyles(fn lipgloss.LightDarkFunc) {
+	// tiny helper for clearing up boilerplate
 	fg := func(light, dark string) lipgloss.Style {
 		return lipgloss.NewStyle().Foreground(fn(lipgloss.Color(light), lipgloss.Color(dark)))
 	}
 
-	// text styles
+	// styles
 	Brand = fg(Tailwind.Blue.C600, Tailwind.Blue.C400).Bold(true)
 	Muted = fg(Tailwind.Gray.C400, Tailwind.Gray.C600)
 	Success = fg(Tailwind.Green.C700, Tailwind.Green.C400).Bold(true)
 	Warn = fg(Tailwind.Amber.C700, Tailwind.Amber.C400).Bold(true)
 	Error = fg(Tailwind.Red.C700, Tailwind.Red.C400).Bold(true)
-	Fatal = lipgloss.NewStyle().Foreground(lipgloss.Color("white")).Background(lipgloss.Color(Tailwind.Red.C700)).Bold(true)
-
-	// dots
-	dotsWithColor = renderDots()
+	Fatal = lipgloss.NewStyle().Foreground(lipgloss.Color("#fff")).Background(lipgloss.Color(Tailwind.Red.C700)).Bold(true)
 }
 
 //
-// styleText
+// Restyle
 //
 
 type RestyleRule struct {
@@ -107,7 +94,10 @@ func Restyle(str string, styles []RestyleRule) string {
 	return buf.String()
 }
 
-// Markdown renders the tiny markdown subset used in CLI prose.
+//
+// Markdown renders a tiny markdown subset
+//
+
 func Markdown(str string) string {
 	linkRe := regexp.MustCompile(`\[([^\]]+)\]\(([^)]+)\)`) // markdown link
 	boldRe := regexp.MustCompile(`\*\*([^*]+)\*\*`)         // markdown bold

@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strconv"
 
+	"github.com/gurgeous/gshoot/app"
 	"github.com/gurgeous/gshoot/google"
 	"github.com/gurgeous/gshoot/util"
 	"github.com/gurgeous/gshoot/ux"
@@ -13,35 +13,47 @@ import (
 
 type ListCmd struct{}
 
-func (c *ListCmd) Run() error {
-	ctx := context.Background()
-	dots := ux.StartDots(os.Stderr, "connecting to Google Sheets...")
-	client, err := google.NewClient(ctx)
+func (c *ListCmd) Run(a *app.App) error {
+	// fetch
+	files, err := c.run0()
 	if err != nil {
 		return err
 	}
-
-	dots.SetDescription("getting list of spreadsheets...")
-	files, err := client.ListSpreadsheetFiles(ctx, 20)
-	if err != nil {
-		return err
-	}
-	dots.SetDescription(fmt.Sprintf("%d most recent spreadsheets", len(files)))
-	dots.Stop()
 
 	// print
 	for i, file := range files {
-		const width = 30
 		num := ux.Muted.Render(fmt.Sprintf("%2d.", i+1))
-		name := fmt.Sprintf("%-"+strconv.Itoa(width)+"s", util.Truncate(file.Name, width))
+		name := fmt.Sprintf("%-30s", util.Truncate(file.Name, 30))
 		date := ux.Muted.Render(util.DateAndTimeStr(file.ModifiedByMeTime))
-		fmt.Printf(
-			" %s %s     %s\n",
-			num,
-			util.Hyperlink(os.Stdout, util.SpreadsheetURL(file.ID), name),
-			date,
-		)
+		link := a.Hyperlink(util.SpreadsheetURL(file.ID), name)
+		a.Printf(" %s %s     %s\n", num, link, date)
 	}
 
 	return nil
+}
+
+func (c *ListCmd) run0() (files []*google.File, err error) {
+	dots := ux.StartDots(os.Stderr, "connecting to Google Sheets...")
+	defer func() {
+		if err == nil {
+			dots.Stop()
+		} else {
+			dots.Cancel()
+		}
+	}()
+
+	ctx := context.Background()
+	client, err := google.NewClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	dots.SayListFiles()
+	files, err = client.ListSpreadsheetFiles(ctx, 20)
+	if err != nil {
+		return nil, err
+	}
+
+	dots.SayListedSpreadsheets(len(files))
+	return files, nil
 }

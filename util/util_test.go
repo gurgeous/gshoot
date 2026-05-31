@@ -1,7 +1,6 @@
 package util
 
 import (
-	"bytes"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -51,11 +50,11 @@ func TestRandomHex(t *testing.T) {
 	}
 }
 
-func TestHyperlink(t *testing.T) {
-	var out bytes.Buffer
-	if got := Hyperlink(&out, "https://example.com", "Alpha"); got != "Alpha" {
-		t.Fatalf("Hyperlink() = %q, want plain label", got)
-	}
+func TestFormatInt(t *testing.T) {
+	assert.Equal(t, "0", FormatInt(0))
+	assert.Equal(t, "999", FormatInt(999))
+	assert.Equal(t, "1,000", FormatInt(1000))
+	assert.Equal(t, "1,234,567", FormatInt(1234567))
 }
 
 func TestRenderHyperlink(t *testing.T) {

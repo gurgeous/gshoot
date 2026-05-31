@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gurgeous/gshoot/auth"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -40,11 +41,10 @@ func TestAuthStatus(t *testing.T) {
 	// no auth
 	err, stdout, _ = testCommandWithSetup(t, &AuthStatusCmd{}, nil, func(string) {})
 	assert.NoError(t, err)
-	assert.Contains(t, stdout, "github.com/gurgeous/gshoot#authentication")
-	assert.Contains(t, stdout, "\x1b]8;;https://github.com/gurgeous/gshoot#authentication\x1b\\")
 	assert.Contains(t, stdout, "auth status")
 	assert.Contains(t, stdout, "client secrets")
-	assert.Contains(t, stdout, "\x1b[")
+	assert.Contains(t, stdout, "Github README")
+	assert.Contains(t, auth.AuthReadmeURL, "github.com/gurgeous/gshoot#authentication")
 	assert.NotContains(t, stdout, "<b>")
 	assert.NotContains(t, stdout, "</b>")
 }

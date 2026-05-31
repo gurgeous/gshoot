@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -73,23 +74,27 @@ func EnterRawMode() (func(), error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Fprint(os.Stdout, ansi.SetModeAltScreenSaveCursor, ansi.EraseEntireScreen, ansi.HideCursor)
+	fmt.Fprint(os.Stdout, ansi.SetModeAltScreenSaveCursor, ansi.EraseEntireScreen, ansi.ResetModeTextCursorEnable)
 
 	cleanup := func() {
 		fmt.Fprint(os.Stdout, ansi.ResetModeSynchronizedOutput)
-		fmt.Fprint(os.Stdout, ansi.ResetStyle, ansi.ShowCursor, ansi.ResetModeAltScreenSaveCursor)
+		fmt.Fprint(os.Stdout, ansi.ResetStyle, ansi.SetModeTextCursorEnable, ansi.ResetModeAltScreenSaveCursor)
 		_ = term.Restore(int(os.Stdin.Fd()), oldState)
 	}
 
 	return cleanup, nil
 }
 
-// Hyperlink returns an OSC8 hyperlink when the writer is a TTY.
-func Hyperlink(w io.Writer, link, name string) string {
+// SetCursorVisible shows or hides the terminal cursor.
+func SetCursorVisible(w io.Writer, visible bool) {
 	if !IsTty(w) {
-		return name
+		return
 	}
-	return RenderHyperlink(link, name)
+	mode := ansi.ResetModeTextCursorEnable
+	if visible {
+		mode = ansi.SetModeTextCursorEnable
+	}
+	fmt.Fprint(w, mode)
 }
 
 // RenderHyperlink returns an OSC8 hyperlink string.
@@ -148,6 +153,26 @@ func DateAndTimeStr(s string) string {
 		return s
 	}
 	return t.Local().Format("Mon Jan _2 2006 15:04 MST")
+}
+
+// FormatInt formats n with comma group separators.
+func FormatInt(n int) string {
+	s := strconv.Itoa(n)
+	if len(s) <= 3 {
+		return s
+	}
+
+	var out strings.Builder
+	rem := len(s) % 3
+	if rem == 0 {
+		rem = 3
+	}
+	out.WriteString(s[:rem])
+	for ii := rem; ii < len(s); ii += 3 {
+		out.WriteByte(',')
+		out.WriteString(s[ii : ii+3])
+	}
+	return out.String()
 }
 
 // IndexOfString returns the first index of target, or -1 when missing.

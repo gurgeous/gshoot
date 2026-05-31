@@ -1,14 +1,12 @@
 package gmv
 
-// Config is the small environment surface for GMV playback.
-// It resolves fps, color profile, draw caps, alpha blending, and diff tolerance before rendering starts.
+// Config resolves GMV playback defaults before rendering starts.
 
 import (
 	"os"
 	"time"
 
 	"github.com/charmbracelet/colorprofile"
-	"github.com/gurgeous/gshoot/env"
 )
 
 // config is the resolved playback and rendering configuration.
@@ -21,33 +19,14 @@ type config struct {
 	diffThreshold int
 }
 
-// newConfig combines defaults, caller options, and environment overrides.
+// newConfig returns default playback settings.
 func newConfig() config {
-	envCfg := env.NewConfig()
-	cfg := config{
+	return config{
 		fps:           25,
 		profile:       colorprofile.Detect(os.Stdout, os.Environ()),
 		alphaBlend:    true,
 		diffThreshold: 10,
 	}
-
-	if envCfg.GMVFPS > 0 {
-		cfg.fps = envCfg.GMVFPS
-	}
-	if envCfg.GMVWidth > 0 {
-		cfg.width = envCfg.GMVWidth
-	}
-	if envCfg.GMVHeight > 0 {
-		cfg.height = envCfg.GMVHeight
-	}
-	if envCfg.GMVNoAlpha {
-		cfg.alphaBlend = false
-	}
-	if envCfg.GMVDiffThreshold > 0 {
-		cfg.diffThreshold = envCfg.GMVDiffThreshold
-	}
-
-	return cfg
 }
 
 // colorProfile returns the GMV render profile for cached color escapes.

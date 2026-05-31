@@ -1,32 +1,29 @@
 package commands
 
-import (
-	"context"
-	"fmt"
-
-	"github.com/gurgeous/gshoot/google"
-)
+import "github.com/gurgeous/gshoot/app"
 
 // WipeCmd resets a spreadsheet to one blank Sheet1.
 type WipeCmd struct {
+	Force       bool   `short:"f" help:"Skip confirmation."`
 	Spreadsheet string `arg:"" name:"spreadsheet" help:"Spreadsheet name."`
 }
 
 // Run wipes the selected spreadsheet, creating it if needed.
-func (c *WipeCmd) Run() error {
-	ctx := context.Background()
-	client, err := google.NewClient(ctx)
-	if err != nil {
-		return err
+func (c *WipeCmd) Run(a *app.App) (err error) {
+	if !c.Force {
+		a.Confirm("wipe spreadsheet '" + c.Spreadsheet + "'?")
 	}
 
-	file, err := client.FindOrCreateSpreadsheetFile(ctx, c.Spreadsheet)
+	cmd, err := srunStart(srunOptions{spreadsheet: c.Spreadsheet, create: true})
 	if err != nil {
 		return err
 	}
-	if err := client.WipeSpreadsheet(ctx, file.ID); err != nil {
+	defer func() { cmd.stop(err) }()
+
+	cmd.dots.SayWipeSpreadsheet(cmd.file.Name)
+	if err = cmd.client.WipeSpreadsheet(cmd.ctx, cmd.file.ID); err != nil {
 		return err
 	}
-	fmt.Println("wiped " + file.Name)
+	cmd.dots.SayWipedSpreadsheet(cmd.file.Name)
 	return nil
 }

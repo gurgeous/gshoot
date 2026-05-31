@@ -1,14 +1,17 @@
 package auth
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/gurgeous/gshoot/app"
 	"github.com/gurgeous/gshoot/util"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/oauth2"
@@ -50,6 +53,79 @@ func TestSelectLoopbackRedirectMissing(t *testing.T) {
 	assert.Error(t, err)
 }
 
+// TestLoginRunsBrowserFlow exercises the loopback OAuth login path.
+func TestLoginRunsBrowserFlow(t *testing.T) {
+	_ = withAuthHome(t)
+	writeClient(t, `{"installed":{"client_id":"cid","client_secret":"secret","redirect_uris":["http://127.0.0.1/oauth2/callback"]}}`)
+	manager, err := NewManager()
+	assert.NoError(t, err)
+
+	a, output := captureApp(t)
+	authURLCh := stubOpenBrowser(t)
+	sawTokenExchange := stubTokenExchange(t)
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- manager.Login(context.Background(), a)
+	}()
+
+	select {
+	case authURL := <-authURLCh:
+		sendOAuthCallback(t, authURL, "oauth-code")
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for auth URL")
+	}
+
+	select {
+	case err = <-errCh:
+		assert.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for login")
+	}
+
+	token, err := loadOAuthToken(manager.TokenPath)
+	assert.NoError(t, err)
+	assert.Equal(t, "access", token.AccessToken)
+	assert.Equal(t, "refresh", token.RefreshToken)
+	stdout, _ := output()
+	assert.Contains(t, stdout, "success")
+	assert.True(t, sawTokenExchange())
+}
+
+// captureApp captures App output with the real App constructor.
+func captureApp(t *testing.T) (*app.App, func() (string, string)) {
+	t.Helper()
+
+	stdoutFile, err := os.Create(filepath.Join(t.TempDir(), "stdout"))
+	assert.NoError(t, err)
+	stderrFile, err := os.Create(filepath.Join(t.TempDir(), "stderr"))
+	assert.NoError(t, err)
+
+	origStdout, origStderr := os.Stdout, os.Stderr
+	os.Stdout, os.Stderr = stdoutFile, stderrFile
+	a := app.New()
+	os.Stdout, os.Stderr = origStdout, origStderr
+
+	t.Cleanup(func() {
+		assert.NoError(t, stdoutFile.Close())
+		assert.NoError(t, stderrFile.Close())
+	})
+
+	return a, func() (string, string) {
+		t.Helper()
+
+		_, err := stdoutFile.Seek(0, 0)
+		assert.NoError(t, err)
+		_, err = stderrFile.Seek(0, 0)
+		assert.NoError(t, err)
+		stdout, err := io.ReadAll(stdoutFile)
+		assert.NoError(t, err)
+		stderr, err := io.ReadAll(stderrFile)
+		assert.NoError(t, err)
+		return string(stdout), string(stderr)
+	}
+}
+
 // stubOpenBrowser captures the OAuth URL instead of opening a real browser.
 func stubOpenBrowser(t *testing.T) <-chan string {
 	t.Helper()
@@ -65,40 +141,51 @@ func stubOpenBrowser(t *testing.T) <-chan string {
 	return authURLCh
 }
 
-// captureProcessIO redirects stdout/stderr for auth tests.
-func captureProcessIO(t *testing.T) func() (string, string) {
+type authRoundTripper func(*http.Request) (*http.Response, error)
+
+func (fn authRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	return fn(req)
+}
+
+// stubTokenExchange replaces Google's token endpoint for OAuth exchange tests.
+func stubTokenExchange(t *testing.T) func() bool {
 	t.Helper()
 
-	stdoutPath := filepath.Join(t.TempDir(), "stdout")
-	stderrPath := filepath.Join(t.TempDir(), "stderr")
-	stdoutFile, err := os.Create(stdoutPath)
-	assert.NoError(t, err)
-	stderrFile, err := os.Create(stderrPath)
-	assert.NoError(t, err)
+	sawTokenExchange := false
+	orig := http.DefaultTransport
+	http.DefaultTransport = authRoundTripper(func(req *http.Request) (*http.Response, error) {
+		if req.URL.Host != "oauth2.googleapis.com" {
+			return orig.RoundTrip(req)
+		}
+		if req.URL.Path != "/token" {
+			return &http.Response{
+				StatusCode: http.StatusNotFound,
+				Body:       io.NopCloser(strings.NewReader("not found")),
+				Request:    req,
+			}, nil
+		}
+		if err := req.ParseForm(); err != nil {
+			return nil, err
+		}
+		if req.Form.Get("code") != "oauth-code" {
+			return &http.Response{
+				StatusCode: http.StatusBadRequest,
+				Body:       io.NopCloser(strings.NewReader("bad code")),
+				Request:    req,
+			}, nil
+		}
+		sawTokenExchange = true
 
-	origStdout, origStderr := os.Stdout, os.Stderr
-	os.Stdout, os.Stderr = stdoutFile, stderrFile
-	t.Cleanup(func() {
-		os.Stdout, os.Stderr = origStdout, origStderr
-		assert.NoError(t, stdoutFile.Close())
-		assert.NoError(t, stderrFile.Close())
+		body := `{"access_token":"access","refresh_token":"refresh","token_type":"Bearer","expires_in":3600}`
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     make(http.Header),
+			Body:       io.NopCloser(strings.NewReader(body)),
+			Request:    req,
+		}, nil
 	})
-
-	return func() (string, string) {
-		t.Helper()
-
-		assert.NoError(t, stdoutFile.Sync())
-		assert.NoError(t, stderrFile.Sync())
-		_, err := stdoutFile.Seek(0, 0)
-		assert.NoError(t, err)
-		_, err = stderrFile.Seek(0, 0)
-		assert.NoError(t, err)
-		stdout, err := io.ReadAll(stdoutFile)
-		assert.NoError(t, err)
-		stderr, err := io.ReadAll(stderrFile)
-		assert.NoError(t, err)
-		return string(stdout), string(stderr)
-	}
+	t.Cleanup(func() { http.DefaultTransport = orig })
+	return func() bool { return sawTokenExchange }
 }
 
 // sendOAuthCallback delivers an auth code to the temporary loopback server.

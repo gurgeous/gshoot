@@ -14,7 +14,7 @@ func TestHelpHidesDemoCommand(t *testing.T) {
 	var out bytes.Buffer
 	parser, err := kong.New(
 		&cli,
-		kong.Name(ux.AppName),
+		kong.Name("gshoot"),
 		kong.Help(ux.HelpPrinter),
 		kong.ConfigureHelp(kong.HelpOptions{Compact: true}),
 		kong.Writers(&out, &out),
