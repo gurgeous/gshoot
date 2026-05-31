@@ -1,3 +1,2 @@
-- non-tty behavior
 - this readme
   - auth docs in readme

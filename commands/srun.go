@@ -26,9 +26,7 @@ type srun struct {
 func srunStart(opts srunOptions) (*srun, error) {
 	ctx := context.Background()
 	dots := ux.StartDots(os.Stderr, "connecting to Google Sheets...")
-	dots.SayConnectGoogle()
 
-	client, err := google.NewClient(ctx)
 	if err != nil {
 		dots.Cancel()
 		return nil, err

@@ -87,6 +87,9 @@ func EnterRawMode() (func(), error) {
 
 // SetCursorVisible shows or hides the terminal cursor.
 func SetCursorVisible(w io.Writer, visible bool) {
+	if !IsTty(w) {
+		return
+	}
 	mode := ansi.ResetModeTextCursorEnable
 	if visible {
 		mode = ansi.SetModeTextCursorEnable

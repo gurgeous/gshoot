@@ -125,12 +125,6 @@ func (d *Dots) set(description string) {
 // SayXXX for output
 //
 
-// connect
-
-func (d *Dots) SayConnectGoogle() {
-	d.set("connecting to Google Sheets...")
-}
-
 //
 // files
 //
