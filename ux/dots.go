@@ -39,15 +39,14 @@ func renderDots() []string {
 type Dots struct {
 	w           io.Writer
 	bar         *progressbar.ProgressBar
-	stop        chan struct{}
+	stopCh      chan bool
 	stopped     chan struct{}
 	description string
 	tty         bool
 }
 
 // StartDots displays progress and returns a controller.
-func StartDots(w io.Writer) *Dots {
-	description := "connecting..."
+func StartDots(w io.Writer, description string) *Dots {
 	d := &Dots{
 		w:           w,
 		description: description,
@@ -72,7 +71,7 @@ func StartDots(w io.Writer) *Dots {
 		progressbar.OptionThrottle(interval),
 	)
 
-	d.stop = make(chan struct{}, 1)
+	d.stopCh = make(chan bool, 1)
 	d.stopped = make(chan struct{})
 	go func() {
 		ticker := time.NewTicker(interval)
@@ -83,9 +82,11 @@ func StartDots(w io.Writer) *Dots {
 			select {
 			case <-ticker.C:
 				_ = d.bar.Add(1)
-			case <-d.stop:
+			case success := <-d.stopCh:
 				_ = d.bar.Finish()
-				_, _ = lipgloss.Fprintf(w, "%s %s\n", Success.Render("✓"), Brand.Render(d.description))
+				if success {
+					_, _ = lipgloss.Fprintf(w, "%s %s\n", Success.Render("✓"), Brand.Render(d.description))
+				}
 				util.SetCursorVisible(w, true)
 				return
 			}
@@ -168,6 +169,10 @@ func (d *Dots) SayPeekSheets(file string) {
 }
 
 func (d *Dots) SayUploadRows(n int, file, sheet string) {
+	if sheet == "" {
+		d.SetDescription(fmt.Sprintf("uploading %d rows to %s...", n, file))
+		return
+	}
 	d.SetDescription(fmt.Sprintf("uploading %d rows to %s sheet %s...", n, file, sheet))
 }
 
@@ -185,10 +190,21 @@ func (d *Dots) SaySaveRows(n int, path string) {
 
 // Stop stops the spinner and prints the final description.
 func (d *Dots) Stop() {
+	d.finish(true)
+}
+
+// Cancel stops the spinner without printing success.
+func (d *Dots) Cancel() {
+	d.finish(false)
+}
+
+func (d *Dots) finish(success bool) {
 	if !d.tty {
-		_, _ = lipgloss.Fprintf(d.w, "%s %s\n", Success.Render("✓"), d.description)
+		if success {
+			_, _ = lipgloss.Fprintf(d.w, "%s %s\n", Success.Render("✓"), d.description)
+		}
 		return
 	}
-	d.stop <- struct{}{}
+	d.stopCh <- success
 	<-d.stopped
 }

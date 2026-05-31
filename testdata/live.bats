@@ -24,7 +24,7 @@ banner() {
   banner "wipe $SHEET..."
   run "$BIN" wipe -f "$SHEET"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"wiped $SHEET"* ]]
+  [[ "$output" == *"wiped spreadsheet file $SHEET"* ]]
 
   # confirm list and peek can see the reset spreadsheet
   banner "list..."

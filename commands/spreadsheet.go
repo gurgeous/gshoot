@@ -25,12 +25,12 @@ type srun struct {
 // srunStart connects to Google and opens a spreadsheet file by name.
 func srunStart(a *app.App, opts srunOptions) (*srun, error) {
 	ctx := context.Background()
-	dots := ux.StartDots(a.RawStderr())
+	dots := ux.StartDots(a.RawStderr(), "connecting to Google Sheets...")
 	dots.SayConnectGoogle()
 
 	client, err := google.NewClient(ctx)
 	if err != nil {
-		dots.Stop()
+		dots.Cancel()
 		return nil, err
 	}
 
@@ -43,11 +43,11 @@ func srunStart(a *app.App, opts srunOptions) (*srun, error) {
 		file, err = client.FindSpreadsheetFile(ctx, opts.spreadsheet)
 	}
 	if err != nil {
-		dots.Stop()
+		dots.Cancel()
 		return nil, err
 	}
 	if file == nil {
-		dots.Stop()
+		dots.Cancel()
 		return nil, fmt.Errorf("could not find spreadsheet file named '%s'", opts.spreadsheet)
 	}
 
@@ -59,10 +59,10 @@ func srunStart(a *app.App, opts srunOptions) (*srun, error) {
 	}, nil
 }
 
-func (c *srun) stop() {
-	if c.dots == nil {
+func (c *srun) stop(err error) {
+	if err == nil {
+		c.dots.Stop()
 		return
 	}
-	c.dots.Stop()
-	c.dots = nil
+	c.dots.Cancel()
 }

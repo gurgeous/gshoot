@@ -31,10 +31,16 @@ func (c *ListCmd) Run(a *app.App) error {
 	return nil
 }
 
-func (c *ListCmd) run0(a *app.App) ([]*google.File, error) {
-	dots := ux.StartDots(a.RawStderr())
-	defer dots.Stop()
+func (c *ListCmd) run0(a *app.App) (files []*google.File, err error) {
+	dots := ux.StartDots(a.RawStderr(), "connecting to Google Sheets...")
 	dots.SayConnectGoogle()
+	defer func() {
+		if err == nil {
+			dots.Stop()
+		} else {
+			dots.Cancel()
+		}
+	}()
 
 	ctx := context.Background()
 	client, err := google.NewClient(ctx)
@@ -43,7 +49,7 @@ func (c *ListCmd) run0(a *app.App) ([]*google.File, error) {
 	}
 
 	dots.SayListFiles()
-	files, err := client.ListSpreadsheetFiles(ctx, 20)
+	files, err = client.ListSpreadsheetFiles(ctx, 20)
 	if err != nil {
 		return nil, err
 	}

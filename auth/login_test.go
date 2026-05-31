@@ -65,7 +65,7 @@ func TestLoginRunsBrowserFlow(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	a := app.NewWithWriters(&stdout, &stderr, env.Config{})
 	authURLCh := stubOpenBrowser(t)
-	stubTokenExchange(t)
+	sawTokenExchange := stubTokenExchange(t)
 
 	errCh := make(chan error, 1)
 	go func() {
@@ -91,6 +91,7 @@ func TestLoginRunsBrowserFlow(t *testing.T) {
 	assert.Equal(t, "access", token.AccessToken)
 	assert.Equal(t, "refresh", token.RefreshToken)
 	assert.Contains(t, stdout.String(), "success")
+	assert.True(t, sawTokenExchange())
 }
 
 // stubOpenBrowser captures the OAuth URL instead of opening a real browser.
@@ -115,17 +116,33 @@ func (fn authRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 }
 
 // stubTokenExchange replaces Google's token endpoint for OAuth exchange tests.
-func stubTokenExchange(t *testing.T) {
+func stubTokenExchange(t *testing.T) func() bool {
 	t.Helper()
 
+	sawTokenExchange := false
 	orig := http.DefaultTransport
 	http.DefaultTransport = authRoundTripper(func(req *http.Request) (*http.Response, error) {
 		if req.URL.Host != "oauth2.googleapis.com" {
 			return orig.RoundTrip(req)
 		}
-		assert.Equal(t, "/token", req.URL.Path)
-		assert.NoError(t, req.ParseForm())
-		assert.Equal(t, "oauth-code", req.Form.Get("code"))
+		if req.URL.Path != "/token" {
+			return &http.Response{
+				StatusCode: http.StatusNotFound,
+				Body:       io.NopCloser(strings.NewReader("not found")),
+				Request:    req,
+			}, nil
+		}
+		if err := req.ParseForm(); err != nil {
+			return nil, err
+		}
+		if req.Form.Get("code") != "oauth-code" {
+			return &http.Response{
+				StatusCode: http.StatusBadRequest,
+				Body:       io.NopCloser(strings.NewReader("bad code")),
+				Request:    req,
+			}, nil
+		}
+		sawTokenExchange = true
 
 		body := `{"access_token":"access","refresh_token":"refresh","token_type":"Bearer","expires_in":3600}`
 		return &http.Response{
@@ -136,6 +153,7 @@ func stubTokenExchange(t *testing.T) {
 		}, nil
 	})
 	t.Cleanup(func() { http.DefaultTransport = orig })
+	return func() bool { return sawTokenExchange }
 }
 
 // sendOAuthCallback delivers an auth code to the temporary loopback server.

@@ -35,7 +35,7 @@ func (c *DownCmd) Run(a *app.App) error {
 	return util.CSVWrite(writer, rows)
 }
 
-func (c *DownCmd) run0(a *app.App) (google.Rows, error) {
+func (c *DownCmd) run0(a *app.App) (rows google.Rows, err error) {
 	//
 	// init
 	//
@@ -44,7 +44,7 @@ func (c *DownCmd) run0(a *app.App) (google.Rows, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer cmd.stop()
+	defer func() { cmd.stop(err) }()
 
 	//
 	// find sheet
@@ -64,7 +64,7 @@ func (c *DownCmd) run0(a *app.App) (google.Rows, error) {
 	//
 
 	cmd.dots.SayDownloadRows(cmd.file.Name)
-	rows, err := cmd.client.GetRows(cmd.ctx, cmd.file.ID, sheet.Title)
+	rows, err = cmd.client.GetRows(cmd.ctx, cmd.file.ID, sheet.Title)
 	if err != nil {
 		return nil, err
 	}

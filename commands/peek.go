@@ -30,15 +30,15 @@ func (c *PeekCmd) Run(a *app.App) error {
 	return nil
 }
 
-func (c *PeekCmd) run0(a *app.App) ([]*google.Sheet, error) {
+func (c *PeekCmd) run0(a *app.App) (sheets []*google.Sheet, err error) {
 	cmd, err := srunStart(a, srunOptions{spreadsheet: c.Spreadsheet})
 	if err != nil {
 		return nil, err
 	}
-	defer cmd.stop()
+	defer func() { cmd.stop(err) }()
 
 	cmd.dots.SayPeekSheets(cmd.file.Name)
-	sheets, err := cmd.client.GetSheets(cmd.ctx, cmd.file.ID)
+	sheets, err = cmd.client.GetSheets(cmd.ctx, cmd.file.ID)
 	if err != nil {
 		return nil, err
 	}

@@ -22,7 +22,7 @@ type UpCmd struct {
 }
 
 // Run uploads the configured CSV.
-func (c *UpCmd) Run(a *app.App) error {
+func (c *UpCmd) Run(a *app.App) (err error) {
 	if c.Refill && c.Replace {
 		return errors.New("use either --refill or --replace")
 	}
@@ -40,7 +40,7 @@ func (c *UpCmd) Run(a *app.App) error {
 	if err != nil {
 		return err
 	}
-	defer cmd.stop()
+	defer func() { cmd.stop(err) }()
 
 	//
 	// upload

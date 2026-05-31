@@ -37,9 +37,10 @@ func NewWithWriters(stdout, stderr io.Writer, cfg env.Config) *App {
 func NewWithIO(stdin io.Reader, stdout, stderr io.Writer, cfg env.Config) *App {
 	initIn, initOut := os.Stdin, os.Stdout
 	if in, ok := stdin.(*os.File); ok {
-		if out, ok := stdout.(*os.File); ok {
-			initIn, initOut = in, out
-		}
+		initIn = in
+	}
+	if out, ok := stdout.(*os.File); ok {
+		initOut = out
 	}
 	ux.Init(cfg, initIn, initOut)
 
