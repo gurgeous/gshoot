@@ -96,98 +96,6 @@ func StartDots(w io.Writer, description string) *Dots {
 	return d
 }
 
-// SetDescription changes the current description.
-func (d *Dots) SetDescription(description string) {
-	d.description = description
-	if !d.tty {
-		_, _ = lipgloss.Fprintln(d.w, d.description)
-		return
-	}
-	d.bar.Describe(Brand.Render(d.description))
-}
-
-//
-// SayXXX for output
-//
-
-// connect
-
-func (d *Dots) SayConnectGoogle() {
-	d.SetDescription("connecting to Google Sheets...")
-}
-
-//
-// files
-//
-
-func (d *Dots) SayListFiles() {
-	d.SetDescription("listing spreadsheet files...")
-}
-
-func (d *Dots) SayListedSpreadsheets(n int) {
-	d.SetDescription(fmt.Sprintf("%d most recent spreadsheets", n))
-}
-
-//
-// spreadsheets
-//
-
-func (d *Dots) SayFetchSpreadsheet(spreadsheet string) {
-	d.SetDescription(fmt.Sprintf("fetching spreadsheet file %s...", spreadsheet))
-}
-
-func (d *Dots) SayFindSpreadsheet(spreadsheet string) {
-	d.SetDescription(fmt.Sprintf("finding spreadsheet file '%s'...", spreadsheet))
-}
-
-func (d *Dots) SayFindOrCreateSpreadsheet(name string) {
-	d.SetDescription(fmt.Sprintf("finding or creating spreadsheet file '%s'...", name))
-}
-
-func (d *Dots) SayWipeSpreadsheet(spreadsheet string) {
-	d.SetDescription(fmt.Sprintf("wiping spreadsheet file %s...", spreadsheet))
-}
-
-func (d *Dots) SayWipedSpreadsheet(spreadsheet string) {
-	d.SetDescription(fmt.Sprintf("wiped spreadsheet file %s", spreadsheet))
-}
-
-//
-// sheets
-//
-
-func (d *Dots) SayFindSheet(sheet string) {
-	if sheet == "" {
-		d.SetDescription("finding first sheet...")
-		return
-	}
-	d.SetDescription(fmt.Sprintf("finding sheet '%s'...", sheet))
-}
-
-func (d *Dots) SayPeekSheets(file string) {
-	d.SetDescription(fmt.Sprintf("peeking in %s...", file))
-}
-
-func (d *Dots) SayUploadRows(n int, file, sheet string) {
-	if sheet == "" {
-		d.SetDescription(fmt.Sprintf("uploading %d rows to %s...", n, file))
-		return
-	}
-	d.SetDescription(fmt.Sprintf("uploading %d rows to %s sheet %s...", n, file, sheet))
-}
-
-//
-// rows
-//
-
-func (d *Dots) SayDownloadRows(spreadsheet string) {
-	d.SetDescription(fmt.Sprintf("downloading rows from %s...", spreadsheet))
-}
-
-func (d *Dots) SaySaveRows(n int, path string) {
-	d.SetDescription(fmt.Sprintf("saving %d rows to %s...", n, path))
-}
-
 // Stop stops the spinner and prints the final description.
 func (d *Dots) Stop() {
 	d.finish(true)
@@ -207,4 +115,96 @@ func (d *Dots) finish(success bool) {
 	}
 	d.stopCh <- success
 	<-d.stopped
+}
+
+// set changes the current description.
+func (d *Dots) set(description string) {
+	d.description = description
+	if !d.tty {
+		_, _ = lipgloss.Fprintln(d.w, d.description)
+		return
+	}
+	d.bar.Describe(Brand.Render(d.description))
+}
+
+//
+// SayXXX for output
+//
+
+// connect
+
+func (d *Dots) SayConnectGoogle() {
+	d.set("connecting to Google Sheets...")
+}
+
+//
+// files
+//
+
+func (d *Dots) SayListFiles() {
+	d.set("listing spreadsheet files...")
+}
+
+func (d *Dots) SayListedSpreadsheets(n int) {
+	d.set(fmt.Sprintf("%d most recent spreadsheets", n))
+}
+
+//
+// spreadsheets
+//
+
+func (d *Dots) SayFetchSpreadsheet(spreadsheet string) {
+	d.set(fmt.Sprintf("fetching spreadsheet file %s...", spreadsheet))
+}
+
+func (d *Dots) SayFindSpreadsheet(spreadsheet string) {
+	d.set(fmt.Sprintf("finding spreadsheet file '%s'...", spreadsheet))
+}
+
+func (d *Dots) SayFindOrCreateSpreadsheet(name string) {
+	d.set(fmt.Sprintf("finding or creating spreadsheet file '%s'...", name))
+}
+
+func (d *Dots) SayWipeSpreadsheet(spreadsheet string) {
+	d.set(fmt.Sprintf("wiping spreadsheet file %s...", spreadsheet))
+}
+
+func (d *Dots) SayWipedSpreadsheet(spreadsheet string) {
+	d.set(fmt.Sprintf("wiped spreadsheet file %s", spreadsheet))
+}
+
+//
+// sheets
+//
+
+func (d *Dots) SayFindSheet(sheet string) {
+	if sheet == "" {
+		d.set("finding first sheet...")
+		return
+	}
+	d.set(fmt.Sprintf("finding sheet '%s'...", sheet))
+}
+
+func (d *Dots) SayPeekSheets(file string) {
+	d.set(fmt.Sprintf("peeking in %s...", file))
+}
+
+func (d *Dots) SayUploadRows(n int, file, sheet string) {
+	if sheet == "" {
+		d.set(fmt.Sprintf("uploading %d rows to %s...", n, file))
+		return
+	}
+	d.set(fmt.Sprintf("uploading %d rows to %s sheet %s...", n, file, sheet))
+}
+
+//
+// rows
+//
+
+func (d *Dots) SayDownloadRows(spreadsheet string) {
+	d.set(fmt.Sprintf("downloading rows from %s...", spreadsheet))
+}
+
+func (d *Dots) SaySaveRows(n int, path string) {
+	d.set(fmt.Sprintf("saving %d rows to %s...", n, path))
 }

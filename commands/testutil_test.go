@@ -12,7 +12,6 @@ import (
 
 	"github.com/gurgeous/gshoot/app"
 	"github.com/gurgeous/gshoot/auth"
-	"github.com/gurgeous/gshoot/env"
 	"github.com/gurgeous/gshoot/util"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/oauth2"
@@ -105,7 +104,10 @@ func testCommandWithSetup(t *testing.T, cmd runnable, handler http.HandlerFunc, 
 	} else {
 		writeAuthFiles(t, tmp)
 	}
-	a := app.NewWithWriters(stdoutFile, stderrFile, env.NewConfig())
+	origStdout, origStderr := os.Stdout, os.Stderr
+	os.Stdout, os.Stderr = stdoutFile, stderrFile
+	a := app.New()
+	os.Stdout, os.Stderr = origStdout, origStderr
 
 	// stub google api
 	googleAPIHandler = handler

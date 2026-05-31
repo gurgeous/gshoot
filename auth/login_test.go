@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"bytes"
 	"context"
 	"io"
 	"net/http"
@@ -13,7 +12,6 @@ import (
 	"time"
 
 	"github.com/gurgeous/gshoot/app"
-	"github.com/gurgeous/gshoot/env"
 	"github.com/gurgeous/gshoot/util"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/oauth2"
@@ -62,8 +60,7 @@ func TestLoginRunsBrowserFlow(t *testing.T) {
 	manager, err := NewManager()
 	assert.NoError(t, err)
 
-	var stdout, stderr bytes.Buffer
-	a := app.NewWithWriters(&stdout, &stderr, env.Config{})
+	a, output := captureApp(t)
 	authURLCh := stubOpenBrowser(t)
 	sawTokenExchange := stubTokenExchange(t)
 
@@ -90,8 +87,43 @@ func TestLoginRunsBrowserFlow(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "access", token.AccessToken)
 	assert.Equal(t, "refresh", token.RefreshToken)
-	assert.Contains(t, stdout.String(), "success")
+	stdout, _ := output()
+	assert.Contains(t, stdout, "success")
 	assert.True(t, sawTokenExchange())
+}
+
+// captureApp captures App output with the real App constructor.
+func captureApp(t *testing.T) (*app.App, func() (string, string)) {
+	t.Helper()
+
+	stdoutFile, err := os.Create(filepath.Join(t.TempDir(), "stdout"))
+	assert.NoError(t, err)
+	stderrFile, err := os.Create(filepath.Join(t.TempDir(), "stderr"))
+	assert.NoError(t, err)
+
+	origStdout, origStderr := os.Stdout, os.Stderr
+	os.Stdout, os.Stderr = stdoutFile, stderrFile
+	a := app.New()
+	os.Stdout, os.Stderr = origStdout, origStderr
+
+	t.Cleanup(func() {
+		assert.NoError(t, stdoutFile.Close())
+		assert.NoError(t, stderrFile.Close())
+	})
+
+	return a, func() (string, string) {
+		t.Helper()
+
+		_, err := stdoutFile.Seek(0, 0)
+		assert.NoError(t, err)
+		_, err = stderrFile.Seek(0, 0)
+		assert.NoError(t, err)
+		stdout, err := io.ReadAll(stdoutFile)
+		assert.NoError(t, err)
+		stderr, err := io.ReadAll(stderrFile)
+		assert.NoError(t, err)
+		return string(stdout), string(stderr)
+	}
 }
 
 // stubOpenBrowser captures the OAuth URL instead of opening a real browser.

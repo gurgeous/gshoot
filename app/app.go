@@ -16,7 +16,7 @@ import (
 type App struct {
 	Config env.Config // environment config
 
-	stdin  io.Reader            // raw stdin
+	stdin  *os.File             // raw stdin
 	stdout io.Writer            // raw stdout
 	stderr io.Writer            // raw stderr
 	out    *colorprofile.Writer // styled stdout
@@ -25,32 +25,16 @@ type App struct {
 
 // New initializes process-wide app state.
 func New() *App {
-	return NewWithIO(os.Stdin, os.Stdout, os.Stderr, env.NewConfig())
-}
-
-// NewWithWriters initializes app state for explicit output streams.
-func NewWithWriters(stdout, stderr io.Writer, cfg env.Config) *App {
-	return NewWithIO(os.Stdin, stdout, stderr, cfg)
-}
-
-// NewWithIO initializes app state for explicit input and output streams.
-func NewWithIO(stdin io.Reader, stdout, stderr io.Writer, cfg env.Config) *App {
-	initIn, initOut := os.Stdin, os.Stdout
-	if in, ok := stdin.(*os.File); ok {
-		initIn = in
-	}
-	if out, ok := stdout.(*os.File); ok {
-		initOut = out
-	}
-	ux.Init(cfg, initIn, initOut)
+	cfg := env.NewConfig()
+	ux.Init(cfg, os.Stdin, os.Stdout)
 
 	return &App{
 		Config: cfg,
-		stdin:  stdin,
-		stdout: stdout,
-		stderr: stderr,
-		out:    colorprofile.NewWriter(stdout, os.Environ()),
-		err:    colorprofile.NewWriter(stderr, os.Environ()),
+		stdin:  os.Stdin,
+		stdout: os.Stdout,
+		stderr: os.Stderr,
+		out:    colorprofile.NewWriter(os.Stdout, os.Environ()),
+		err:    colorprofile.NewWriter(os.Stderr, os.Environ()),
 	}
 }
 
