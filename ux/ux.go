@@ -19,23 +19,22 @@ var (
 	Fatal   lipgloss.Style // white on red
 )
 
-// Default to dark. Later, we can look at the terminal to get a better answer.
 func init() {
-	setStyles(lipgloss.LightDark(true))
+	// Default to dark. We can look at the terminal to get a better answer.
+	Init("dark")
 }
 
 // Init sets up styles from config and terminal background.
 func Init(theme string) {
+	// fn used for light/dark switching
+	var fn lipgloss.LightDarkFunc
 	if theme != "" {
-		setStyles(lipgloss.LightDark(theme != "light"))
-		return
+		fn = lipgloss.LightDark(theme != "light")
+	} else {
+		fn = lipgloss.LightDark(lipgloss.HasDarkBackground(os.Stdin, os.Stdout))
 	}
 
-	setStyles(lipgloss.LightDark(lipgloss.HasDarkBackground(os.Stdin, os.Stdout)))
-}
-
-// setStyles rebuilds global styles for one light/dark profile.
-func setStyles(fn lipgloss.LightDarkFunc) {
+	// tiny helper for clearing up boilerplate
 	fg := func(light, dark string) lipgloss.Style {
 		return lipgloss.NewStyle().Foreground(fn(lipgloss.Color(light), lipgloss.Color(dark)))
 	}
