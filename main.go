@@ -33,6 +33,14 @@ type CLI struct {
 }
 
 func main() {
+	err := main0()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, ux.Fatal.Render(fmt.Sprintf("gshoot: %-64s", err.Error())))
+		os.Exit(1)
+	}
+}
+
+func main0() error {
 	//
 	// Version
 	//
@@ -50,7 +58,7 @@ func main() {
 	}
 
 	//
-	// init real early, this setups up color styles
+	// init real early, this sets up color styles
 	//
 
 	app.Init()
@@ -71,8 +79,7 @@ func main() {
 		} else {
 			_ = gmv.Demo(context.Background())
 		}
-		commands.ShowAuthStatus(mustNewManager())
-		return
+		return commands.ShowAuthStatus()
 	}
 
 	//
@@ -103,29 +110,15 @@ func main() {
 			_ = parseErr.Context.PrintUsage(false)
 			fmt.Fprintln(os.Stdout)
 		}
-		fatal(err.Error())
+		return err
 	}
 
 	//
 	// preflight - all (non-auth) commands require login
 	//
 
-	if !strings.HasPrefix(ctx.Command(), "auth") {
-		manager := mustNewManager()
-		if !manager.LoggedIn() {
-			var msg string
-			if manager.HasClientSecrets() {
-				// botched browser flow
-				msg = "you must complete `gshoot auth login` first"
-			} else {
-				// don't say "gshoot auth login" because of --client-secret
-				msg = "you must authenticate first"
-			}
-			boom(msg)
-			fmt.Fprintln(os.Stderr)
-			commands.ShowAuthStatus(manager)
-			os.Exit(1)
-		}
+	if err := preflight(ctx); err != nil {
+		return err
 	}
 
 	//
@@ -133,23 +126,39 @@ func main() {
 	//
 
 	if err := ctx.Run(); err != nil {
-		fatal(err.Error())
+		return err
 	}
+
+	return nil
 }
 
-func mustNewManager() *auth.Manager {
+func preflight(ctx *kong.Context) error {
+	// auth commands don't need preflight
+	if strings.HasPrefix(ctx.Command(), "auth") {
+		return nil
+	}
+
+	// logged in?
 	manager, err := auth.NewManager()
 	if err != nil {
-		fatal(err.Error())
+		return err
 	}
-	return manager
-}
+	if manager.LoggedIn() {
+		return nil
+	}
 
-func boom(msg string) {
-	fmt.Fprintln(os.Stderr, ux.Fatal.Render(fmt.Sprintf("gshoot: %-64s", msg)))
-}
+	// not logged in - show status
+	_ = commands.ShowAuthStatus()
 
-func fatal(msg string) {
-	boom(msg)
-	os.Exit(1)
+	// report error
+	var msg string
+	if manager.HasClientSecrets() {
+		// botched browser flow
+		msg = "you must complete `gshoot auth login` first"
+	} else {
+		// don't say "gshoot auth login" because of --client-secret
+		msg = "you must authenticate first"
+	}
+	fmt.Fprintln(os.Stderr)
+	return errors.New(msg)
 }

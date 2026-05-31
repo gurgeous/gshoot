@@ -50,8 +50,7 @@ func (c *AuthLoginCmd) Run() error {
 
 	// can't proceed with login without client secrets
 	if !manager.HasClientSecrets() {
-		ShowAuthStatus(manager)
-		return nil
+		return ShowAuthStatus()
 	}
 
 	return manager.Login(context.Background(), app.Env.Smoke, os.Stdout)
@@ -75,10 +74,5 @@ func (c *AuthLogoutCmd) Run() error {
 //
 
 func (c *AuthStatusCmd) Run() error {
-	manager, err := auth.NewManager()
-	if err != nil {
-		return err
-	}
-	ShowAuthStatus(manager)
-	return nil
+	return ShowAuthStatus()
 }

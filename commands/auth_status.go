@@ -10,19 +10,26 @@ import (
 )
 
 // ShowAuthStatus writes a short auth status summary.
-func ShowAuthStatus(m *auth.Manager) {
+func ShowAuthStatus() error {
+	m, err := auth.NewManager()
+	if err != nil {
+		return err
+	}
+
 	fmt.Fprintln(os.Stdout, ux.Success.Render("--- gshoot auth status ---"))
 
-	intro := "Authenticating with Google Sheets is quite tricky. Don't blame me, I have no idea why they made it so hard!"
-	if !m.HasClientSecrets() {
-		intro += "\n\nFor starters, we need your *client secrets file*. When you register to use the Google Docs API, Google will give you this file. We use the client secrets file to access Google APIs and get oauth started. When you download it from google it has a crazy name like:"
-		intro += "\n\n*client_secret_XXXXXXXXXXXX.apps.googleusercontent.com.json*"
-		intro += "\n\nand it contains JSON like this:"
-		intro += "\n\n*{\"installed\":{ <secret stuff> }}*"
-		intro += "\n\nOnce you have that file from Google, import it into gshoot:\n\n**$ gshoot auth login --client-secret <client_secret_XXXXXXXXX.json>**"
+	if !m.LoggedIn() {
+		intro := "Authenticating with Google Sheets is quite tricky. Don't blame me, I have no idea why they made it so hard!"
+		if !m.HasClientSecrets() {
+			intro += "\n\nFor starters, we need your *client secrets file*. When you register to use the Google Docs API, Google will give you this file. We use the client secrets file to access Google APIs and get oauth started. When you download it from google it has a crazy name like:"
+			intro += "\n\n*client_secret_XXXXXXXXXXXX.apps.googleusercontent.com.json*"
+			intro += "\n\nand it contains JSON like this:"
+			intro += "\n\n*{\"installed\":{ <secret stuff> }}*"
+			intro += "\n\nOnce you have that file from Google, import it into gshoot:\n\n**$ gshoot auth login --client-secret <client_secret_XXXXXXXXX.json>**"
+		}
+		fmt.Fprintln(os.Stdout)
+		fmt.Fprintln(os.Stdout, ux.Markdown(intro))
 	}
-	fmt.Fprintln(os.Stdout)
-	fmt.Fprintln(os.Stdout, ux.Markdown(intro))
 
 	if m.HasClientSecrets() {
 		fmt.Fprintln(os.Stdout)
@@ -31,8 +38,14 @@ func ShowAuthStatus(m *auth.Manager) {
 	}
 
 	fmt.Fprintln(os.Stdout)
-	outro := "See our [Github README](" + auth.AuthReadmeURL + ") for full instructions."
-	fmt.Fprintln(os.Stdout, ux.Markdown(outro))
+	if !m.LoggedIn() {
+		outro := "See our [Github README](" + auth.AuthReadmeURL + ") for full instructions."
+		fmt.Fprintln(os.Stdout, ux.Markdown(outro))
+	} else {
+		fmt.Fprintln(os.Stdout, "You are logged in and gshoot commands should work.")
+	}
+
+	return nil
 }
 
 // authFileStatus formats one auth file path status line.
