@@ -24,7 +24,7 @@ func (c *PeekCmd) Run() error {
 		rows := ux.Success.Render(util.FormatInt(sheet.GridProperties.RowCount))
 		cols := ux.Success.Render(util.FormatInt(sheet.GridProperties.ColumnCount))
 		x := ux.Muted.Render("x")
-		fmt.Printf("%s %-25s %s %s %s\n", num, sheet.Title, rows, x, cols)
+		ux.Printf("%s %-25s %s %s %s\n", num, sheet.Title, rows, x, cols)
 	}
 	return nil
 }

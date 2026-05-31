@@ -74,15 +74,24 @@ func EnterRawMode() (func(), error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Fprint(os.Stdout, ansi.SetModeAltScreenSaveCursor, ansi.EraseEntireScreen, ansi.HideCursor)
+	fmt.Fprint(os.Stdout, ansi.SetModeAltScreenSaveCursor, ansi.EraseEntireScreen, ansi.ResetModeTextCursorEnable)
 
 	cleanup := func() {
 		fmt.Fprint(os.Stdout, ansi.ResetModeSynchronizedOutput)
-		fmt.Fprint(os.Stdout, ansi.ResetStyle, ansi.ShowCursor, ansi.ResetModeAltScreenSaveCursor)
+		fmt.Fprint(os.Stdout, ansi.ResetStyle, ansi.SetModeTextCursorEnable, ansi.ResetModeAltScreenSaveCursor)
 		_ = term.Restore(int(os.Stdin.Fd()), oldState)
 	}
 
 	return cleanup, nil
+}
+
+// SetCursorVisible shows or hides the terminal cursor.
+func SetCursorVisible(w io.Writer, visible bool) {
+	mode := ansi.ResetModeTextCursorEnable
+	if visible {
+		mode = ansi.SetModeTextCursorEnable
+	}
+	fmt.Fprint(w, mode)
 }
 
 // Hyperlink returns an OSC8 hyperlink when the writer is a TTY.

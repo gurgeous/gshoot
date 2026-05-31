@@ -1,15 +1,13 @@
 package auth
 
 import (
-	"fmt"
-
 	"github.com/gurgeous/gshoot/util"
 	"github.com/gurgeous/gshoot/ux"
 )
 
 // ShowStatus writes a short auth status summary.
 func (m *Manager) ShowStatus() {
-	fmt.Println(ux.Success.Render("--- gshoot auth status ---"))
+	ux.Println(ux.Success.Render("--- gshoot auth status ---"))
 
 	// calculate intro text
 	intro := "Authenticating with Google Sheets is quite tricky. Don't blame me, I have no idea why they made it so hard!"
@@ -20,18 +18,18 @@ func (m *Manager) ShowStatus() {
 		intro += "\n\n*{\"installed\":{ <secret stuff> }}*"
 		intro += "\n\nOnce you have that file from Google, import it into gshoot:\n\n**$ gshoot auth login --client-secret <client_secret_XXXXXXXXX.json>**"
 	}
-	fmt.Println()
-	fmt.Println(ux.Markdown(intro))
+	ux.Println()
+	ux.Println(ux.Markdown(intro))
 
 	if m.HasClientSecrets() {
-		fmt.Println()
-		fmt.Println("Client secrets file: " + missing(m.ClientPath))
-		fmt.Println("Token file:          " + missing(m.TokenPath))
+		ux.Println()
+		ux.Println("Client secrets file: " + missing(m.ClientPath))
+		ux.Println("Token file:          " + missing(m.TokenPath))
 	}
 
-	fmt.Println()
+	ux.Println()
 	outro := "See our [Github README](" + AuthReadmeURL + ") for full instructions."
-	fmt.Println(ux.Markdown(outro))
+	ux.Println(ux.Markdown(outro))
 }
 
 // missing formats one status line for an auth file path.

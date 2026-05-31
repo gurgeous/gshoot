@@ -2,7 +2,6 @@ package ux
 
 import (
 	"bytes"
-	"fmt"
 	"regexp"
 
 	"github.com/alecthomas/kong"
@@ -28,6 +27,6 @@ func HelpPrinter(options kong.HelpOptions, ctx *kong.Context) error {
 		{Re: regexp.MustCompile(`(?:^|\s)(-{1,2}[A-Za-z0-9=-]+)`), Style: Warn},        // --xxxx=
 	}
 	help := Restyle(buf.String(), styles)
-	fmt.Fprint(ctx.Stdout, help)
+	Fprint(ctx.Stdout, help)
 	return nil
 }

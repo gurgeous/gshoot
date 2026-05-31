@@ -25,7 +25,7 @@ func (c *ListCmd) Run() error {
 		name := fmt.Sprintf("%-30s", util.Truncate(file.Name, 30))
 		date := ux.Muted.Render(util.DateAndTimeStr(file.ModifiedByMeTime))
 		link := util.Hyperlink(os.Stdout, util.SpreadsheetURL(file.ID), name)
-		fmt.Printf(" %s %s     %s\n", num, link, date)
+		ux.Printf(" %s %s     %s\n", num, link, date)
 	}
 
 	return nil

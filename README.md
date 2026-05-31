@@ -1,4 +1,3 @@
-- wipe - peek/confirm before wiping, unless --force
 - non-tty behavior
 - this readme
   - auth docs in readme

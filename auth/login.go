@@ -2,7 +2,6 @@ package auth
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"time"
 
@@ -38,9 +37,9 @@ func (m *Manager) Login(ctx context.Context) error {
 	if err := m.SaveOAuthToken(token); err != nil {
 		return err
 	}
-	fmt.Println()
-	fmt.Println(ux.Success.Render("gshoot: success! oauth token copied to " + m.TokenPath))
-	fmt.Println("gshoot should work now, have fun!")
+	ux.Println()
+	ux.Println(ux.Success.Render("gshoot: success! oauth token copied to " + m.TokenPath))
+	ux.Println("gshoot should work now, have fun!")
 
 	return nil
 }
@@ -93,12 +92,12 @@ func browserLoginFlow(ctx context.Context, client *OClient) (*oauth2.Token, erro
 	//
 
 	intro := "Now you will need to click through the OAuth thing at Google. I will open this magic Google URL in your browser. If I can't open your browser, you can click or copy/paste to open it manually. Here is the URL:"
-	fmt.Println(lipgloss.Wrap(intro, 72, " "))
-	fmt.Println()
-	fmt.Println(ux.Success.Render(authURL))
-	fmt.Println(ux.Muted.Render("(only works if you can run a browser, see README for headless tips)"))
-	fmt.Println()
-	fmt.Println(ux.Brand.Render("gshoot is now waiting for you to finish OAuth so we can continue..."))
+	ux.Println(lipgloss.Wrap(intro, 72, " "))
+	ux.Println()
+	ux.Println(ux.Success.Render(authURL))
+	ux.Println(ux.Muted.Render("(only works if you can run a browser, see README for headless tips)"))
+	ux.Println()
+	ux.Println(ux.Brand.Render("gshoot is now waiting for you to finish OAuth so we can continue..."))
 	openBrowser(authURL)
 
 	//

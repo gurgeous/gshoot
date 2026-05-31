@@ -2,10 +2,10 @@ package commands
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/gurgeous/gshoot/google"
 	"github.com/gurgeous/gshoot/util"
+	"github.com/gurgeous/gshoot/ux"
 )
 
 // UpCmd uploads a CSV to Google Sheets.
@@ -53,7 +53,7 @@ func (c *UpCmd) Run() error {
 
 	// print url and maybe open
 	url := util.SpreadsheetURL(file.ID) + "/edit"
-	fmt.Println(url)
+	ux.Println(url)
 	if c.Open {
 		util.OpenBrowserURL(url)
 	}

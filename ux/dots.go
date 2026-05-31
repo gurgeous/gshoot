@@ -5,7 +5,6 @@ import (
 	"io"
 	"time"
 
-	"github.com/charmbracelet/x/ansi"
 	"github.com/gurgeous/gshoot/util"
 	"github.com/schollz/progressbar/v3"
 )
@@ -56,12 +55,12 @@ func StartDots(w io.Writer) *Dots {
 
 	// fallback
 	if !d.tty {
-		fmt.Fprintln(w, description)
+		Fprintln(w, description)
 		return d
 	}
 
 	// hide cursor
-	fmt.Fprint(w, ansi.ResetModeTextCursorEnable) // hide cursor
+	util.SetCursorVisible(w, false)
 
 	d.bar = progressbar.NewOptions(-1,
 		progressbar.OptionClearOnFinish(),
@@ -85,8 +84,8 @@ func StartDots(w io.Writer) *Dots {
 				_ = d.bar.Add(1)
 			case <-d.stop:
 				_ = d.bar.Finish()
-				fmt.Fprintf(w, "%s %s\n", Success.Render("✓"), Brand.Render(d.description))
-				fmt.Fprint(w, ansi.SetModeTextCursorEnable) // show cursor
+				Fprintf(w, "%s %s\n", Success.Render("✓"), Brand.Render(d.description))
+				util.SetCursorVisible(w, true)
 				return
 			}
 		}
@@ -99,7 +98,7 @@ func StartDots(w io.Writer) *Dots {
 func (d *Dots) SetDescription(description string) {
 	d.description = description
 	if !d.tty {
-		fmt.Fprintln(d.w, d.description)
+		Fprintln(d.w, d.description)
 		return
 	}
 	d.bar.Describe(Brand.Render(d.description))
@@ -186,7 +185,7 @@ func (d *Dots) SaySaveRows(n int, path string) {
 // Stop stops the spinner and prints the final description.
 func (d *Dots) Stop() {
 	if !d.tty {
-		fmt.Fprintf(d.w, "%s %s\n", Success.Render("✓"), d.description)
+		Fprintf(d.w, "%s %s\n", Success.Render("✓"), d.description)
 		return
 	}
 	d.stop <- struct{}{}

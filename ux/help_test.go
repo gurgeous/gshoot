@@ -14,7 +14,7 @@ type testCLI struct {
 	Verbose bool `short:"v" help:"Print more output."`
 }
 
-func TestHelpPrinterWritesColoredKongHelp(t *testing.T) {
+func TestHelpPrinterWritesKongHelp(t *testing.T) {
 	var cli testCLI
 	var out bytes.Buffer
 	parser, err := kong.New(
@@ -34,10 +34,10 @@ func TestHelpPrinterWritesColoredKongHelp(t *testing.T) {
 	}, ctx)
 
 	assert.NoError(t, err)
-	assert.Contains(t, out.String(), Success.Render("Usage:"))
-	assert.Contains(t, out.String(), Brand.Render(AppName))
+	assert.Contains(t, out.String(), "Usage:")
+	assert.Contains(t, out.String(), AppName)
 	assert.Contains(t, out.String(), "[flags]")
-	assert.Contains(t, out.String(), Warn.Render("--verbose"))
+	assert.Contains(t, out.String(), "--verbose")
 }
 
 func TestColorizeColorsSectionsCommandsAppNameAndFlags(t *testing.T) {

@@ -68,7 +68,7 @@ func main() {
 	if (isFirstRun && isNaked) || isWelcome {
 		// show movie, then auth status
 		if envCfg.Smoke {
-			fmt.Println("welcome")
+			ux.Println("welcome")
 		} else {
 			_ = gmv.Demo(context.Background())
 		}
@@ -101,7 +101,7 @@ func main() {
 		var parseErr *kong.ParseError
 		if errors.As(err, &parseErr) && parseErr.Context != nil {
 			_ = parseErr.Context.PrintUsage(false)
-			fmt.Fprintln(os.Stdout)
+			ux.Fprintln(os.Stdout)
 		}
 		fatal(err.Error())
 	}
@@ -122,7 +122,7 @@ func main() {
 				msg = "you must authenticate first"
 			}
 			boom(msg)
-			fmt.Fprintln(os.Stderr)
+			ux.Fprintln(os.Stderr)
 			manager.ShowStatus()
 			os.Exit(1)
 		}
@@ -146,7 +146,7 @@ func mustNewManager() *auth.Manager {
 }
 
 func boom(msg string) {
-	fmt.Fprintln(os.Stderr, ux.Fatal.Render(fmt.Sprintf("gshoot: %-64s", msg)))
+	ux.Fprintln(os.Stderr, ux.Fatal.Render(fmt.Sprintf("gshoot: %-64s", msg)))
 }
 
 func fatal(msg string) {

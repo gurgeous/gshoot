@@ -2,7 +2,6 @@ package commands
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/gurgeous/gshoot/auth"
 	"github.com/gurgeous/gshoot/ux"
@@ -42,8 +41,8 @@ func (c *AuthLoginCmd) Run() error {
 		if err = manager.SaveOClient(c.ClientSecretPath); err != nil {
 			return err
 		}
-		fmt.Println(ux.Success.Render("gshoot: copied to " + manager.ClientPath))
-		fmt.Println()
+		ux.Println(ux.Success.Render("gshoot: copied to " + manager.ClientPath))
+		ux.Println()
 	}
 
 	// can't proceed with login without client secrets
