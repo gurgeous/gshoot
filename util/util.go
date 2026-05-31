@@ -94,14 +94,6 @@ func SetCursorVisible(w io.Writer, visible bool) {
 	fmt.Fprint(w, mode)
 }
 
-// Hyperlink returns an OSC8 hyperlink when the writer is a TTY.
-func Hyperlink(w io.Writer, link, name string) string {
-	if !IsTty(w) {
-		return name
-	}
-	return RenderHyperlink(link, name)
-}
-
 // RenderHyperlink returns an OSC8 hyperlink string.
 func RenderHyperlink(link, name string) string {
 	return OSC + "8;;" + link + ST + name + OSC + "8;;" + ST

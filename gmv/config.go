@@ -4,6 +4,7 @@ package gmv
 // It resolves fps, color profile, draw caps, alpha blending, and diff tolerance before rendering starts.
 
 import (
+	"io"
 	"os"
 	"time"
 
@@ -21,12 +22,11 @@ type config struct {
 	diffThreshold int
 }
 
-// newConfig combines defaults, caller options, and environment overrides.
-func newConfig() config {
-	envCfg := env.NewConfig()
+// newConfig combines defaults and environment overrides.
+func newConfig(envCfg env.Config, stdout io.Writer) config {
 	cfg := config{
 		fps:           25,
-		profile:       colorprofile.Detect(os.Stdout, os.Environ()),
+		profile:       colorprofile.Detect(stdout, os.Environ()),
 		alphaBlend:    true,
 		diffThreshold: 10,
 	}

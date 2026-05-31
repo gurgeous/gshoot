@@ -3,7 +3,7 @@ package commands
 import (
 	"fmt"
 
-	"github.com/gurgeous/gshoot/ux"
+	"github.com/gurgeous/gshoot/app"
 )
 
 // WipeCmd resets a spreadsheet to one blank Sheet1.
@@ -13,12 +13,12 @@ type WipeCmd struct {
 }
 
 // Run wipes the selected spreadsheet, creating it if needed.
-func (c *WipeCmd) Run() error {
+func (c *WipeCmd) Run(a *app.App) error {
 	if !c.Force {
-		ux.Confirm(fmt.Sprintf("wipe spreadsheet '%s'?", c.Spreadsheet))
+		a.Confirm(fmt.Sprintf("wipe spreadsheet '%s'?", c.Spreadsheet))
 	}
 
-	cmd, err := srunStart(srunOptions{spreadsheet: c.Spreadsheet, create: true})
+	cmd, err := srunStart(a, srunOptions{spreadsheet: c.Spreadsheet, create: true})
 	if err != nil {
 		return err
 	}

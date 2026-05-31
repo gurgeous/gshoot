@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/gurgeous/gshoot/app"
 	"github.com/gurgeous/gshoot/google"
 	"github.com/gurgeous/gshoot/util"
 )
@@ -14,15 +15,15 @@ type DownCmd struct {
 	Sheet       string `arg:"" optional:"" name:"sheet" help:"Sheet name."`
 }
 
-func (c *DownCmd) Run() error {
+func (c *DownCmd) Run(a *app.App) error {
 	// fetch
-	rows, err := c.run0()
+	rows, err := c.run0(a)
 	if err != nil {
 		return err
 	}
 
 	// print
-	writer := os.Stdout
+	writer := a.RawStdout()
 	if c.Output != "" && c.Output != "-" {
 		file, err := os.Create(c.Output)
 		if err != nil {
@@ -34,12 +35,12 @@ func (c *DownCmd) Run() error {
 	return util.CSVWrite(writer, rows)
 }
 
-func (c *DownCmd) run0() (google.Rows, error) {
+func (c *DownCmd) run0(a *app.App) (google.Rows, error) {
 	//
 	// init
 	//
 
-	cmd, err := srunStart(srunOptions{spreadsheet: c.Spreadsheet})
+	cmd, err := srunStart(a, srunOptions{spreadsheet: c.Spreadsheet})
 	if err != nil {
 		return nil, err
 	}

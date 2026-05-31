@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"regexp"
 
+	lipgloss "charm.land/lipgloss/v2"
 	"github.com/alecthomas/kong"
 )
 
@@ -27,6 +28,6 @@ func HelpPrinter(options kong.HelpOptions, ctx *kong.Context) error {
 		{Re: regexp.MustCompile(`(?:^|\s)(-{1,2}[A-Za-z0-9=-]+)`), Style: Warn},        // --xxxx=
 	}
 	help := Restyle(buf.String(), styles)
-	Fprint(ctx.Stdout, help)
+	_, _ = lipgloss.Fprint(ctx.Stdout, help)
 	return nil
 }

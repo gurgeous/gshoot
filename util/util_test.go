@@ -1,7 +1,6 @@
 package util
 
 import (
-	"bytes"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -48,13 +47,6 @@ func TestRandomHex(t *testing.T) {
 	}
 	if !regexp.MustCompile(`^[0-9a-f]+$`).MatchString(got) {
 		t.Fatalf("RandomHex() = %q, want lowercase hex", got)
-	}
-}
-
-func TestHyperlink(t *testing.T) {
-	var out bytes.Buffer
-	if got := Hyperlink(&out, "https://example.com", "Alpha"); got != "Alpha" {
-		t.Fatalf("Hyperlink() = %q, want plain label", got)
 	}
 }
 

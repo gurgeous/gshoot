@@ -3,6 +3,7 @@ package commands
 import (
 	"fmt"
 
+	"github.com/gurgeous/gshoot/app"
 	"github.com/gurgeous/gshoot/google"
 	"github.com/gurgeous/gshoot/util"
 	"github.com/gurgeous/gshoot/ux"
@@ -14,8 +15,8 @@ type PeekCmd struct {
 }
 
 // Run prints one sheet name per line.
-func (c *PeekCmd) Run() error {
-	sheets, err := c.run0()
+func (c *PeekCmd) Run(a *app.App) error {
+	sheets, err := c.run0(a)
 	if err != nil {
 		return err
 	}
@@ -24,13 +25,13 @@ func (c *PeekCmd) Run() error {
 		rows := ux.Success.Render(util.FormatInt(sheet.GridProperties.RowCount))
 		cols := ux.Success.Render(util.FormatInt(sheet.GridProperties.ColumnCount))
 		x := ux.Muted.Render("x")
-		ux.Printf("%s %-25s %s %s %s\n", num, sheet.Title, rows, x, cols)
+		a.Printf("%s %-25s %s %s %s\n", num, sheet.Title, rows, x, cols)
 	}
 	return nil
 }
 
-func (c *PeekCmd) run0() ([]*google.Sheet, error) {
-	cmd, err := srunStart(srunOptions{spreadsheet: c.Spreadsheet})
+func (c *PeekCmd) run0(a *app.App) ([]*google.Sheet, error) {
+	cmd, err := srunStart(a, srunOptions{spreadsheet: c.Spreadsheet})
 	if err != nil {
 		return nil, err
 	}

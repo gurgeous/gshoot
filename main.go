@@ -9,9 +9,9 @@ import (
 	"strings"
 
 	"github.com/alecthomas/kong"
+	"github.com/gurgeous/gshoot/app"
 	"github.com/gurgeous/gshoot/auth"
 	"github.com/gurgeous/gshoot/commands"
-	"github.com/gurgeous/gshoot/env"
 	"github.com/gurgeous/gshoot/gmv"
 	"github.com/gurgeous/gshoot/util"
 	"github.com/gurgeous/gshoot/ux"
@@ -53,8 +53,7 @@ func main() {
 	// init
 	//
 
-	ux.Init()
-	envCfg := env.NewConfig()
+	a := app.New()
 
 	//
 	// show welcome?
@@ -67,12 +66,12 @@ func main() {
 
 	if (isFirstRun && isNaked) || isWelcome {
 		// show movie, then auth status
-		if envCfg.Smoke {
-			ux.Println("welcome")
+		if a.Config.Smoke {
+			a.Println("welcome")
 		} else {
-			_ = gmv.Demo(context.Background())
+			_ = gmv.Demo(context.Background(), a.Config, a.RawStdout())
 		}
-		mustNewManager().ShowStatus()
+		mustNewManager(a).ShowStatus(a)
 		return
 	}
 
@@ -91,6 +90,7 @@ func main() {
 		kong.Description("Magically upload/download CSVs from Google Sheets."),
 		kong.Help(ux.HelpPrinter),
 		kong.ConfigureHelp(kong.HelpOptions{Compact: true}),
+		kong.Writers(a.RawStdout(), a.RawStderr()),
 		kong.Vars{
 			"version":       version,
 			"versionNumber": Version,
@@ -101,9 +101,9 @@ func main() {
 		var parseErr *kong.ParseError
 		if errors.As(err, &parseErr) && parseErr.Context != nil {
 			_ = parseErr.Context.PrintUsage(false)
-			ux.Fprintln(os.Stdout)
+			a.Println()
 		}
-		fatal(err.Error())
+		a.Fatal(err.Error())
 	}
 
 	//
@@ -111,7 +111,7 @@ func main() {
 	//
 
 	if !strings.HasPrefix(ctx.Command(), "auth") {
-		manager := mustNewManager()
+		manager := mustNewManager(a)
 		if !manager.LoggedIn() {
 			var msg string
 			if manager.HasClientSecrets() {
@@ -121,9 +121,9 @@ func main() {
 				// don't say "gshoot auth login" because of --client-secret
 				msg = "you must authenticate first"
 			}
-			boom(msg)
-			ux.Fprintln(os.Stderr)
-			manager.ShowStatus()
+			a.Boom(msg)
+			a.Eprintln()
+			manager.ShowStatus(a)
 			os.Exit(1)
 		}
 	}
@@ -132,24 +132,15 @@ func main() {
 	// run
 	//
 
-	if err := ctx.Run(); err != nil {
-		fatal(err.Error())
+	if err := ctx.Run(a); err != nil {
+		a.Fatal(err.Error())
 	}
 }
 
-func mustNewManager() *auth.Manager {
+func mustNewManager(a *app.App) *auth.Manager {
 	manager, err := auth.NewManager()
 	if err != nil {
-		fatal(err.Error())
+		a.Fatal(err.Error())
 	}
 	return manager
-}
-
-func boom(msg string) {
-	ux.Fprintln(os.Stderr, ux.Fatal.Render(fmt.Sprintf("gshoot: %-64s", msg)))
-}
-
-func fatal(msg string) {
-	boom(msg)
-	os.Exit(1)
 }

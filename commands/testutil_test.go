@@ -10,7 +10,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gurgeous/gshoot/app"
 	"github.com/gurgeous/gshoot/auth"
+	"github.com/gurgeous/gshoot/env"
 	"github.com/gurgeous/gshoot/util"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/oauth2"
@@ -65,7 +67,7 @@ func TestMain(m *testing.M) {
 
 // kong commands look like this
 type runnable interface {
-	Run() error
+	Run(*app.App) error
 }
 
 type authFilesOptions struct {
@@ -88,14 +90,11 @@ func testCommandWithSetup(t *testing.T, cmd runnable, handler http.HandlerFunc, 
 	assert.NoError(t, os.Chdir(tmp))
 	t.Cleanup(func() { assert.NoError(t, os.Chdir(origDir)) })
 
-	// stub stdout/stderr
-	origStdout, origStderr := os.Stdout, os.Stderr
+	// capture stdout/stderr
 	stdoutFile, err := os.Create("test-stdout")
 	assert.NoError(t, err)
 	stderrFile, err := os.Create("test-stderr")
 	assert.NoError(t, err)
-	os.Stdout, os.Stderr = stdoutFile, stderrFile
-	t.Cleanup(func() { os.Stdout, os.Stderr = origStdout, origStderr })
 	t.Cleanup(func() { stdoutFile.Close() })
 	t.Cleanup(func() { stderrFile.Close() })
 
@@ -106,21 +105,26 @@ func testCommandWithSetup(t *testing.T, cmd runnable, handler http.HandlerFunc, 
 	} else {
 		writeAuthFiles(t, tmp)
 	}
+	a := app.NewWithWriters(stdoutFile, stderrFile, env.NewConfig())
 
 	// stub google api
 	googleAPIHandler = handler
 	defer func() { googleAPIHandler = invalid }()
 
 	// run
-	runErr := cmd.Run()
+	runErr := cmd.Run(a)
 
 	//
 
 	// drain stdout/stderr
-	stdoutFile.Seek(0, 0)
-	stderrFile.Seek(0, 0)
-	stdoutBytes, _ := io.ReadAll(stdoutFile)
-	stderrBytes, _ := io.ReadAll(stderrFile)
+	_, err = stdoutFile.Seek(0, 0)
+	assert.NoError(t, err)
+	_, err = stderrFile.Seek(0, 0)
+	assert.NoError(t, err)
+	stdoutBytes, err := io.ReadAll(stdoutFile)
+	assert.NoError(t, err)
+	stderrBytes, err := io.ReadAll(stderrFile)
+	assert.NoError(t, err)
 
 	return runErr, string(stdoutBytes), string(stderrBytes)
 }

@@ -1,8 +1,10 @@
 package gmv
 
 import (
+	"io"
 	"testing"
 
+	"github.com/gurgeous/gshoot/env"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -13,7 +15,7 @@ func TestNewConfigReadsEnv(t *testing.T) {
 	t.Setenv("GSHOOT_GMV_NO_ALPHA", "true")
 	t.Setenv("GSHOOT_GMV_DIFF_THRESHOLD", "4")
 
-	cfg := newConfig()
+	cfg := newConfig(env.NewConfig(), io.Discard)
 
 	assert.Equal(t, 12.5, cfg.fps)
 	assert.Equal(t, 80, cfg.width)
@@ -26,7 +28,7 @@ func TestNewConfigIgnoresInvalidEnv(t *testing.T) {
 	t.Setenv("GSHOOT_GMV_FPS", "wat")
 	t.Setenv("GSHOOT_GMV_WIDTH", "80")
 
-	cfg := newConfig()
+	cfg := newConfig(env.NewConfig(), io.Discard)
 
 	assert.Equal(t, 25.0, cfg.fps)
 	assert.Equal(t, 0, cfg.width)

@@ -33,7 +33,7 @@ linters:
     generated: lax
     presets: [comments, common-false-positives, std-error-handling]
     rules:
-      - path: '(gmv/player\.go|util/util\.go)$'
+      - path: '(app/app\.go|gmv/player\.go|util/util\.go)$'
         linters: [forbidigo]
 
   settings:

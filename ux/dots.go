@@ -5,6 +5,7 @@ import (
 	"io"
 	"time"
 
+	lipgloss "charm.land/lipgloss/v2"
 	"github.com/gurgeous/gshoot/util"
 	"github.com/schollz/progressbar/v3"
 )
@@ -55,7 +56,7 @@ func StartDots(w io.Writer) *Dots {
 
 	// fallback
 	if !d.tty {
-		Fprintln(w, description)
+		_, _ = lipgloss.Fprintln(w, description)
 		return d
 	}
 
@@ -84,7 +85,7 @@ func StartDots(w io.Writer) *Dots {
 				_ = d.bar.Add(1)
 			case <-d.stop:
 				_ = d.bar.Finish()
-				Fprintf(w, "%s %s\n", Success.Render("✓"), Brand.Render(d.description))
+				_, _ = lipgloss.Fprintf(w, "%s %s\n", Success.Render("✓"), Brand.Render(d.description))
 				util.SetCursorVisible(w, true)
 				return
 			}
@@ -98,7 +99,7 @@ func StartDots(w io.Writer) *Dots {
 func (d *Dots) SetDescription(description string) {
 	d.description = description
 	if !d.tty {
-		Fprintln(d.w, d.description)
+		_, _ = lipgloss.Fprintln(d.w, d.description)
 		return
 	}
 	d.bar.Describe(Brand.Render(d.description))
@@ -185,7 +186,7 @@ func (d *Dots) SaySaveRows(n int, path string) {
 // Stop stops the spinner and prints the final description.
 func (d *Dots) Stop() {
 	if !d.tty {
-		Fprintf(d.w, "%s %s\n", Success.Render("✓"), d.description)
+		_, _ = lipgloss.Fprintf(d.w, "%s %s\n", Success.Render("✓"), d.description)
 		return
 	}
 	d.stop <- struct{}{}
