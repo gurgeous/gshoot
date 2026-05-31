@@ -1,12 +1,12 @@
 package ux
 
 import (
+	"os"
 	"regexp"
 	"sort"
 	"strings"
 
 	lipgloss "charm.land/lipgloss/v2"
-	"github.com/charmbracelet/x/term"
 	"github.com/gurgeous/gshoot/env"
 	"github.com/gurgeous/gshoot/util"
 )
@@ -28,13 +28,13 @@ func init() {
 }
 
 // Init sets up styles from config and terminal background.
-func Init(cfg env.Config, in, out term.File) {
+func Init(cfg env.Config) {
 	if cfg.Theme != "" {
 		setStyles(lipgloss.LightDark(cfg.Theme != "light"))
 		return
 	}
 
-	setStyles(lipgloss.LightDark(lipgloss.HasDarkBackground(in, out)))
+	setStyles(lipgloss.LightDark(lipgloss.HasDarkBackground(os.Stdin, os.Stdout)))
 }
 
 // setStyles rebuilds global styles for one light/dark profile.

@@ -16,17 +16,20 @@ import (
 type App struct {
 	Config env.Config // environment config
 
-	stdin  *os.File             // raw stdin
-	stdout io.Writer            // raw stdout
-	stderr io.Writer            // raw stderr
-	out    *colorprofile.Writer // styled stdout
-	err    *colorprofile.Writer // styled stderr
+	// raw
+	stdin  *os.File
+	stdout io.Writer
+	stderr io.Writer
+
+	// potentially downsampled (eats ansi escapes)
+	out *colorprofile.Writer
+	err *colorprofile.Writer
 }
 
 // New initializes process-wide app state.
 func New() *App {
 	cfg := env.NewConfig()
-	ux.Init(cfg, os.Stdin, os.Stdout)
+	ux.Init(cfg)
 
 	return &App{
 		Config: cfg,
