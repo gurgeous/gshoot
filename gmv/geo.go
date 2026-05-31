@@ -3,7 +3,7 @@ package gmv
 import "image"
 
 //
-// Geo aliases Go image geometry for terminal-space math.
+// Image geometry for terminal math
 //
 
 type (

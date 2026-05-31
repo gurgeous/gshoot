@@ -15,7 +15,9 @@ import (
 )
 
 //
-// Small Google Drive and Sheets API client.
+// Small Google Drive and Sheets API client. I didn't want to use the standard
+// google api lib because it adds 10mb to our binary. This was not super hard to
+// embed.
 //
 
 const spreadsheetMimeType = "application/vnd.google-apps.spreadsheet"

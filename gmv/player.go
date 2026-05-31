@@ -17,8 +17,7 @@ import (
 )
 
 //
-// Player is the outer GMV playback loop. It owns raw mode, key exit, resize
-// handling, timing, and stdout writes.
+// Playback loop. Raw mode, key exit, resize handling, timing, writing...
 //
 
 func NewPlayer(card string, showStats bool) (*Player, error) {

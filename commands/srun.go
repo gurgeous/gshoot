@@ -10,7 +10,8 @@ import (
 )
 
 //
-// Shared spreadsheet command startup and progress lifecycle.
+// Just a little helper for showing dots and finding a spreadsheet, several
+// commands start up like this
 //
 
 type srunOptions struct {

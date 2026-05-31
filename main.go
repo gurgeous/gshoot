@@ -18,7 +18,7 @@ import (
 )
 
 //
-// Main entrypoint, Kong setup, and command preflight.
+// Main cli entrypoint
 //
 
 var (
@@ -36,6 +36,7 @@ type CLI struct {
 	Wipe    commands.WipeCmd `cmd:"" help:"Wipe/delete all data from a spreadsheet."`
 }
 
+// tinry wrapper around main0, with err handling
 func main() {
 	err := main0()
 	if err != nil {
@@ -46,7 +47,7 @@ func main() {
 
 func main0() error {
 	//
-	// Version
+	// load Version
 	//
 
 	if Version == "" {
@@ -62,13 +63,13 @@ func main0() error {
 	}
 
 	//
-	// init real early, this sets up color styles
+	// Init real early, this sets up color styles
 	//
 
 	app.Init()
 
 	//
-	// show welcome?
+	// welcome?
 	//
 
 	args := os.Args[1:]
@@ -118,7 +119,7 @@ func main0() error {
 	}
 
 	//
-	// preflight - all (non-auth) commands require login
+	// all (non-auth) commands require login
 	//
 
 	if err := preflight(ctx); err != nil {
@@ -126,7 +127,7 @@ func main0() error {
 	}
 
 	//
-	// run
+	// run the command
 	//
 
 	if err := ctx.Run(); err != nil {
@@ -135,6 +136,10 @@ func main0() error {
 
 	return nil
 }
+
+//
+// preflight - if not logged in, give some auth hints
+//
 
 func preflight(ctx *kong.Context) error {
 	// auth commands don't need preflight

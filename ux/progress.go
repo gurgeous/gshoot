@@ -10,7 +10,7 @@ import (
 )
 
 //
-// Progress spinner and status text helpers.
+// Progress spinner and w/ text
 //
 
 //

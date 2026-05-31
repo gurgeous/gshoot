@@ -3,7 +3,7 @@ package google
 import "fmt"
 
 //
-// Minimal Google Drive and Sheets payload types.
+// Google API types
 //
 
 //

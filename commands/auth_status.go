@@ -10,7 +10,7 @@ import (
 )
 
 //
-// Human-readable auth status and setup guidance.
+// Human-readable auth status. We trigger this from several places
 //
 
 func ShowAuthStatus() error {

@@ -9,7 +9,7 @@ import (
 )
 
 //
-// ANSI centralizes terminal color conversion for GMV rendering.
+// Lower level ansi helpers for GMV
 //
 
 const (

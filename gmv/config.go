@@ -8,7 +8,7 @@ import (
 )
 
 //
-// Config resolves GMV playback defaults before rendering starts.
+// MV playback settings
 //
 
 type config struct {

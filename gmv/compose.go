@@ -1,8 +1,8 @@
 package gmv
 
 //
-// Compose is the renderer's image assembly step. It samples the movie, then
-// overlays card and stats images before diffing.
+// Compose samples the movie, then overlays card and stats images before
+// diffing.
 //
 
 // drawFrame samples the movie background into the next frame.

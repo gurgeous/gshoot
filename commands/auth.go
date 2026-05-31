@@ -11,7 +11,7 @@ import (
 )
 
 //
-// Auth login, logout, and status commands.
+// Auth xxx commands
 //
 
 type (

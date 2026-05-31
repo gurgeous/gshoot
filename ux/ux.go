@@ -13,7 +13,7 @@ import (
 )
 
 //
-// Shared color styles, tiny markdown, and regex restyling.
+// Color styles and helpers
 //
 
 var (

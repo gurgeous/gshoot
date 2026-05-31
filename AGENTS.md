@@ -31,7 +31,8 @@
 - Prefer small, direct code with early returns and explicit data flow
 - Avoid unnecessary interfaces, clever abstractions, extra globals, and one-off helper layers
 - Keep comments brief and useful
-- Every non-test `.go` file should have a terse `//` block after imports explaining the file's purpose; wrap at 80 columns
+- Comments wrap at 80 columns
+- Every non-test `.go` file should have a terse `//` block after imports explaining the file's purpose
 - Fail fast; prefer clear errors and actionable hints
 
 ## Design

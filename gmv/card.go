@@ -9,7 +9,7 @@ import (
 )
 
 //
-// Card turns lipgloss-rendered ANSI text into a transparent terminal image.
+// Render a card, for use on top of the movie
 //
 
 // card is rendered card text plus its terminal dimensions.

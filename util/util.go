@@ -22,7 +22,7 @@ import (
 )
 
 //
-// Small shared utilities for CLI output, files, CSV, and terminal state.
+// Small shared utils
 //
 
 const (

@@ -8,8 +8,8 @@ import (
 )
 
 //
-// Renderer converts composited terminal images into ANSI output. It emits full
-// keyframes or small dirty spans depending on terminal state.
+// Renderer converts composited images into ANSI output. It emits full
+// keyframes or dirty spans.
 //
 
 type renderer struct {
