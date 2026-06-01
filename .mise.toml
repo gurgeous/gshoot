@@ -5,5 +5,7 @@ _.path = ["{{config_root}}/bin"]
 bats = "latest"
 golang = "latest"
 golangci-lint = "latest"
+goreleaser = "latest"
 just = "latest"
 uv = "latest"
+svu = "latest"

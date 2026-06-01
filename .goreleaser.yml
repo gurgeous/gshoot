@@ -1,0 +1,39 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema-pro.json
+version: 2
+
+dist: tmp/dist
+
+before:
+  hooks: ["go mod tidy"]
+
+builds:
+  - env: ["CGO_ENABLED=0"]
+    flags: ["-trimpath"]
+    goos: ["darwin", "linux"]
+    goarch: ["amd64", "arm64"]
+    ignore: [{ goos: "windows", goarch: "arm64" }]
+    ldflags: -s -w -X "github.com/gurgeous/gshoot.Version={{ .Tag }} {{ .ShortCommit }} {{ .Date }}"
+    # main: ./cmd?
+
+# what to put in the tgz files
+archives:
+  - files:
+      - LICENSE
+      - README.md
+      - extra/
+    name_template: "{{.ProjectName}}-{{.Version}}-{{.Os}}-{{.Arch}}"
+    wrap_in_directory: true
+
+# turn stuff off
+announce: { skip: true }
+changelog: { disable: true }
+
+# brew tap
+brews:
+  - repository: { owner: "gurgeous", name: "homebrew-tap" }
+    description: REMIND
+    homepage: https://github.com/gurgeous/gshoot
+    test: system "#{bin}/gshoot --version"
+    extra_install: |
+      bash_completion.install "extra/gshoot.bash" => "gshoot"
+      zsh_completion.install "extra/_gshoot" => "_gshoot"
