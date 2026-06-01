@@ -22,8 +22,10 @@ import (
 //
 
 var (
-	Version   = ""
-	CommitSHA = ""
+	// from goreleaser
+	version = ""
+	commit  = ""
+	date    = ""
 )
 
 type CLI struct {
@@ -46,22 +48,6 @@ func main() {
 }
 
 func main0() error {
-	//
-	// load Version
-	//
-
-	if Version == "" {
-		if info, ok := debug.ReadBuildInfo(); ok && info.Main.Sum != "" {
-			Version = info.Main.Version
-		} else {
-			Version = "built from source"
-		}
-	}
-	version := fmt.Sprintf("gshoot: %s", Version)
-	if len(CommitSHA) >= 7 {
-		version += " (" + CommitSHA[:7] + ")"
-	}
-
 	//
 	// Init real early, this sets up color styles
 	//
@@ -104,8 +90,7 @@ func main0() error {
 		kong.ConfigureHelp(kong.HelpOptions{Compact: true}),
 		kong.Writers(os.Stdout, os.Stderr),
 		kong.Vars{
-			"version":       version,
-			"versionNumber": Version,
+			"version": versionString(),
 		},
 	)
 	ctx, err := parser.Parse(args)
@@ -170,4 +155,34 @@ func preflight(ctx *kong.Context) error {
 	}
 	fmt.Fprintln(os.Stderr)
 	return errors.New(msg)
+}
+
+// pull version string, either populated by gorelease or from debug.ReadBuildInfo
+func versionString() string {
+	modified := false
+
+	if version == "" {
+		version = "built from source"
+		if info, ok := debug.ReadBuildInfo(); ok {
+			for _, setting := range info.Settings {
+				switch setting.Key {
+				case "vcs.revision":
+					commit = setting.Value
+				case "vcs.time":
+					date = setting.Value
+				case "vcs.modified":
+					if setting.Value == "true" {
+						modified = true
+					}
+				}
+			}
+		}
+	}
+
+	c := commit[:7]
+	if modified {
+		c += "*"
+	}
+
+	return fmt.Sprintf("ghoot %s (%s, %s)", version, c, date[:16])
 }
