@@ -4,9 +4,9 @@
 
 # gshoot
 
-Magically upload/download CSVs from Google Sheets.
+`gshoot` is a cli to magically import and exports CSV from Google Sheets. That's it. For some projects I end up doing this literally dozens of times a day, `gshoot` makes my life much easier
 
-## Installation
+### Installation
 
 On MacOS use brew:
 
@@ -18,7 +18,11 @@ For Linux, see the [latest release on github](https://github.com/gurgeous/gshoot
 
 ### Important Features
 
-REMIND
+- download a CSV from a Google Sheets file (and maybe a specific sheet)
+- upload a CSV into a Google Sheets file (and maybe replace/merge into an existing sheet)
+- `up --replace` mode to overwrite an existing sheet
+- `up --refill` mode to merge data into an existing sheet, leave other columns untouched
+- `up` has lots of little helpers to make life easier like `--filter`, `--layout`, `--numeric` and `--open`
 
 ### Options
 
@@ -38,7 +42,7 @@ Commands:
   wipe           Wipe/delete all data from a spreadsheet.
 ```
 
-## Authentication
+### Authentication
 
 Getting `gshoot` to talk to Google Sheets is challenging, to put it mildly. Don't blame me, I do not work for Google and I did not design this system. `gshoot` talks to Google Sheets as you, using a _Google Cloud project_ that _you create_. Again, I would like to apologize in advance. This is just incredibly complicated and error-prone.
 
@@ -66,10 +70,10 @@ $ gshoot auth login --client-secrets client_secret_XXXXXXXXXXXX.apps.googleuserc
 
 ### Changelog
 
-REMIND
+#### 0.1.0 (unreleased)
+
+- initial release
 
 # TODO
 
-- README
-- badges
 - vhs demo / screenshots
