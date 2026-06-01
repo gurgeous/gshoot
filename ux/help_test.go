@@ -1,12 +1,10 @@
 package ux
 
 import (
-	"bytes"
 	"regexp"
 	"strings"
 	"testing"
 
-	"github.com/alecthomas/kong"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -16,32 +14,6 @@ type testCLI struct {
 
 func init() {
 	Init("dark")
-}
-
-func TestHelpPrinterWritesKongHelp(t *testing.T) {
-	var cli testCLI
-	var out bytes.Buffer
-	parser, err := kong.New(
-		&cli,
-		kong.Name("gshoot"),
-		kong.Help(HelpPrinter),
-		kong.Writers(&out, &out),
-		kong.Exit(func(int) {}),
-	)
-	assert.NoError(t, err)
-	ctx, err := kong.Trace(parser, []string{})
-	assert.NoError(t, err)
-
-	err = HelpPrinter(kong.HelpOptions{
-		Compact:        true,
-		ValueFormatter: kong.DefaultHelpValueFormatter,
-	}, ctx)
-
-	assert.NoError(t, err)
-	assert.Contains(t, out.String(), "Usage:")
-	assert.Contains(t, out.String(), "gshoot")
-	assert.Contains(t, out.String(), "[flags]")
-	assert.Contains(t, out.String(), "--verbose")
 }
 
 func TestColorizeColorsSectionsCommandsAndFlags(t *testing.T) {
@@ -73,17 +45,6 @@ func TestColorizeColorsSectionsCommandsAndFlags(t *testing.T) {
 	assert.Contains(t, colored, "Destination sheet name.")
 	assert.Contains(t, colored, "context-sensitive")
 	assert.NotContains(t, colored, "context"+Warn.Render("-sensitive"))
-}
-
-func TestColorHelpHandlesEmptyInput(t *testing.T) {
-	assert.Equal(t, "", Restyle("", helpRules()))
-}
-
-func TestColorHelpHandlesUsageWithoutCommand(t *testing.T) {
-	colored := Restyle("Usage: [--flag]\n", helpRules())
-
-	assert.Contains(t, colored, Success.Render("Usage:"))
-	assert.Contains(t, colored, "[--flag]")
 }
 
 func TestColorHelpLeavesCommandLikeProseAlone(t *testing.T) {

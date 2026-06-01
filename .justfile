@@ -1,20 +1,12 @@
 default:
   just --list
 
-auth-watch:
-  GSHOOT_THEME=1 watchexec -q --clear=reset "just build && clear && gshoot auth status"
-
 build:
   go build -o bin/gshoot
   just banner "✓ build ✓"
 
 build-release:
   go build -ldflags "-w -s" -o bin/gshoot-release
-
-check: lint build test test-bats
-  just banner "✓ check ✓"
-
-ci: check
 
 clean:
   go clean -testcache
@@ -30,6 +22,15 @@ install: build
 lint:
   golangci-lint run
   just banner "✓ lint ✓"
+
+#
+# run/test
+#
+
+check: lint build test test-bats
+  just banner "✓ check ✓"
+
+ci: check
 
 run *ARGS: build
   gshoot {{ARGS}}
@@ -52,6 +53,17 @@ test-live *ARGS: build
 test-watch *ARGS:
   GSHOOT_THEME=1 watchexec -q --clear=reset just test {{ARGS}}
 
+#
+# release
+#
+
+release: check
+  bin/release
+
+release-preview: check
+  goreleaser release --clean --snapshot
+  just banner "macOS tarball preview..."
+  tar -tvzf "$(find tmp/dist -maxdepth 1 -name 'gshoot_*_darwin_arm64.tar.gz' | head -n 1)"
 #
 # gmv
 #

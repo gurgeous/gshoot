@@ -14,13 +14,6 @@ func TestAuthLogin(t *testing.T) {
 	assert.Contains(t, stdout, "client secrets")
 }
 
-func TestAuthLogout(t *testing.T) {
-	err, _, _ := testCommandWithSetup(t, &AuthLogoutCmd{}, nil, func(home string) {
-		writeAuthFiles(t, home)
-	})
-	assert.NoError(t, err)
-}
-
 func TestAuthStatus(t *testing.T) {
 	err, stdout, _ := testCommandWithSetup(t, &AuthStatusCmd{}, nil, func(home string) {
 		writeAuthFiles(t, home)

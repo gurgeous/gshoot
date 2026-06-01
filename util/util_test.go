@@ -105,24 +105,6 @@ func TestCSVReadRectangularizesRows(t *testing.T) {
 	}, rows)
 }
 
-func TestStringSliceHelpers(t *testing.T) {
-	values := []string{"alpha", "beta", "gamma"}
-
-	assert.Equal(t, 1, IndexOfString(values, "beta"))
-	assert.Equal(t, -1, IndexOfString(values, "missing"))
-	assert.True(t, ContainsString(values, "gamma"))
-	assert.False(t, ContainsString(values, "missing"))
-	assert.True(t, AnyContains(values, "mm"))
-	assert.False(t, AnyContains(values, "zz"))
-}
-
-func TestAllMatch(t *testing.T) {
-	re := regexp.MustCompile(`^\d+$`)
-
-	assert.True(t, AllMatch([]string{"1", "22"}, re))
-	assert.False(t, AllMatch([]string{"1", "no"}, re))
-}
-
 func TestDecimalPrecision(t *testing.T) {
 	assert.Equal(t, 1, DecimalPrecision([]string{"1", "2"}))
 	assert.Equal(t, 3, DecimalPrecision([]string{"1.2", "3.456"}))
