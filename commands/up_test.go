@@ -36,7 +36,7 @@ func TestUpCommandRenamesBlankDefaultSheet(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, "https://docs.google.com/spreadsheets/d/sheet-1/edit\n", stdout)
-	assertBatchContains(t, batches, "updateSheetProperties", `"sheetId":0`, `"title":"gshoot_1"`)
+	assertBatchContains(t, batches, "updateSheetProperties", `"sheetId":0`, `"title":"gshoot"`)
 	assertBatchContains(t, batches, "pasteData", `"data":"name,count\nalpha,1\n"`)
 }
 
@@ -94,6 +94,65 @@ func TestUpCommandCustomSheetAddsSheetWhenDefaultBlank(t *testing.T) {
 
 	assert.NoError(t, err)
 	assertBatchContains(t, batches, "addSheet", `"title":"Monthly"`)
+}
+
+func TestUpCommandCustomSheetChoosesAvailableName(t *testing.T) {
+	csvPath := writeCSV(t, "name,count\nalpha,1\n")
+	batches := []map[string]any{}
+
+	err, _, _ := testCommand(t, &UpCmd{Spreadsheet: "Budget", Sheet: "Monthly", CSVPath: csvPath}, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/drive/v3/files":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"files": []map[string]string{{"id": "sheet-1", "name": "Budget"}},
+			})
+		case r.URL.Path == "/v4/spreadsheets/sheet-1":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"sheets": []map[string]any{
+					{"properties": map[string]any{"sheetId": 3, "title": "Monthly"}},
+					{"properties": map[string]any{"sheetId": 4, "title": "Monthly_2"}},
+				},
+			})
+		case r.URL.Path == "/v4/spreadsheets/sheet-1:batchUpdate":
+			batches = append(batches, readBatch(t, r))
+			writeBatchReply(w)
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	})
+
+	assert.NoError(t, err)
+	assertBatchContains(t, batches, "addSheet", `"title":"Monthly_3"`)
+	assertBatchMissing(t, batches, "pasteData", `"sheetId":3`)
+}
+
+func TestUpCommandReplaceCustomSheetUsesExactName(t *testing.T) {
+	csvPath := writeCSV(t, "name,count\nalpha,1\n")
+	batches := []map[string]any{}
+
+	err, _, _ := testCommand(t, &UpCmd{Spreadsheet: "Budget", Sheet: "Monthly", CSVPath: csvPath, Replace: true}, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/drive/v3/files":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"files": []map[string]string{{"id": "sheet-1", "name": "Budget"}},
+			})
+		case r.URL.Path == "/v4/spreadsheets/sheet-1":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"sheets": []map[string]any{
+					{"properties": map[string]any{"sheetId": 3, "title": "Monthly"}},
+				},
+			})
+		case r.URL.Path == "/v4/spreadsheets/sheet-1:batchUpdate":
+			batches = append(batches, readBatch(t, r))
+			writeBatchReply(w)
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	})
+
+	assert.NoError(t, err)
+	assertBatchContains(t, batches, "updateCells", `"sheetId":3`, `"fields":"*"`)
+	assertBatchMissing(t, batches, "addSheet")
 }
 
 func TestUpCommandRefillMergesAndExtendsFormulas(t *testing.T) {

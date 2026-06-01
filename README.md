@@ -66,9 +66,11 @@ Commands:
 
 ### Up, Up, Up
 
-There are three different modes for `gshoot up` with some subtle differences.
+There are three different modes for `gshoot up`.
 
-1. `gshoot up <spreadsheet> <csv>` will upload the csv file into the Google Sheets spreadsheet. The spreadsheet file will be created if necessary, and this will ALWAYS add a new sheet. Nothing will be overwritten, this is totally safe.
+1. **Non-destructive** - this is our default. A new sheet will be added. Nothing will be overwritten, this is totally safe. If you run this over and over you will see new sheets appear like `gshoot`, `gshoot_2`, `gshoot_3` ... Safe.
+2. **Replace** - with `gshoot up --replace`, gshoot will find/create the sheet and completely replace it with the new data. Caution. Use
+3. `gshoot up --replace` The csv will replace the first sheet of the spreadsheet file. Use `--sheet=STRING` to pick a different sheet.
 
 ### Authentication
 
