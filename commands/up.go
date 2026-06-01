@@ -77,12 +77,12 @@ func (c *UpCmd) run0(rows google.Rows) (*google.File, error) {
 	// find/create target sheet
 	//
 
-	cmd.progress.SayUploadRows(len(rows), cmd.file.Name, c.Sheet)
 	s := newUploader(cmd.ctx, cmd.client, cmd.file, spreadsheet, c, rows)
 	s.id, err = s.resolveTargetSheet()
 	if err != nil {
 		return nil, err
 	}
+	cmd.progress.SayUploadRows(len(s.rows), cmd.file.Name, s.title)
 
 	//
 	// --refill

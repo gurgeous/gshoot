@@ -149,19 +149,15 @@ func (p *Progress) SayFetchSpreadsheet(spreadsheet string) {
 }
 
 func (p *Progress) SayFindSpreadsheet(spreadsheet string) {
-	p.set(fmt.Sprintf("finding spreadsheet file '%s'...", spreadsheet))
+	p.set(fmt.Sprintf("finding spreadsheet file %s...", spreadsheet))
 }
 
 func (p *Progress) SayFindOrCreateSpreadsheet(name string) {
-	p.set(fmt.Sprintf("finding or creating spreadsheet file '%s'...", name))
+	p.set(fmt.Sprintf("finding or creating spreadsheet file %s...", name))
 }
 
 func (p *Progress) SayWipeSpreadsheet(spreadsheet string) {
 	p.set(fmt.Sprintf("wiping spreadsheet file %s...", spreadsheet))
-}
-
-func (p *Progress) SayWipedSpreadsheet(spreadsheet string) {
-	p.set(fmt.Sprintf("wiped spreadsheet file %s", spreadsheet))
 }
 
 //
@@ -173,7 +169,7 @@ func (p *Progress) SayFindSheet(sheet string) {
 		p.set("finding first sheet...")
 		return
 	}
-	p.set(fmt.Sprintf("finding sheet '%s'...", sheet))
+	p.set(fmt.Sprintf("finding sheet %s...", sheet))
 }
 
 func (p *Progress) SayPeekSheets(file string) {
@@ -181,11 +177,7 @@ func (p *Progress) SayPeekSheets(file string) {
 }
 
 func (p *Progress) SayUploadRows(n int, file, sheet string) {
-	if sheet == "" {
-		p.set(fmt.Sprintf("uploading %d rows to %s...", n, file))
-		return
-	}
-	p.set(fmt.Sprintf("uploading %d rows to %s sheet %s...", n, file, sheet))
+	p.set(fmt.Sprintf("uploading %d rows to %s / %s...", n, file, sheet))
 }
 
 //

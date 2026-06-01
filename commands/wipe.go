@@ -32,6 +32,5 @@ func (c *WipeCmd) Run() (err error) {
 	if err = cmd.client.WipeSpreadsheet(cmd.ctx, cmd.file.ID); err != nil {
 		return err
 	}
-	cmd.progress.SayWipedSpreadsheet(cmd.file.Name)
 	return nil
 }
