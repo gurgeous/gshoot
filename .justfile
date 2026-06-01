@@ -57,8 +57,9 @@ test-watch *ARGS:
 # release
 #
 
-release *ARGS: check
-  bin/release {{ARGS}}
+release: check
+  bin/release
+  just banner "✓ release ✓"
 
 release-preview: check
   goreleaser release --clean --snapshot --verbose
