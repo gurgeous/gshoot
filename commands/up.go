@@ -30,26 +30,14 @@ func (c *UpCmd) Run() (err error) {
 		return errors.New("use either --refill or --replace")
 	}
 
+	// read
 	rows, err := util.CSVRead(c.CSVPath)
 	if err != nil {
 		return err
 	}
 
-	//
-	// init
-	//
-
-	cmd, err := srunStart(os.Stderr, srunOptions{spreadsheet: c.Spreadsheet, create: true})
-	if err != nil {
-		return err
-	}
-	defer func() { cmd.stop(err) }()
-
-	//
 	// upload
-	//
-
-	file, err := c.upload(cmd, google.Rows(rows))
+	file, err := c.run0(google.Rows(rows))
 	if err != nil {
 		return err
 	}
@@ -63,9 +51,17 @@ func (c *UpCmd) Run() (err error) {
 	return nil
 }
 
-// upload runs the complete upload workflow.
-func (c *UpCmd) upload(cmd *srun, rows google.Rows) (*google.File, error) {
-	var err error
+// run0 runs the complete run0 workflow.
+func (c *UpCmd) run0(rows google.Rows) (*google.File, error) {
+	//
+	// init
+	//
+
+	cmd, err := srunStart(os.Stderr, srunOptions{spreadsheet: c.Spreadsheet})
+	if err != nil {
+		return nil, err
+	}
+	defer func() { cmd.stop(err) }()
 
 	//
 	// get Spreadsheet for that File

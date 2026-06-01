@@ -6,7 +6,15 @@
 
 `gshoot` is a CLI to magically import and export CSVs from Google Sheets. It has a few carefully chosen features along those lines.
 
-For example, if I'm analyzing my local zoo I might run `gshoot up Zoo zoo.csv --numeric --layout --filter` to create a nice-looking Google Sheet. If I add more rows to `zoo.csv`, I can run `gshoot up Zoo zoo.csv --refill` to add the new data without messing up the Google Sheet. For some projects I do this dozens of times a day.
+For example, if I'm analyzing my local zoo I might run `gshoot up Zoo zoo.csv --numeric --layout --filter` to create a nice-looking Google Sheet. If I add more rows to `zoo.csv`, I can run `gshoot up Zoo zoo.csv --refill` to add the new data without messing up the Google Sheet. For some projects I do this dozens of times a day. Some examples:
+
+```sh
+# download the Google Sheets spreadsheet file "Zoo" to /tmp/zoo.csv
+$ gshoot down Zoo -o /tmp/zoo.csv
+
+# upload zoo.csv back into the Zoo Google Sheets file
+$ gshoot up Zoo /tmp/zoo.csv
+```
 
 That's it, that's the whole thing. Be sure to check out our [authentication](#authentication) docs if you haven't been through this before with Google Sheets.
 
@@ -56,6 +64,12 @@ Commands:
   wipe           Wipe/delete all data from a spreadsheet.
 ```
 
+### Up, Up, Up
+
+There are three different modes for `gshoot up` with some subtle differences.
+
+1. `gshoot up <spreadsheet> <csv>` will upload the csv file into the Google Sheets spreadsheet. The spreadsheet file will be created if necessary, and this will ALWAYS add a new sheet. Nothing will be overwritten, this is totally safe.
+
 ### Authentication
 
 Getting `gshoot` to talk to Google Sheets is challenging, to put it mildly. Don't blame me, I do not work for Google and I did not design this system. `gshoot` talks to Google Sheets as you, using a _Google Cloud project_ that _you create_. Again, I would like to apologize in advance. This is just incredibly complicated and error-prone.
@@ -74,7 +88,7 @@ The goal here is something like:
 | 2. In your new project, enable these two Google APIs: **Google Drive** and **Google Sheets**. If your project doesn't enable these two APIs, nothing will work. Ever.                                                                                                                                                                                                                                                                                                                               | <img width="381" height="265" alt="image" src="https://github.com/user-attachments/assets/5501aeb8-204a-4a62-9574-c3a0ea45f90a" />                                                                                                                                           |
 | 3. Configure the **OAuth Consent Screen**. Pick whatever name/email you want, you are the only human alive who will see this screen. If your Google account is a "Google Workspace" account with a custom domain, set this up as **Internal Audience**. Otherwise use **External Audience**. If you use **External Audience**, add your email as the sole test user. This is required. No test user, no access for you. Is it strange Google doesn't automatically do this for you? I think so too! | <img width="535" height="430" alt="image" src="https://github.com/user-attachments/assets/74cc4456-c081-4113-b070-6a0e675fa107" /><br><br><img width="413" height="383" alt="image" src="https://github.com/user-attachments/assets/7ef82e92-930d-4398-ba63-0331745cebe0" /> |
 | 4. Create a **Desktop OAuth Client**. Yes, I know that `gshoot` has nothing to do with desktop and this is very confusing. This is just what Google calls this kind of authentication.                                                                                                                                                                                                                                                                                                              | <img width="315" height="410" alt="image" src="https://github.com/user-attachments/assets/40bc40b8-1070-488d-89b5-951a21580e00" />                                                                                                                                           |
-| 5. Download the **OAuth Client Secrets JSON** file from your "Desktop App". Google gives it a really simple name like `client_secret_XXXXXXXXXXXX.com.json`.                                                                                                                                                                                                                                                                                                                 | <img width="247" height="541" alt="image" src="https://github.com/user-attachments/assets/3eccd6e9-5594-41c0-a473-2bca72e8a4ca" />                                                                                                                                           |
+| 5. Download the **OAuth Client Secrets JSON** file from your "Desktop App". Google gives it a really simple name like `client_secret_XXXXXXXXXXXX.com.json`.                                                                                                                                                                                                                                                                                                                                        | <img width="247" height="541" alt="image" src="https://github.com/user-attachments/assets/3eccd6e9-5594-41c0-a473-2bca72e8a4ca" />                                                                                                                                           |
 
 and finally we get to the part where gshoot can actually do something:
 
