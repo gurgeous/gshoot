@@ -6,8 +6,6 @@
 
 Magically upload/download CSVs from Google Sheets.
 
-![logo](logo.svg)
-
 ## Installation
 
 On MacOS use brew:
@@ -16,9 +14,13 @@ On MacOS use brew:
 $ brew install gurgeous/tap/gshoot
 ```
 
-For Linux and Windows, see the [latest release on github](https://github.com/gurgeous/gshoot/releases/latest). You'll find MacOS builds in there too, but they are difficult to run since they are unsigned.
+For Linux, see the [latest release on github](https://github.com/gurgeous/gshoot/releases/latest). You'll find MacOS builds in there too, but they are difficult to run since they are unsigned. Windows is not yet supported.
 
-Then try gshoot:
+### Important Features
+
+REMIND
+
+### Options
 
 ```
 $ gshoot --help
@@ -61,6 +63,10 @@ and finally we get to the part where gshoot can actually do something:
 ```sh
 $ gshoot auth login --client-secrets client_secret_XXXXXXXXXXXX.apps.googleusercontent.com.json
 ```
+
+### Changelog
+
+REMIND
 
 # TODO
 
