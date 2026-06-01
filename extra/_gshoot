@@ -2,97 +2,121 @@
 compdef _gshoot gshoot
 
 _gshoot() {
-  local cur prev command subcommand
-  cur="${words[CURRENT]}"
-  prev="${words[CURRENT - 1]}"
-  command="${words[2]}"
-  subcommand="${words[3]}"
+  local curcontext=$curcontext state line ret=1
+  local -A opt_args
 
-  case "${prev}" in
-    --client-secret)
-      _files -g "*.json(-.)" "*(-/)"
-      return
-      ;;
-    --output|-o)
-      _files -g "*.csv(-.)" "*(-/)"
-      return
-      ;;
-    --sheet)
-      return
-      ;;
-  esac
+  _arguments -C \
+    '--help[Show context-sensitive help]' \
+    '--version[Print the version number]' \
+    ':command:->command' \
+    '*::arg:->arg' && ret=0
 
-  if [[ "${cur}" == -* ]]; then
-    if [[ "${CURRENT}" == 2 ]]; then
-      _gshoot_options \
-        '--help:Show context-sensitive help' \
-        '--version:Print the version number'
-      return
-    fi
-
-    case "${command}" in
-      auth)
-        case "${subcommand}" in
-          login) _gshoot_options \
-            '--client-secret:Path to a Google Desktop app OAuth client JSON' \
-            '--help:Show context-sensitive help' ;;
-          *) _gshoot_options '--help:Show context-sensitive help' ;;
-        esac
-        ;;
-      down) _gshoot_options \
-        '-o:Where to write the CSV' \
-        '--output:Where to write the CSV' \
-        '--help:Show context-sensitive help' ;;
-      up) _gshoot_options \
-        '--sheet:Destination sheet name' \
-        '--refill:Merge CSV data INTO the sheet' \
-        '--replace:Create or overwrite the destination sheet' \
-        '--filter:Add a standard Google Sheets filter' \
-        '--layout:Auto-size column width to fit cells' \
-        '--numeric:Format obvious numeric columns' \
-        '--open:Open the sheet URL when done' \
-        '--help:Show context-sensitive help' ;;
-      wipe) _gshoot_options \
-        '-f:Skip confirmation' \
-        '--force:Skip confirmation' \
-        '--help:Show context-sensitive help' ;;
-      *) _gshoot_options '--help:Show context-sensitive help' ;;
-    esac
-    return
-  fi
-
-  case "${CURRENT}" in
-    2)
-      _gshoot_options \
-        'auth:Login or logout from Google Sheets' \
-        'down:Download a Google Sheet as CSV' \
-        'up:Upload a CSV to Google Sheets' \
-        'list:List your Google Sheets' \
-        'peek:List sheets in a spreadsheet' \
+  case $state in
+    command)
+      local -a commands
+      commands=(
+        'auth:Login or logout from Google Sheets'
+        'down:Download a Google Sheet as CSV'
+        'list:List your Google Sheets'
+        'peek:List sheets in a spreadsheet'
+        'up:Upload a CSV to Google Sheets'
         'wipe:Wipe/delete all data from a spreadsheet'
+      )
+      _describe -t commands command commands && ret=0
       ;;
-    3)
-      case "${command}" in
-        auth) _gshoot_options \
-          'login:Login via OAuth' \
-          'logout:Logout of OAuth' \
-          'status:Show auth status' ;;
-        *) ;;
-      esac
-      ;;
-    *)
-      case "${command}" in
-        up) _files -g "*.(csv|tsv)(-.)" "*(-/)" ;;
-        *) _files ;;
+    arg)
+      curcontext=${curcontext%:*}-$line[1]:
+      case $line[1] in
+        auth) _gshoot_auth && ret=0 ;;
+        down) _gshoot_down && ret=0 ;;
+        list) _gshoot_list && ret=0 ;;
+        peek) _gshoot_peek && ret=0 ;;
+        up) _gshoot_up && ret=0 ;;
+        wipe) _gshoot_wipe && ret=0 ;;
       esac
       ;;
   esac
+
+  return ret
 }
 
-_gshoot_options() {
-  local -a options
-  options=("$@")
-  _describe 'option' options
+_gshoot_auth() {
+  local curcontext=$curcontext state line ret=1
+  local -A opt_args
+
+  _arguments -C \
+    '--help[Show context-sensitive help]' \
+    ':command:->command' \
+    '*::arg:->arg' && ret=0
+
+  case $state in
+    command)
+      local -a commands
+      commands=(
+        'login:Login via OAuth'
+        'logout:Logout of OAuth'
+        'status:Show auth status'
+      )
+      _describe -t commands command commands && ret=0
+      ;;
+    arg)
+      case $line[1] in
+        login)
+          _arguments -s \
+            '--help[Show context-sensitive help]' \
+            '--client-secret[Path to a Google Desktop app OAuth client JSON]:file:_files -g "*.json(-.)" "*(-/)"' && ret=0
+          ;;
+        logout|status)
+          _arguments -s \
+            '--help[Show context-sensitive help]' && ret=0
+          ;;
+      esac
+      ;;
+  esac
+
+  return ret
+}
+
+_gshoot_down() {
+  _arguments -s \
+    '-o[Where to write the CSV]:file:_files -g "*.csv(-.)" "*(-/)"' \
+    '--output[Where to write the CSV]:file:_files -g "*.csv(-.)" "*(-/)"' \
+    '--help[Show context-sensitive help]' \
+    ':spreadsheet:' \
+    '::sheet:'
+}
+
+_gshoot_up() {
+  _arguments -s \
+    '--sheet[Destination sheet name]:sheet:' \
+    '--refill[Merge CSV data INTO the sheet]' \
+    '--replace[Create or overwrite the destination sheet]' \
+    '--filter[Add a standard Google Sheets filter]' \
+    '--layout[Auto-size column width to fit cells]' \
+    '--numeric[Format obvious numeric columns]' \
+    '--open[Open the sheet URL when done]' \
+    '--help[Show context-sensitive help]' \
+    ':spreadsheet:' \
+    ':csv:_files -g "*.(csv|tsv)(-.)" "*(-/)"'
+}
+
+_gshoot_list() {
+  _arguments -s \
+    '--help[Show context-sensitive help]'
+}
+
+_gshoot_peek() {
+  _arguments -s \
+    '--help[Show context-sensitive help]' \
+    ':spreadsheet:'
+}
+
+_gshoot_wipe() {
+  _arguments -s \
+    '-f[Skip confirmation]' \
+    '--force[Skip confirmation]' \
+    '--help[Show context-sensitive help]' \
+    ':spreadsheet:'
 }
 
 if [ "$funcstack[1]" = "_gshoot" ]; then
