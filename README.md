@@ -14,7 +14,7 @@ That's it, that's the whole thing. Be sure to check out our [authentication](#au
 
 Normally I'd put a CLI demo in here to show what `gshoot` can do, but the actual output isn't that exciting. Instead, here's a screenshot of the incredible welcome screen that shows up the first time you run the thing. Yes, it's animated and alpha blended. It's possible I took this too far
 
-<img width="60%" src="https://github.com/user-attachments/assets/41e9b74a-d8f8-42a0-833b-b518318068c1" />
+<img src="./demo.gif" />
 
 It looks pretty great if you pipe the download into [tennis](https://github.com/gurgeous/tennis)
 
