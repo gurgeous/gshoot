@@ -3,25 +3,17 @@ version: 2
 
 dist: tmp/dist
 
-before:
-  hooks: ["go mod tidy"]
+before: { hooks: ["go mod tidy"] }
 
 builds:
-  - env: ["CGO_ENABLED=0"]
-    flags: ["-trimpath"]
+  - env: ["CGO_ENABLED=0"] # disable cgo for static binaries
+    flags: ["-trimpath"] # remove local fs paths from binary
     goos: ["darwin", "linux"]
     goarch: ["amd64", "arm64"]
-    ignore: [{ goos: "windows", goarch: "arm64" }]
-    ldflags: -s -w -X "github.com/gurgeous/gshoot.Version={{ .Tag }} {{ .ShortCommit }} {{ .Date }}"
-    # main: ./cmd?
 
 # what to put in the tgz files
 archives:
-  - files:
-      - LICENSE
-      - README.md
-      - extra/
-    name_template: "{{.ProjectName}}-{{.Version}}-{{.Os}}-{{.Arch}}"
+  - files: ["extra/", "LICENSE"]
     wrap_in_directory: true
 
 # turn stuff off
@@ -30,9 +22,9 @@ changelog: { disable: true }
 
 # brew tap
 brews:
-  - repository: { owner: "gurgeous", name: "homebrew-tap" }
-    description: REMIND
+  - description: "Magically import/export CSVs from Google Sheets"
     homepage: https://github.com/gurgeous/gshoot
+    repository: { owner: "gurgeous", name: "homebrew-tap" }
     test: system "#{bin}/gshoot --version"
     extra_install: |
       bash_completion.install "extra/gshoot.bash" => "gshoot"

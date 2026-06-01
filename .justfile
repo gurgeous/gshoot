@@ -57,13 +57,18 @@ test-watch *ARGS:
 # release
 #
 
-release: check
-  bin/release
+release *ARGS: check
+  bin/release {{ARGS}}
 
 release-preview: check
-  goreleaser release --clean --snapshot
-  just banner "macOS tarball preview..."
-  tar -tvzf "$(find tmp/dist -maxdepth 1 -name 'gshoot_*_darwin_arm64.tar.gz' | head -n 1)"
+  goreleaser release --clean --snapshot --verbose
+  just banner "tmp/dist"
+  ls -lh tmp/dist
+  just banner "cat tmp/dist/homebrew/gshoot.rb..."
+  bat --paging=never tmp/dist/homebrew/gshoot.rb
+  just banner "tarball..."
+  tar -tvzf "$(find tmp/dist -maxdepth 1 -name '*_darwin_arm64.tar.gz' | head -n 1)"
+
 #
 # gmv
 #
