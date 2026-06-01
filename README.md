@@ -10,6 +10,16 @@ For example, if I'm analyzing my local zoo I might run `gshoot up Zoo zoo.csv --
 
 That's it, that's the whole thing. Be sure to check out our [authentication](#authentication) docs if you haven't been through this before with Google Sheets.
 
+### Demo
+
+Normally I'd put a CLI demo in here to show what `gshoot` can do, but the actual output isn't that exciting. Instead, here's a screenshot of the incredible welcome screen that shows up the first time you run the thing. Yes, it's animated and alpha blended. It's possible I took this too far
+
+<img width="60%" src="https://github.com/user-attachments/assets/41e9b74a-d8f8-42a0-833b-b518318068c1" />
+
+It looks pretty great if you pipe the download into [tennis](https://github.com/gurgeous/tennis)
+
+<img width="60%" src="https://github.com/user-attachments/assets/c0ea68d2-72b5-45d2-96da-259c3e6719e6" />
+
 ### Installation
 
 On macOS use brew:
@@ -77,7 +87,3 @@ $ gshoot auth login --client-secret client_secret_XXXXXXXXXXXX.apps.googleuserco
 #### 0.1.0 (unreleased)
 
 - initial release
-
-# TODO
-
-- vhs demo / screenshots
