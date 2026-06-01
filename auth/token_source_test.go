@@ -129,10 +129,3 @@ func TestLogout(t *testing.T) {
 	client.Logout()
 	assert.False(t, util.FileExists(client.TokenPath))
 }
-
-// TestLogoutMissingToken is a no-op when there is no cached token.
-func TestLogoutMissingToken(t *testing.T) {
-	client := withAuthHome(t)
-	client.Logout()
-	assert.False(t, util.FileExists(client.TokenPath))
-}

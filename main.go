@@ -15,6 +15,7 @@ import (
 	"github.com/gurgeous/gshoot/gmv"
 	"github.com/gurgeous/gshoot/util"
 	"github.com/gurgeous/gshoot/ux"
+	kongcompletion "github.com/jotaen/kong-completion"
 )
 
 //
@@ -34,6 +35,8 @@ type CLI struct {
 	List    commands.ListCmd `cmd:"" help:"List your Google Sheets."`
 	Peek    commands.PeekCmd `cmd:"" help:"List sheets in a spreadsheet."`
 	Wipe    commands.WipeCmd `cmd:"" help:"Wipe/delete all data from a spreadsheet."`
+
+	Completion kongcompletion.Completion `cmd:"" hidden:"" help:"Generate shell completion."`
 }
 
 // tinry wrapper around main0, with err handling
@@ -108,6 +111,7 @@ func main0() error {
 			"versionNumber": Version,
 		},
 	)
+	kongcompletion.Register(parser)
 	ctx, err := parser.Parse(args)
 	if err != nil {
 		var parseErr *kong.ParseError
@@ -142,8 +146,8 @@ func main0() error {
 //
 
 func preflight(ctx *kong.Context) error {
-	// auth commands don't need preflight
-	if strings.HasPrefix(ctx.Command(), "auth") {
+	// auth/completion commands don't need preflight
+	if !commandNeedsAuth(ctx.Command()) {
 		return nil
 	}
 
@@ -170,4 +174,8 @@ func preflight(ctx *kong.Context) error {
 	}
 	fmt.Fprintln(os.Stderr)
 	return errors.New(msg)
+}
+
+func commandNeedsAuth(command string) bool {
+	return !strings.HasPrefix(command, "auth") && command != "completion"
 }

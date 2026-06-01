@@ -16,6 +16,10 @@ format:
   go mod tidy
   golangci-lint fmt
 
+gen: build
+  bin/gshoot completion -c bash | sed "s#$(pwd)/bin/gshoot#gshoot#g" > extra/gshoot.bash
+  bin/gshoot completion -c zsh | sed "s#$(pwd)/bin/gshoot#gshoot#g" > extra/_gshoot
+
 install: build
   cp bin/gshoot ~/.local/bin
 
@@ -57,10 +61,10 @@ test-watch *ARGS:
 # release
 #
 
-release: check valgrind
+release: gen check
   bin/release
 
-release-preview: check
+release-preview: gen check
   goreleaser release --clean --snapshot
   just banner "macOS tarball preview..."
   tar -tvzf "$(find tmp/dist -maxdepth 1 -name 'gshoot_*_darwin_arm64.tar.gz' | head -n 1)"

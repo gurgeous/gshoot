@@ -1,3 +1,12 @@
+TODO
+
+- README
+- badges
+- license
+- vhs demo / screenshots
+- logo
+- kongplete?
+
 # gshoot
 
 REMIND

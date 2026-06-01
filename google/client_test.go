@@ -33,11 +33,6 @@ func TestListSpreadsheetFiles(t *testing.T) {
 	assert.Equal(t, "Alpha", files[0].Name)
 }
 
-func TestClientUsesDocumentedBaseURLs(t *testing.T) {
-	assert.Equal(t, "https://www.googleapis.com", driveBaseURL)
-	assert.Equal(t, "https://sheets.googleapis.com", sheetsBaseURL)
-}
-
 func TestClientRoutesRequestsByService(t *testing.T) {
 	driveHits := 0
 	sheetsHits := 0

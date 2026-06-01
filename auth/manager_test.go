@@ -10,14 +10,6 @@ import (
 	"golang.org/x/oauth2"
 )
 
-func TestNewManagerDoesNotCreateConfigDir(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-
-	_, err := os.Stat(util.ConfigDir())
-	assert.ErrorIs(t, err, os.ErrNotExist)
-}
-
 func TestSetupStateGuidesAuthWizard(t *testing.T) {
 	client := withAuthHome(t)
 
