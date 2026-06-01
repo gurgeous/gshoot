@@ -1,3 +1,95 @@
 #compdef gshoot
-autoload -U +X bashcompinit && bashcompinit
-complete -o default -o bashdefault -C gshoot gshoot
+compdef _gshoot gshoot
+
+_gshoot() {
+  local cur prev command subcommand
+  cur="${words[CURRENT]}"
+  prev="${words[CURRENT - 1]}"
+  command="${words[2]}"
+  subcommand="${words[3]}"
+
+  case "${prev}" in
+    --client-secret)
+      _files
+      return
+      ;;
+    --output|-o)
+      _files -g "*.csv(-.)" "*(-/)"
+      return
+      ;;
+    --sheet)
+      return
+      ;;
+  esac
+
+  if [[ "${cur}" == -* ]]; then
+    case "${command}" in
+      auth)
+        case "${subcommand}" in
+          login) _gshoot_options \
+            '--client-secret:Path to a Google Desktop app OAuth client JSON' \
+            '--help:Show context-sensitive help' ;;
+          *) _gshoot_options '--help:Show context-sensitive help' ;;
+        esac
+        ;;
+      down) _gshoot_options \
+        '-o:Where to write the CSV' \
+        '--output:Where to write the CSV' \
+        '--help:Show context-sensitive help' ;;
+      up) _gshoot_options \
+        '--sheet:Destination sheet name' \
+        '--refill:Merge CSV data INTO the sheet' \
+        '--replace:Create or overwrite the destination sheet' \
+        '--filter:Add a standard Google Sheets filter' \
+        '--layout:Auto-size column width to fit cells' \
+        '--numeric:Format obvious numeric columns' \
+        '--open:Open the sheet URL when done' \
+        '--help:Show context-sensitive help' ;;
+      wipe) _gshoot_options \
+        '-f:Skip confirmation' \
+        '--force:Skip confirmation' \
+        '--help:Show context-sensitive help' ;;
+      *) _gshoot_options \
+        '--help:Show context-sensitive help' \
+        '--version:Print the version number' ;;
+    esac
+    return
+  fi
+
+  case "${CURRENT}" in
+    2)
+      _gshoot_options \
+        'auth:Login or logout from Google Sheets' \
+        'down:Download a Google Sheet as CSV' \
+        'up:Upload a CSV to Google Sheets' \
+        'list:List your Google Sheets' \
+        'peek:List sheets in a spreadsheet' \
+        'wipe:Wipe/delete all data from a spreadsheet'
+      ;;
+    3)
+      case "${command}" in
+        auth) _gshoot_options \
+          'login:Login via OAuth' \
+          'logout:Logout of OAuth' \
+          'status:Show auth status' ;;
+        *) ;;
+      esac
+      ;;
+    *)
+      case "${command}" in
+        up) _files -g "*.(csv|tsv)(-.)" "*(-/)" ;;
+        *) _files ;;
+      esac
+      ;;
+  esac
+}
+
+_gshoot_options() {
+  local -a options
+  options=("$@")
+  _describe 'option' options
+}
+
+if [ "$funcstack[1]" = "_gshoot" ]; then
+  _gshoot
+fi
