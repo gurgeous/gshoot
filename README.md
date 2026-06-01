@@ -1,15 +1,12 @@
-TODO
+[![test](https://github.com/gurgeous/gshoot/actions/workflows/ci.yml/badge.svg)](https://github.com/gurgeous/gshoot/actions/workflows/ci.yml)
 
-- README
-- badges
-- license
-- vhs demo / screenshots
-- logo
-- kongplete?
+<img src="./logo.svg" width="60%">
 
 # gshoot
 
-REMIND
+Magically upload/download CSVs from Google Sheets.
+
+![logo](logo.svg)
 
 ## Installation
 
@@ -21,10 +18,22 @@ $ brew install gurgeous/tap/gshoot
 
 For Linux and Windows, see the [latest release on github](https://github.com/gurgeous/gshoot/releases/latest). You'll find MacOS builds in there too, but they are difficult to run since they are unsigned.
 
-Then run gshoot like this:
+Then try gshoot:
 
 ```
 $ gshoot --help
+
+Magically upload/download CSVs from Google Sheets.
+
+Commands:
+  auth login     Login via OAuth. (start here!)
+  auth logout    Logout of OAuth.
+  auth status    Show auth status.
+  down           Download a Google Sheet as CSV.
+  up             Upload a CSV to Google Sheets.
+  list           List your Google Sheets.
+  peek           List sheets in a spreadsheet.
+  wipe           Wipe/delete all data from a spreadsheet.
 ```
 
 ## Authentication
@@ -52,3 +61,9 @@ and finally we get to the part where gshoot can actually do something:
 ```sh
 $ gshoot auth login --client-secrets client_secret_XXXXXXXXXXXX.apps.googleusercontent.com.json
 ```
+
+# TODO
+
+- README
+- badges
+- vhs demo / screenshots
