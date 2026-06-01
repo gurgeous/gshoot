@@ -13,7 +13,7 @@ import (
 // Main entrypoint
 //
 
-// populated by goreleaser
+// goreleaser populates these by default, let's use 'em
 var commit, date, version string
 
 // wraps command.Main and handles err
@@ -25,7 +25,7 @@ func main() {
 	}
 }
 
-// pull version string, either populated by gorelease or from debug.ReadBuildInfo
+// calculate version string, from goreleaser or debug.ReadBuildInfo
 func versionString() string {
 	modified := false
 
@@ -49,6 +49,7 @@ func versionString() string {
 
 	c := commit[:7]
 	if modified {
+		// only possible in dev
 		c += "*"
 	}
 

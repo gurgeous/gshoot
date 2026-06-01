@@ -197,5 +197,9 @@ func (p *Progress) SayDownloadRows(spreadsheet string) {
 }
 
 func (p *Progress) SaySaveRows(n int, path string) {
-	p.set(fmt.Sprintf("saving %d rows to %s...", n, path))
+	if path == "" {
+		p.set(fmt.Sprintf("writing %d rows...", n))
+	} else {
+		p.set(fmt.Sprintf("saving %d rows to %s...", n, path))
+	}
 }
