@@ -7,13 +7,15 @@ import (
 	"github.com/gurgeous/gshoot/ux"
 )
 
-// WipeCmd resets a spreadsheet to one blank Sheet1.
+//
+// Wipe a spreadsheet back to one blank Sheet1
+//
+
 type WipeCmd struct {
 	Force       bool   `short:"f" help:"Skip confirmation."`
 	Spreadsheet string `arg:"" name:"spreadsheet" help:"Spreadsheet name."`
 }
 
-// Run wipes the selected spreadsheet, creating it if needed.
 func (c *WipeCmd) Run() (err error) {
 	if !c.Force {
 		prompt := ux.Warn.Render("wipe spreadsheet '"+c.Spreadsheet+"'?") + " " + ux.Muted.Render("(y/n)")

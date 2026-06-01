@@ -1,8 +1,5 @@
 package commands
 
-// This file owns the target worksheet for `up`: choose/create/rename it,
-// paste rows into it, and apply optional sheet-level formatting.
-
 import (
 	"context"
 	"fmt"
@@ -15,6 +12,10 @@ import (
 	"github.com/gurgeous/gshoot/util"
 )
 
+//
+// This does most of the work
+//
+
 const (
 	gridPadding   = 2         // empty rows/columns kept around uploaded data
 	layoutPadding = 20        // extra pixels added after auto-sizing columns
@@ -26,10 +27,6 @@ var (
 	decimalRE     = regexp.MustCompile(`\A-?\d+(?:\.\d+)?\z`) // decimal detector for numeric formatting
 	leadingZeroRE = regexp.MustCompile(`\A-?0\d`)             // numeric-looking value that should remain text
 )
-
-//
-// this does most of the work
-//
 
 type uploader struct {
 	ctx         context.Context     // request context for Google calls

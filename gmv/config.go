@@ -1,7 +1,5 @@
 package gmv
 
-// Config resolves GMV playback defaults before rendering starts.
-
 import (
 	"os"
 	"time"
@@ -9,7 +7,10 @@ import (
 	"github.com/charmbracelet/colorprofile"
 )
 
-// config is the resolved playback and rendering configuration.
+//
+// MV playback settings
+//
+
 type config struct {
 	fps           float64
 	profile       colorprofile.Profile

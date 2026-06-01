@@ -8,6 +8,10 @@ import (
 	"github.com/gurgeous/gshoot/util"
 )
 
+//
+// Download a Google Sheet as CSV.
+//
+
 type DownCmd struct {
 	Output      string `short:"o" type:"path" help:"Where to write the CSV."`
 	Spreadsheet string `arg:"" name:"spreadsheet" help:"Spreadsheet name."`

@@ -12,6 +12,10 @@ import (
 	"github.com/gurgeous/gshoot/util"
 )
 
+//
+// Color styles and helpers
+//
+
 var (
 	Brand   lipgloss.Style // blue
 	Success lipgloss.Style // green

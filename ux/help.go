@@ -8,7 +8,10 @@ import (
 	"github.com/alecthomas/kong"
 )
 
-// HelpPrinter renders Kong help with gshoot's ANSI color rules.
+//
+// Render kong --help with color
+//
+
 func HelpPrinter(options kong.HelpOptions, ctx *kong.Context) error {
 	// render vanilla kong help into tmp buf
 	var buf bytes.Buffer
@@ -20,7 +23,7 @@ func HelpPrinter(options kong.HelpOptions, ctx *kong.Context) error {
 		return err
 	}
 
-	// now add color
+	// now add color with Restyle
 	styles := []RestyleRule{
 		{Re: regexp.MustCompile(`(?m)^[A-Z][A-Za-z ]*:`), Style: Success},              // `Usage:`
 		{Re: regexp.MustCompile(`(?m)^  ([a-z]+(?: [a-z]+)?)\s{2,}.*$`), Style: Brand}, // `  auth login ...`

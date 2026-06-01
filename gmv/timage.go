@@ -1,7 +1,9 @@
 package gmv
 
-// Timage is GMV's terminal image primitive.
-// It is a rectangular grid of one-column pixels; empty Ch means transparent, while " " is an opaque blank.
+//
+// Timage ("terminal image") is GMV's terminal image primitive. Empty Ch means
+// transparent, while " " is an opaque blank.
+//
 
 // tpixel is one terminal cell in an image.
 type tpixel struct {

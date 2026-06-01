@@ -9,7 +9,10 @@ import (
 	"github.com/gurgeous/gshoot/ux"
 )
 
-// ShowAuthStatus writes a short auth status summary.
+//
+// Human-readable auth status. We trigger this from several places
+//
+
 func ShowAuthStatus() error {
 	m, err := auth.NewManager()
 	if err != nil {

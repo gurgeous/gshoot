@@ -6,6 +6,10 @@ import (
 	"github.com/gurgeous/gshoot/ux"
 )
 
+//
+// just some app-wide globals and Init(), nothing to see here
+//
+
 // Env contains process-wide environment config.
 var Env Config
 

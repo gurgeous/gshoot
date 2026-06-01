@@ -1,8 +1,5 @@
 package gmv
 
-// Renderer converts composited terminal images into ANSI output.
-// It keeps previous and next images, writes keyframes after invalidation, and otherwise emits dirty spans to reduce bytes.
-
 import (
 	"bytes"
 	"image/color"
@@ -10,7 +7,11 @@ import (
 	xansi "github.com/charmbracelet/x/ansi"
 )
 
-// renderer caches palettes and previous terminal state.
+//
+// Renderer converts composited images into ANSI output. It emits full
+// keyframes or dirty spans.
+//
+
 type renderer struct {
 	movie         *movie         // decoded source animation
 	palette       []paletteColor // terminal escapes for source colors

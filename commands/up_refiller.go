@@ -1,8 +1,5 @@
 package commands
 
-// This file owns `up --refill`: merge CSV rows into a remote sheet while
-// preserving remote user-entered values, formats, and formula columns.
-
 import (
 	"fmt"
 	"sort"
@@ -11,6 +8,10 @@ import (
 	"github.com/gurgeous/gshoot/google"
 	"github.com/gurgeous/gshoot/util"
 )
+
+//
+// up --refill
+//
 
 type refiller struct {
 	sheet           *uploader         // target sheet being refilled

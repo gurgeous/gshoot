@@ -15,7 +15,7 @@ import (
 )
 
 //
-// Login
+// Browser login flow including loopback, browser, etc.
 //
 
 var openBrowser = util.OpenBrowserURL

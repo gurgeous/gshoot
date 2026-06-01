@@ -9,7 +9,8 @@ import (
 )
 
 //
-// HTTPClient builds an authenticated HTTP client from saved OAuth files.
+// An authenticated OAuth HTTP client to talk to Google. Wraps oauth2.NewClient,
+// saves fresh oauth tokens to disk on refesh
 //
 
 func (m *Manager) HTTPClient(ctx context.Context) (*http.Client, error) {

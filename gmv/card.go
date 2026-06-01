@@ -1,9 +1,5 @@
 package gmv
 
-// Card turns lipgloss-rendered ANSI text into a transparent terminal image.
-// It owns glyphs and foreground styles only; renderer supplies movie-derived backgrounds.
-// Card text is curated single-width text; wide glyphs are intentionally unsupported.
-
 import (
 	"strconv"
 	"strings"
@@ -11,6 +7,10 @@ import (
 	lipgloss "charm.land/lipgloss/v2"
 	xansi "github.com/charmbracelet/x/ansi"
 )
+
+//
+// Render a card, for use on top of the movie
+//
 
 // card is rendered card text plus its terminal dimensions.
 type card struct {

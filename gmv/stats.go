@@ -1,14 +1,15 @@
 package gmv
 
-// Stats tracks compact demo playback metrics.
-// The renderer treats stats as a tiny overlay image, so demo instrumentation stays out of the render path.
-
 import (
 	"fmt"
 	"time"
 )
 
-// statsTracker aggregates short rolling playback stats.
+//
+// Stats tracks compact demo playback metrics. The renderer treats stats as a
+// tiny overlay image.
+//
+
 type statsTracker struct {
 	last   time.Time
 	bytes  int

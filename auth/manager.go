@@ -12,6 +12,10 @@ import (
 	"golang.org/x/oauth2"
 )
 
+//
+// Manager manages auth flow, client secrets and token
+//
+
 var (
 	AuthReadmeURL = "https://github.com/gurgeous/gshoot#authentication"
 	Scopes        = []string{
@@ -19,21 +23,6 @@ var (
 		"https://www.googleapis.com/auth/spreadsheets",
 	}
 )
-
-//
-// OClient is an installed OAuth client config from google client secrets
-//
-
-type OClient struct {
-	ClientID          string   `json:"client_id"`     // Google OAuth client id
-	ClientSecret      string   `json:"client_secret"` // Google OAuth client secret
-	RedirectURIs      []string `json:"redirect_uris"` // redirect URIs from the client JSON
-	LocalhostRedirect *url.URL `json:"-"`             // validated localhost redirect selected at load time
-}
-
-//
-// Manager manages auth flow
-//
 
 type Manager struct {
 	ClientPath string // saved OAuth client JSON path
@@ -197,4 +186,12 @@ func findLocalhostRedirect(redirectURIs []string) (*url.URL, error) {
 		}
 	}
 	return nil, errors.New("client secrets json needs a localhost or 127.0.0.1 redirect URI")
+}
+
+// OClient is an installed OAuth client config from google client secrets
+type OClient struct {
+	ClientID          string   `json:"client_id"`     // Google OAuth client id
+	ClientSecret      string   `json:"client_secret"` // Google OAuth client secret
+	RedirectURIs      []string `json:"redirect_uris"` // redirect URIs from the client JSON
+	LocalhostRedirect *url.URL `json:"-"`             // validated localhost redirect selected at load time
 }

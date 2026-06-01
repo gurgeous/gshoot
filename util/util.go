@@ -21,6 +21,10 @@ import (
 	"golang.org/x/term"
 )
 
+//
+// Small shared utils
+//
+
 const (
 	ESC      = "\x1b"
 	CSI      = ESC + "["

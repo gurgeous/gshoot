@@ -11,7 +11,7 @@ import (
 )
 
 //
-// commands
+// Auth xxx commands
 //
 
 type (

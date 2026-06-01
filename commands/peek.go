@@ -9,12 +9,14 @@ import (
 	"github.com/gurgeous/gshoot/ux"
 )
 
-// PeekCmd lists sheet names in a spreadsheet.
+//
+// Peek at sheet names and shapes in a spreadsheet.
+//
+
 type PeekCmd struct {
 	Spreadsheet string `arg:"" name:"spreadsheet" help:"Spreadsheet name."`
 }
 
-// Run prints one sheet name per line.
 func (c *PeekCmd) Run() error {
 	sheets, err := c.run0()
 	if err != nil {

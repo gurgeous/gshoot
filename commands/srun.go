@@ -9,6 +9,11 @@ import (
 	"github.com/gurgeous/gshoot/ux"
 )
 
+//
+// Just a little helper for showing dots and finding a spreadsheet, several
+// commands start up like this
+//
+
 type srunOptions struct {
 	spreadsheet string // spreadsheet file name
 	create      bool   // create spreadsheet file when missing
