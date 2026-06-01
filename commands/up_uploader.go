@@ -351,7 +351,7 @@ func sheetTitle(cmd *UpCmd, spreadsheet *google.Spreadsheet) string {
 		return cmd.Sheet
 	}
 	if cmd.Refill || cmd.Replace {
-		return "gsheet_up"
+		return "gsheet"
 	}
 
 	nxt := 1

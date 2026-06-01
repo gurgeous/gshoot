@@ -57,7 +57,7 @@ func (c *UpCmd) run0(rows google.Rows) (*google.File, error) {
 	// init
 	//
 
-	cmd, err := srunStart(os.Stderr, srunOptions{spreadsheet: c.Spreadsheet})
+	cmd, err := srunStart(os.Stderr, srunOptions{spreadsheet: c.Spreadsheet, create: true})
 	if err != nil {
 		return nil, err
 	}
