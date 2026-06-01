@@ -13,7 +13,7 @@ fatal() {
 # what tags are we talking about?
 old_tag="$(svu current)"
 if [[ "${1:-}" == "--rc" ]]; then
-  new_tag="$(svu prerelease --prerelease rc)"
+  new_tag="$(svu minor --prerelease rc)"
 else
   new_tag="$(svu minor)"
 fi
