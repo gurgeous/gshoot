@@ -18,7 +18,7 @@ import (
 )
 
 //
-// Main cli entrypoint
+// Main CLI entrypoint
 //
 
 var (
@@ -36,7 +36,7 @@ type CLI struct {
 	Wipe    commands.WipeCmd `cmd:"" help:"Wipe/delete all data from a spreadsheet."`
 }
 
-// tinry wrapper around main0, with err handling
+// tiny wrapper around main0, with err handling
 func main() {
 	err := main0()
 	if err != nil {

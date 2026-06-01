@@ -16,7 +16,7 @@ import (
 
 //
 // Small Google Drive and Sheets API client. I didn't want to use the standard
-// google api lib because it adds 10mb to our binary. This was not super hard to
+// Google API lib because it adds 10mb to our binary. This was not super hard to
 // embed.
 //
 
@@ -28,7 +28,7 @@ const (
 )
 
 //
-// google api client
+// Google API client
 //
 
 type Client struct {
@@ -303,7 +303,7 @@ func (c *Client) reqJSON(ctx context.Context, baseURL string, method string, pat
 	if body != nil {
 		var buf bytes.Buffer
 		if err := json.NewEncoder(&buf).Encode(body); err != nil {
-			return fmt.Errorf("encode google api request: %w", err)
+			return fmt.Errorf("encode Google API request: %w", err)
 		}
 		bodyReader = &buf
 	}
@@ -327,14 +327,14 @@ func (c *Client) reqJSON(ctx context.Context, baseURL string, method string, pat
 		if msg == "" {
 			msg = res.Status
 		}
-		return fmt.Errorf("google api: %s", msg)
+		return fmt.Errorf("Google API: %s", msg)
 	}
 
 	if dst == nil {
 		return nil
 	}
 	if err := json.NewDecoder(res.Body).Decode(dst); err != nil {
-		return fmt.Errorf("decode google api response: %w", err)
+		return fmt.Errorf("decode Google API response: %w", err)
 	}
 	return nil
 }

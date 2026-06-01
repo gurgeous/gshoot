@@ -25,7 +25,7 @@ func (m *Manager) Login(ctx context.Context, smoke bool, out io.Writer) error {
 	// browser login flow
 	//
 
-	// send the user off to google.com, get an oauth token using our client secret
+	// send the user off to google.com, get an OAuth token using our client secret
 	token, err := browserLoginFlow(ctx, smoke, out, m.client)
 	if err != nil {
 		return err
@@ -39,7 +39,7 @@ func (m *Manager) Login(ctx context.Context, smoke bool, out io.Writer) error {
 		return err
 	}
 	_, _ = fmt.Fprintln(out)
-	_, _ = fmt.Fprintln(out, ux.Success.Render("gshoot: success! oauth token copied to "+m.TokenPath))
+	_, _ = fmt.Fprintln(out, ux.Success.Render("gshoot: success! OAuth token copied to "+m.TokenPath))
 	_, _ = fmt.Fprintln(out, "gshoot: should work now, have fun!")
 
 	return nil
@@ -66,7 +66,7 @@ func browserLoginFlow(ctx context.Context, smoke bool, out io.Writer, client *OC
 	}
 
 	//
-	// create oauth2 config
+	// create OAuth2 config
 	//
 
 	config := oauth2.Config{

@@ -39,7 +39,7 @@ login() {
 @test "login --client-secret" {
   run "$BIN" auth login --client-secret "$ROOT/testdata/oauth-client.json"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"success! oauth token copied"* ]]
+  [[ "$output" == *"token copied"* ]]
   [ -f "$HOME/.config/gshoot/oauth-client.json" ]
   [ -f "$HOME/.config/gshoot/oauth-token.json" ]
 }

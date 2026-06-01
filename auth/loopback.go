@@ -50,7 +50,7 @@ func (l *Loopback) Start() error {
 
 	listener, err := net.Listen("tcp", net.JoinHostPort(host, "0"))
 	if err != nil {
-		return fmt.Errorf("listen for oauth callback: %w", err)
+		return fmt.Errorf("listen for OAuth callback: %w", err)
 	}
 
 	// Replace the configured loopback port with the ephemeral port we actually bound.
@@ -73,18 +73,18 @@ func (l *Loopback) Start() error {
 		q := r.URL.Query()
 		if got := q.Get("state"); got != l.State {
 			http.Error(w, "state mismatch", http.StatusBadRequest)
-			l.errCh <- errors.New("oauth callback state mismatch")
+			l.errCh <- errors.New("OAuth callback state mismatch")
 			return
 		}
 		if gotErr := q.Get("error"); gotErr != "" {
 			http.Error(w, "login failed", http.StatusBadRequest)
-			l.errCh <- fmt.Errorf("oauth callback error: %s", gotErr)
+			l.errCh <- fmt.Errorf("OAuth callback error: %s", gotErr)
 			return
 		}
 		code := q.Get("code")
 		if code == "" {
 			http.Error(w, "missing code", http.StatusBadRequest)
-			l.errCh <- errors.New("oauth callback missing code")
+			l.errCh <- errors.New("OAuth callback missing code")
 			return
 		}
 		fmt.Fprintln(w, "gshoot: login complete, you can close this tab.") // HTTP response

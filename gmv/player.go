@@ -73,9 +73,9 @@ func (p *Player) Play(ctx context.Context) error {
 // Demo plays the built-in GMV with sample first-run text.
 func Demo(ctx context.Context) error {
 	text := ("Welcome to gshoot. Looks like your " +
-		ux.Brand.Render("Google Sheets oauth") +
-		" isn't setup yet. This is tricky with Google Sheets, sorry about that. Don't blame us!\n\n" +
-		"Check our Github README for instructions.\n\n" +
+		ux.Brand.Render("Google Sheets OAuth") +
+		" isn't set up yet. This is tricky with Google Sheets, sorry about that. Don't blame us!\n\n" +
+		"Check our GitHub README for instructions.\n\n" +
 		ux.Muted.Render("press a key to exit the amazing welcome screen"))
 	text = lipgloss.Wrap(text, 50, " ")
 

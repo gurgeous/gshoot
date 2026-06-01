@@ -24,7 +24,7 @@ func ShowAuthStatus() error {
 	if !m.LoggedIn() {
 		intro := "Authenticating with Google Sheets is quite tricky. Don't blame me, I have no idea why they made it so hard!"
 		if !m.HasClientSecrets() {
-			intro += "\n\nFor starters, we need your *client secrets file*. When you register to use the Google Docs API, Google will give you this file. We use the client secrets file to access Google APIs and get oauth started. When you download it from google it has a crazy name like:"
+			intro += "\n\nFor starters, we need your *client secrets file*. When you register to use the Google Sheets API, Google will give you this file. We use the client secrets file to access Google APIs and get OAuth started. When you download it from Google, it has a crazy name like:"
 			intro += "\n\n*client_secret_XXXXXXXXXXXX.apps.googleusercontent.com.json*"
 			intro += "\n\nand it contains JSON like this:"
 			intro += "\n\n*{\"installed\":{ <secret stuff> }}*"
@@ -42,7 +42,7 @@ func ShowAuthStatus() error {
 
 	fmt.Fprintln(os.Stdout)
 	if !m.LoggedIn() {
-		outro := "See our [Github README](" + auth.AuthReadmeURL + ") for full instructions."
+		outro := "See our [GitHub README](" + auth.AuthReadmeURL + ") for full instructions."
 		fmt.Fprintln(os.Stdout, ux.Markdown(outro))
 	} else {
 		fmt.Fprintln(os.Stdout, "You are logged in and gshoot commands should work.")

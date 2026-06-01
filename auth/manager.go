@@ -136,7 +136,7 @@ func parseOClient(data []byte) (*OClient, error) {
 		Installed *OClient `json:"installed"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
-		return nil, errors.New("not JSON") // uncommmon
+		return nil, errors.New("not JSON") // uncommon
 	}
 
 	// maybe they set it up as Web by mistake?
@@ -147,7 +147,7 @@ func parseOClient(data []byte) (*OClient, error) {
 
 	redirect, err := findLocalhostRedirect(client.RedirectURIs)
 	if err != nil {
-		return nil, errors.New("no localhost/127.0.01 redirect") // uncommon
+		return nil, errors.New("no localhost/127.0.0.1 redirect") // uncommon
 	}
 	client.LocalhostRedirect = redirect
 
@@ -185,10 +185,10 @@ func findLocalhostRedirect(redirectURIs []string) (*url.URL, error) {
 			return u, nil
 		}
 	}
-	return nil, errors.New("client secrets json needs a localhost or 127.0.0.1 redirect URI")
+	return nil, errors.New("client secrets JSON needs a localhost or 127.0.0.1 redirect URI")
 }
 
-// OClient is an installed OAuth client config from google client secrets
+// OClient is an installed OAuth client config from Google client secrets
 type OClient struct {
 	ClientID          string   `json:"client_id"`     // Google OAuth client id
 	ClientSecret      string   `json:"client_secret"` // Google OAuth client secret

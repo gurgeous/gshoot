@@ -10,7 +10,7 @@ import (
 
 //
 // An authenticated OAuth HTTP client to talk to Google. Wraps oauth2.NewClient,
-// saves fresh oauth tokens to disk on refesh
+// saves fresh OAuth tokens to disk on refresh
 //
 
 func (m *Manager) HTTPClient(ctx context.Context) (*http.Client, error) {
@@ -34,12 +34,12 @@ func (m *Manager) HTTPClient(ctx context.Context) (*http.Client, error) {
 		previous: m.token,
 	}
 
-	// now create the http client with our oauth2 stuff inside
+	// now create the HTTP client with our OAuth2 stuff inside
 	return oauth2.NewClient(ctx, tokenSource), nil
 }
 
 //
-// special TokenSource wrapper, it saves updated OAuthToken to disk on refresh
+// special TokenSource wrapper, it saves updated OAuth tokens to disk on refresh
 //
 
 type saveTokenSource struct {
@@ -55,7 +55,7 @@ func (s *saveTokenSource) Token() (*oauth2.Token, error) {
 		return nil, err
 	}
 
-	// use existing refresh token, google doesn't necessarily send a new one
+	// use existing refresh token, Google doesn't necessarily send a new one
 	if nxt.RefreshToken == "" {
 		nxt.RefreshToken = s.previous.RefreshToken
 	}
