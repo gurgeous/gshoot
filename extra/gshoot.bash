@@ -9,7 +9,8 @@ _gshoot() {
 
   case "${prev}" in
   --client-secret)
-    _filedir
+    _filedir json
+    [[ ${#COMPREPLY[@]} -eq 0 ]] && _filedir
     return
     ;;
   --output | -o)
@@ -24,6 +25,11 @@ _gshoot() {
   esac
 
   if [[ "${cur}" == -* ]]; then
+    if [[ "${COMP_CWORD}" == 1 ]]; then
+      COMPREPLY=($(compgen -W "--help --version" -- "${cur}"))
+      return
+    fi
+
     case "${command}" in
     auth)
       case "${subcommand}" in
@@ -34,7 +40,7 @@ _gshoot() {
     down) COMPREPLY=($(compgen -W "-o --output --help" -- "${cur}")) ;;
     up) COMPREPLY=($(compgen -W "--sheet --refill --replace --filter --layout --numeric --open --help" -- "${cur}")) ;;
     wipe) COMPREPLY=($(compgen -W "-f --force --help" -- "${cur}")) ;;
-    *) COMPREPLY=($(compgen -W "-h --help -v --version" -- "${cur}")) ;;
+    *) COMPREPLY=($(compgen -W "--help" -- "${cur}")) ;;
     esac
     return
   fi

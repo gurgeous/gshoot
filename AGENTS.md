@@ -33,6 +33,8 @@
 - Keep comments brief and useful
 - Comments wrap at 80 columns
 - Every non-test `.go` file should have a terse `//` block after imports explaining the file's purpose
+- For shell completion changes, test zsh with a small harness that stubs completion builtins and inspects candidates
+- For completion-only changes, run shell syntax/harness checks instead of `just check`
 - Fail fast; prefer clear errors and actionable hints
 
 ## Design

@@ -10,7 +10,7 @@ _gshoot() {
 
   case "${prev}" in
     --client-secret)
-      _files
+      _files -g "*.json(-.)" "*(-/)"
       return
       ;;
     --output|-o)
@@ -23,6 +23,13 @@ _gshoot() {
   esac
 
   if [[ "${cur}" == -* ]]; then
+    if [[ "${CURRENT}" == 2 ]]; then
+      _gshoot_options \
+        '--help:Show context-sensitive help' \
+        '--version:Print the version number'
+      return
+    fi
+
     case "${command}" in
       auth)
         case "${subcommand}" in
@@ -49,9 +56,7 @@ _gshoot() {
         '-f:Skip confirmation' \
         '--force:Skip confirmation' \
         '--help:Show context-sensitive help' ;;
-      *) _gshoot_options \
-        '--help:Show context-sensitive help' \
-        '--version:Print the version number' ;;
+      *) _gshoot_options '--help:Show context-sensitive help' ;;
     esac
     return
   fi
