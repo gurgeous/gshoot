@@ -19,7 +19,7 @@ import (
 const (
 	gridPadding   = 2         // empty rows/columns kept around uploaded data
 	layoutPadding = 20        // extra pixels added after auto-sizing columns
-	sheetPrefix   = "gsheet_" // prefix for generated upload sheet names
+	sheetPrefix   = "gshoot_" // prefix for generated upload sheet names
 )
 
 var (
@@ -351,7 +351,7 @@ func sheetTitle(cmd *UpCmd, spreadsheet *google.Spreadsheet) string {
 		return cmd.Sheet
 	}
 	if cmd.Refill || cmd.Replace {
-		return "gsheet"
+		return "gshoot"
 	}
 
 	nxt := 1
