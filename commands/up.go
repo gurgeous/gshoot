@@ -14,14 +14,14 @@ import (
 //
 
 type UpCmd struct {
-	Sheet       string `help:"Destination sheet name."`
+	Sheet       string `default:"gshoot" help:"Destination sheet name."`
 	Refill      bool   `help:"Merge CSV data INTO the sheet."`
 	Replace     bool   `help:"Create or overwrite the destination sheet."`
 	Filter      bool   `help:"Add a standard Google Sheets filter."`
 	Layout      bool   `help:"Auto-size column width to fit cells."`
 	Numeric     bool   `help:"Format obvious numeric columns."`
 	Open        bool   `help:"Open the sheet URL when done."`
-	Spreadsheet string `arg:"" name:"spreadsheet" help:"Spreadsheet name."`
+	Spreadsheet string `arg:"" name:"spreadsheet" help:"Spreadsheet file name."`
 	CSVPath     string `arg:"" name:"csv" type:"path" help:"CSV file to upload."`
 }
 

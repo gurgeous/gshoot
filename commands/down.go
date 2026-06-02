@@ -16,7 +16,7 @@ import (
 type DownCmd struct {
 	Output      string `short:"o" type:"path" help:"Where to write the CSV."`
 	Sheet       string `help:"Sheet name."`
-	Spreadsheet string `arg:"" name:"spreadsheet" help:"Spreadsheet name."`
+	Spreadsheet string `arg:"" name:"spreadsheet" help:"Spreadsheet file name."`
 }
 
 func (c *DownCmd) Run() error {

@@ -14,7 +14,7 @@ import (
 //
 
 type PeekCmd struct {
-	Spreadsheet string `arg:"" name:"spreadsheet" help:"Spreadsheet name."`
+	Spreadsheet string `arg:"" name:"spreadsheet" help:"Spreadsheet file name."`
 }
 
 func (c *PeekCmd) Run() error {
