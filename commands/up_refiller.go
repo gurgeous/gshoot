@@ -109,11 +109,11 @@ func (s *refiller) extend() error {
 	nrows := s.remoteDataHeight()
 	if len(s.sheet.rows) > nrows && nrows >= 2 {
 		// copy FORMATS
-		requests = append(requests, s.copyRequests(s.sharedColumns(), 2, "PASTE_FORMAT")...)
+		requests = append(requests, s.extendRowsRequests(s.allColumns(), nrows, "PASTE_FORMAT")...)
 
 		// copy FORMULAS
 		formulaColumns := s.formulaColumns()
-		requests = append(requests, s.copyRequests(formulaColumns, nrows, "PASTE_FORMULA")...)
+		requests = append(requests, s.extendRowsRequests(formulaColumns, nrows, "PASTE_FORMULA")...)
 	}
 
 	// clear out the padding rows & cols
@@ -129,24 +129,25 @@ func (s *refiller) extend() error {
 }
 
 //
-// build CopyPaste Requests for extending cols
+// build CopyPaste Requests that copy the final remote row into new rows.
 //
 
-func (s *refiller) copyRequests(columns []int, endRow int, pasteType string) []google.Request {
+func (s *refiller) extendRowsRequests(columns []int, remoteRows int, pasteType string) []google.Request {
 	requests := make([]google.Request, 0, len(columns))
+	sourceRow := remoteRows - 1
 	for _, c := range columns {
 		requests = append(requests, google.Request{
 			CopyPaste: &google.CopyPasteRequest{
 				Source: google.GridRange{
 					SheetID:          s.sheet.id,
-					StartRowIndex:    1,
-					EndRowIndex:      endRow,
+					StartRowIndex:    sourceRow,
+					EndRowIndex:      sourceRow + 1,
 					StartColumnIndex: c,
 					EndColumnIndex:   c + 1,
 				},
 				Destination: google.GridRange{
 					SheetID:          s.sheet.id,
-					StartRowIndex:    1,
+					StartRowIndex:    remoteRows,
 					EndRowIndex:      len(s.sheet.rows),
 					StartColumnIndex: c,
 					EndColumnIndex:   c + 1,
@@ -211,6 +212,15 @@ func (s *refiller) formulaColumns() []int {
 		if s.hasFormula(c) {
 			columns = append(columns, c)
 		}
+	}
+	return columns
+}
+
+// allColumns returns every column in the final refill rectangle.
+func (s *refiller) allColumns() []int {
+	columns := make([]int, len(s.sheet.rows[0]))
+	for c := range columns {
+		columns[c] = c
 	}
 	return columns
 }

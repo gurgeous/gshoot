@@ -68,9 +68,23 @@ Commands:
 
 There are three different modes for `gshoot up`.
 
-1. **Non-destructive** - this is our default. A new sheet will be added. Nothing will be overwritten, this is totally safe. If you run this over and over you will see new sheets appear like `gshoot`, `gshoot_2`, `gshoot_3` ... Safe.
-2. **Replace** - with `gshoot up --replace`, gshoot will find/create the sheet and completely replace it with the new data. Caution. Use
-3. `gshoot up --replace` The csv will replace the first sheet of the spreadsheet file. Use `--sheet=STRING` to pick a different sheet.
+1. **safe** (default). A new sheet will be added to the file. When run repeatedly, you will see new sheets like `gshoot`, `gshoot_2`, `gshoot_3`...
+2. **`--replace`** will find/create the sheet in that file and overwrite it with the CSV data.
+3. **`--refill`** will merge the CSV data into an existing sheet. It will update old rows and add new ones as necessary. gshoot won't really mess with unknown columns, but it will _extend_ formulas and formatting into new rows.
+
+When using `up`, gshoot will find or create the spreadsheet file as necessary. The target sheet name will be `gshoot`, which you can override with `--sheet`. I almost always use `--filter`, `--layout`, `--numeric` and `--open` too.
+
+### Down, Down, Down
+
+`gshoot down` is much simpler. By default it downloads the first sheet, but you can override with `--sheet`.
+
+### Other Commands
+
+These are a few other commands for convenience:
+
+- `list` - list recently edited spreadsheet files
+- `peek` - list the sheets in a spreadsheet file
+- `wipe` - delete all sheets from a spreadsheet file
 
 ### Authentication
 

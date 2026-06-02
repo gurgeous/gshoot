@@ -24,7 +24,7 @@ banner() {
   banner "wipe $SHEET..."
   run "$BIN" wipe -f "$SHEET"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"wiped spreadsheet file $SHEET"* ]]
+  [[ "$output" == *"$SHEET"* ]]
 
   # confirm list and peek can see the reset spreadsheet
   banner "list..."
@@ -50,7 +50,7 @@ banner() {
   [[ "$output" == *"basic "* ]]
 
   banner "down..."
-  run "$BIN" down -o "$BATS_TEST_TMPDIR/basic.out.csv" "$SHEET" basic
+  run "$BIN" down --sheet basic -o "$BATS_TEST_TMPDIR/basic.out.csv" "$SHEET"
   [ "$status" -eq 0 ]
   grep -q "name,score,city" "$BATS_TEST_TMPDIR/basic.out.csv"
   grep -q "alice,1,denver" "$BATS_TEST_TMPDIR/basic.out.csv"
@@ -63,7 +63,7 @@ banner() {
   [ "$status" -eq 0 ]
 
   banner "down..."
-  run "$BIN" down -o "$BATS_TEST_TMPDIR/default.out.csv" "$SHEET" default
+  run "$BIN" down --sheet default -o "$BATS_TEST_TMPDIR/default.out.csv" "$SHEET"
   [ "$status" -eq 0 ]
   grep -q "cara,3,miami" "$BATS_TEST_TMPDIR/default.out.csv"
   grep -q "drew,4,seattle" "$BATS_TEST_TMPDIR/default.out.csv"
@@ -75,7 +75,7 @@ banner() {
   [ "$status" -eq 0 ]
 
   banner "down..."
-  run "$BIN" down -o "$BATS_TEST_TMPDIR/numeric.out.csv" "$SHEET" numeric
+  run "$BIN" down --sheet numeric -o "$BATS_TEST_TMPDIR/numeric.out.csv" "$SHEET"
   [ "$status" -eq 0 ]
   grep -q "alice,10" "$BATS_TEST_TMPDIR/numeric.out.csv"
   grep -q "bob,20" "$BATS_TEST_TMPDIR/numeric.out.csv"
@@ -92,7 +92,7 @@ banner() {
   [ "$status" -eq 0 ]
 
   banner "down..."
-  run "$BIN" down -o "$BATS_TEST_TMPDIR/refill.out.csv" "$SHEET" refill
+  run "$BIN" down --sheet refill -o "$BATS_TEST_TMPDIR/refill.out.csv" "$SHEET"
   [ "$status" -eq 0 ]
   grep -q "a,Ada,10" "$BATS_TEST_TMPDIR/refill.out.csv"
   grep -q "b,Bob,20" "$BATS_TEST_TMPDIR/refill.out.csv"

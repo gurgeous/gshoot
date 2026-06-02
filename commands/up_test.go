@@ -191,7 +191,8 @@ func TestUpCommandRefillMergesAndExtendsFormulas(t *testing.T) {
 	assert.NoError(t, err)
 	assertBatchContains(t, batches, "pasteData", `"type":"PASTE_VALUES"`)
 	assertBatchContains(t, batches, "pasteData", `"data":"id,calc,name\na,=A2,Ada\nb,=A3,Bob\nc,=A4,Cyd\nd,,Dee\n"`)
-	assertBatchContains(t, batches, "copyPaste", `"pasteType":"PASTE_FORMULA"`, `"endRowIndex":5`)
+	assertBatchContains(t, batches, "copyPaste", `"pasteType":"PASTE_FORMAT"`, `"startRowIndex":3`, `"endRowIndex":4`, `"startRowIndex":4`, `"endRowIndex":5`)
+	assertBatchContains(t, batches, "copyPaste", `"pasteType":"PASTE_FORMULA"`, `"startRowIndex":3`, `"endRowIndex":4`, `"startRowIndex":4`, `"endRowIndex":5`)
 }
 
 func TestUpCommandRefillExtendsFormulasWithBlankDisplayValues(t *testing.T) {
@@ -227,7 +228,8 @@ func TestUpCommandRefillExtendsFormulasWithBlankDisplayValues(t *testing.T) {
 	})
 
 	assert.NoError(t, err)
-	assertBatchContains(t, batches, "copyPaste", `"pasteType":"PASTE_FORMULA"`, `"endRowIndex":4`)
+	assertBatchContains(t, batches, "copyPaste", `"pasteType":"PASTE_FORMAT"`, `"startRowIndex":2`, `"endRowIndex":3`, `"startRowIndex":3`, `"endRowIndex":4`)
+	assertBatchContains(t, batches, "copyPaste", `"pasteType":"PASTE_FORMULA"`, `"startRowIndex":2`, `"endRowIndex":3`, `"startRowIndex":3`, `"endRowIndex":4`)
 }
 
 func TestUpCommandRefillRejectsDuplicateHeaders(t *testing.T) {
