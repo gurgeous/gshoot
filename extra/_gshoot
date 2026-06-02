@@ -81,9 +81,9 @@ _gshoot_down() {
   _arguments -s \
     '-o[Where to write the CSV]:file:_files -g "*.csv(-.)" "*(-/)"' \
     '--output[Where to write the CSV]:file:_files -g "*.csv(-.)" "*(-/)"' \
+    '--sheet[Sheet name]:sheet:' \
     '--help[Show context-sensitive help]' \
-    ':spreadsheet:' \
-    '::sheet:'
+    ':spreadsheet:'
 }
 
 _gshoot_up() {

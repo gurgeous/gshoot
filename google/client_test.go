@@ -13,10 +13,12 @@ import (
 
 func TestListSpreadsheetFiles(t *testing.T) {
 	var gotPageSize string
+	var gotQuery string
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/drive/v3/files", r.URL.Path)
 		gotPageSize = r.URL.Query().Get("pageSize")
+		gotQuery = r.URL.Query().Get("q")
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"files": []map[string]string{
 				{"id": "1", "name": "Alpha", "modifiedByMeTime": "2026-05-07T12:00:00Z"},
@@ -30,6 +32,7 @@ func TestListSpreadsheetFiles(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, files, 1)
 	assert.Equal(t, "100", gotPageSize)
+	assert.Contains(t, gotQuery, "trashed=false")
 	assert.Equal(t, "Alpha", files[0].Name)
 }
 

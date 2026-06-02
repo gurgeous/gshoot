@@ -36,7 +36,7 @@ func TestUpCommandRenamesBlankDefaultSheet(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, "https://docs.google.com/spreadsheets/d/sheet-1/edit\n", stdout)
-	assertBatchContains(t, batches, "updateSheetProperties", `"sheetId":0`, `"title":"gsheet_1"`)
+	assertBatchContains(t, batches, "updateSheetProperties", `"sheetId":0`, `"title":"gshoot"`)
 	assertBatchContains(t, batches, "pasteData", `"data":"name,count\nalpha,1\n"`)
 }
 
@@ -54,7 +54,7 @@ func TestUpCommandReplaceClearsExistingSheet(t *testing.T) {
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"sheets": []map[string]any{
 					{"properties": map[string]any{"sheetId": 0, "title": "Sheet1"}},
-					{"properties": map[string]any{"sheetId": 7, "title": "gsheet_up"}},
+					{"properties": map[string]any{"sheetId": 7, "title": "gshoot"}},
 				},
 			})
 		case r.URL.Path == "/v4/spreadsheets/sheet-1:batchUpdate":
@@ -96,6 +96,65 @@ func TestUpCommandCustomSheetAddsSheetWhenDefaultBlank(t *testing.T) {
 	assertBatchContains(t, batches, "addSheet", `"title":"Monthly"`)
 }
 
+func TestUpCommandCustomSheetChoosesAvailableName(t *testing.T) {
+	csvPath := writeCSV(t, "name,count\nalpha,1\n")
+	batches := []map[string]any{}
+
+	err, _, _ := testCommand(t, &UpCmd{Spreadsheet: "Budget", Sheet: "Monthly", CSVPath: csvPath}, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/drive/v3/files":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"files": []map[string]string{{"id": "sheet-1", "name": "Budget"}},
+			})
+		case r.URL.Path == "/v4/spreadsheets/sheet-1":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"sheets": []map[string]any{
+					{"properties": map[string]any{"sheetId": 3, "title": "Monthly"}},
+					{"properties": map[string]any{"sheetId": 4, "title": "Monthly_2"}},
+				},
+			})
+		case r.URL.Path == "/v4/spreadsheets/sheet-1:batchUpdate":
+			batches = append(batches, readBatch(t, r))
+			writeBatchReply(w)
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	})
+
+	assert.NoError(t, err)
+	assertBatchContains(t, batches, "addSheet", `"title":"Monthly_3"`)
+	assertBatchMissing(t, batches, "pasteData", `"sheetId":3`)
+}
+
+func TestUpCommandReplaceCustomSheetUsesExactName(t *testing.T) {
+	csvPath := writeCSV(t, "name,count\nalpha,1\n")
+	batches := []map[string]any{}
+
+	err, _, _ := testCommand(t, &UpCmd{Spreadsheet: "Budget", Sheet: "Monthly", CSVPath: csvPath, Replace: true}, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/drive/v3/files":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"files": []map[string]string{{"id": "sheet-1", "name": "Budget"}},
+			})
+		case r.URL.Path == "/v4/spreadsheets/sheet-1":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"sheets": []map[string]any{
+					{"properties": map[string]any{"sheetId": 3, "title": "Monthly"}},
+				},
+			})
+		case r.URL.Path == "/v4/spreadsheets/sheet-1:batchUpdate":
+			batches = append(batches, readBatch(t, r))
+			writeBatchReply(w)
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	})
+
+	assert.NoError(t, err)
+	assertBatchContains(t, batches, "updateCells", `"sheetId":3`, `"fields":"*"`)
+	assertBatchMissing(t, batches, "addSheet")
+}
+
 func TestUpCommandRefillMergesAndExtendsFormulas(t *testing.T) {
 	csvPath := writeCSV(t, "id,name\na,Ada\nb,Bob\nc,Cyd\nd,Dee\n")
 	batches := []map[string]any{}
@@ -108,9 +167,9 @@ func TestUpCommandRefillMergesAndExtendsFormulas(t *testing.T) {
 			})
 		case r.URL.Path == "/v4/spreadsheets/sheet-1":
 			if r.URL.Query().Get("includeGridData") == "true" {
-				writeSpreadsheet(w, "gsheet_up", 7, refillGridData())
+				writeSpreadsheet(w, "gshoot", 7, refillGridData())
 			} else {
-				writeSpreadsheet(w, "gsheet_up", 7, nil)
+				writeSpreadsheet(w, "gshoot", 7, nil)
 			}
 		case strings.HasPrefix(r.URL.Path, "/v4/spreadsheets/sheet-1/values/"):
 			_ = json.NewEncoder(w).Encode(map[string]any{
@@ -132,7 +191,8 @@ func TestUpCommandRefillMergesAndExtendsFormulas(t *testing.T) {
 	assert.NoError(t, err)
 	assertBatchContains(t, batches, "pasteData", `"type":"PASTE_VALUES"`)
 	assertBatchContains(t, batches, "pasteData", `"data":"id,calc,name\na,=A2,Ada\nb,=A3,Bob\nc,=A4,Cyd\nd,,Dee\n"`)
-	assertBatchContains(t, batches, "copyPaste", `"pasteType":"PASTE_FORMULA"`, `"endRowIndex":5`)
+	assertBatchContains(t, batches, "copyPaste", `"pasteType":"PASTE_FORMAT"`, `"startRowIndex":3`, `"endRowIndex":4`, `"startRowIndex":4`, `"endRowIndex":5`)
+	assertBatchContains(t, batches, "copyPaste", `"pasteType":"PASTE_FORMULA"`, `"startRowIndex":3`, `"endRowIndex":4`, `"startRowIndex":4`, `"endRowIndex":5`)
 }
 
 func TestUpCommandRefillExtendsFormulasWithBlankDisplayValues(t *testing.T) {
@@ -147,9 +207,9 @@ func TestUpCommandRefillExtendsFormulasWithBlankDisplayValues(t *testing.T) {
 			})
 		case r.URL.Path == "/v4/spreadsheets/sheet-1":
 			if r.URL.Query().Get("includeGridData") == "true" {
-				writeSpreadsheet(w, "gsheet_up", 7, refillBlankFormulaGridData())
+				writeSpreadsheet(w, "gshoot", 7, refillBlankFormulaGridData())
 			} else {
-				writeSpreadsheet(w, "gsheet_up", 7, nil)
+				writeSpreadsheet(w, "gshoot", 7, nil)
 			}
 		case strings.HasPrefix(r.URL.Path, "/v4/spreadsheets/sheet-1/values/"):
 			_ = json.NewEncoder(w).Encode(map[string]any{
@@ -168,7 +228,8 @@ func TestUpCommandRefillExtendsFormulasWithBlankDisplayValues(t *testing.T) {
 	})
 
 	assert.NoError(t, err)
-	assertBatchContains(t, batches, "copyPaste", `"pasteType":"PASTE_FORMULA"`, `"endRowIndex":4`)
+	assertBatchContains(t, batches, "copyPaste", `"pasteType":"PASTE_FORMAT"`, `"startRowIndex":2`, `"endRowIndex":3`, `"startRowIndex":3`, `"endRowIndex":4`)
+	assertBatchContains(t, batches, "copyPaste", `"pasteType":"PASTE_FORMULA"`, `"startRowIndex":2`, `"endRowIndex":3`, `"startRowIndex":3`, `"endRowIndex":4`)
 }
 
 func TestUpCommandRefillRejectsDuplicateHeaders(t *testing.T) {
@@ -182,9 +243,9 @@ func TestUpCommandRefillRejectsDuplicateHeaders(t *testing.T) {
 			})
 		case r.URL.Path == "/v4/spreadsheets/sheet-1":
 			if r.URL.Query().Get("includeGridData") == "true" {
-				writeSpreadsheet(w, "gsheet_up", 7, refillGridData())
+				writeSpreadsheet(w, "gshoot", 7, refillGridData())
 			} else {
-				writeSpreadsheet(w, "gsheet_up", 7, nil)
+				writeSpreadsheet(w, "gshoot", 7, nil)
 			}
 		case strings.HasPrefix(r.URL.Path, "/v4/spreadsheets/sheet-1/values/"):
 			_ = json.NewEncoder(w).Encode(map[string]any{
@@ -209,9 +270,9 @@ func TestUpCommandRefillRejectsDuplicateHeadersOnEmptyRemote(t *testing.T) {
 			})
 		case r.URL.Path == "/v4/spreadsheets/sheet-1":
 			if r.URL.Query().Get("includeGridData") == "true" {
-				writeSpreadsheet(w, "gsheet_up", 7, []map[string]any{{"rowData": []any{}}})
+				writeSpreadsheet(w, "gshoot", 7, []map[string]any{{"rowData": []any{}}})
 			} else {
-				writeSpreadsheet(w, "gsheet_up", 7, nil)
+				writeSpreadsheet(w, "gshoot", 7, nil)
 			}
 		case strings.HasPrefix(r.URL.Path, "/v4/spreadsheets/sheet-1/values/"):
 			_ = json.NewEncoder(w).Encode(map[string]any{"values": []any{}})
@@ -234,9 +295,9 @@ func TestUpCommandRefillRejectsDuplicateRemoteHeaders(t *testing.T) {
 			})
 		case r.URL.Path == "/v4/spreadsheets/sheet-1":
 			if r.URL.Query().Get("includeGridData") == "true" {
-				writeSpreadsheet(w, "gsheet_up", 7, refillGridData())
+				writeSpreadsheet(w, "gshoot", 7, refillGridData())
 			} else {
-				writeSpreadsheet(w, "gsheet_up", 7, nil)
+				writeSpreadsheet(w, "gshoot", 7, nil)
 			}
 		case strings.HasPrefix(r.URL.Path, "/v4/spreadsheets/sheet-1/values/"):
 			_ = json.NewEncoder(w).Encode(map[string]any{
@@ -262,9 +323,9 @@ func TestUpCommandRefillPreservesExtraRemoteRows(t *testing.T) {
 			})
 		case r.URL.Path == "/v4/spreadsheets/sheet-1":
 			if r.URL.Query().Get("includeGridData") == "true" {
-				writeSpreadsheet(w, "gsheet_up", 7, refillExtraRowsGridData())
+				writeSpreadsheet(w, "gshoot", 7, refillExtraRowsGridData())
 			} else {
-				writeSpreadsheet(w, "gsheet_up", 7, nil)
+				writeSpreadsheet(w, "gshoot", 7, nil)
 			}
 		case strings.HasPrefix(r.URL.Path, "/v4/spreadsheets/sheet-1/values/"):
 			_ = json.NewEncoder(w).Encode(map[string]any{
@@ -299,9 +360,9 @@ func TestUpCommandRefillWithoutNewRowsOnlyClearsPadding(t *testing.T) {
 			})
 		case r.URL.Path == "/v4/spreadsheets/sheet-1":
 			if r.URL.Query().Get("includeGridData") == "true" {
-				writeSpreadsheet(w, "gsheet_up", 7, refillBlankTrailingFormulaGridData())
+				writeSpreadsheet(w, "gshoot", 7, refillBlankTrailingFormulaGridData())
 			} else {
-				writeSpreadsheet(w, "gsheet_up", 7, nil)
+				writeSpreadsheet(w, "gshoot", 7, nil)
 			}
 		case strings.HasPrefix(r.URL.Path, "/v4/spreadsheets/sheet-1/values/"):
 			_ = json.NewEncoder(w).Encode(map[string]any{
@@ -394,7 +455,7 @@ func TestUpCommandAppliesFilterNumericAndLayout(t *testing.T) {
 			})
 		case r.URL.Path == "/v4/spreadsheets/sheet-1":
 			if r.URL.Query().Get("includeGridData") == "true" {
-				writeSpreadsheet(w, "gsheet_1", 0, layoutGridData())
+				writeSpreadsheet(w, "gshoot_1", 0, layoutGridData())
 			} else {
 				writeSpreadsheet(w, "Sheet1", 0, nil)
 			}
@@ -468,7 +529,7 @@ func readBatch(t *testing.T, r *http.Request) map[string]any {
 func writeBatchReply(w http.ResponseWriter) {
 	_ = json.NewEncoder(w).Encode(map[string]any{
 		"replies": []map[string]any{
-			{"addSheet": map[string]any{"properties": map[string]any{"sheetId": 9, "title": "gsheet_1"}}},
+			{"addSheet": map[string]any{"properties": map[string]any{"sheetId": 9, "title": "gshoot_1"}}},
 		},
 	})
 }

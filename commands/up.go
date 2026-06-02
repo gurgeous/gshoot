@@ -14,14 +14,14 @@ import (
 //
 
 type UpCmd struct {
-	Sheet       string `help:"Destination sheet name."`
+	Sheet       string `default:"gshoot" help:"Destination sheet name."`
 	Refill      bool   `help:"Merge CSV data INTO the sheet."`
 	Replace     bool   `help:"Create or overwrite the destination sheet."`
 	Filter      bool   `help:"Add a standard Google Sheets filter."`
 	Layout      bool   `help:"Auto-size column width to fit cells."`
 	Numeric     bool   `help:"Format obvious numeric columns."`
 	Open        bool   `help:"Open the sheet URL when done."`
-	Spreadsheet string `arg:"" name:"spreadsheet" help:"Spreadsheet name."`
+	Spreadsheet string `arg:"" name:"spreadsheet" help:"Spreadsheet file name."`
 	CSVPath     string `arg:"" name:"csv" type:"path" help:"CSV file to upload."`
 }
 
@@ -30,26 +30,14 @@ func (c *UpCmd) Run() (err error) {
 		return errors.New("use either --refill or --replace")
 	}
 
+	// read
 	rows, err := util.CSVRead(c.CSVPath)
 	if err != nil {
 		return err
 	}
 
-	//
-	// init
-	//
-
-	cmd, err := srunStart(os.Stderr, srunOptions{spreadsheet: c.Spreadsheet, create: true})
-	if err != nil {
-		return err
-	}
-	defer func() { cmd.stop(err) }()
-
-	//
 	// upload
-	//
-
-	file, err := c.upload(cmd, google.Rows(rows))
+	file, err := c.run0(google.Rows(rows))
 	if err != nil {
 		return err
 	}
@@ -63,9 +51,17 @@ func (c *UpCmd) Run() (err error) {
 	return nil
 }
 
-// upload runs the complete upload workflow.
-func (c *UpCmd) upload(cmd *srun, rows google.Rows) (*google.File, error) {
-	var err error
+// run0 runs the complete run0 workflow.
+func (c *UpCmd) run0(rows google.Rows) (*google.File, error) {
+	//
+	// init
+	//
+
+	cmd, err := srunStart(os.Stderr, srunOptions{spreadsheet: c.Spreadsheet, create: true})
+	if err != nil {
+		return nil, err
+	}
+	defer func() { cmd.stop(err) }()
 
 	//
 	// get Spreadsheet for that File
@@ -81,12 +77,12 @@ func (c *UpCmd) upload(cmd *srun, rows google.Rows) (*google.File, error) {
 	// find/create target sheet
 	//
 
-	cmd.progress.SayUploadRows(len(rows), cmd.file.Name, c.Sheet)
 	s := newUploader(cmd.ctx, cmd.client, cmd.file, spreadsheet, c, rows)
 	s.id, err = s.resolveTargetSheet()
 	if err != nil {
 		return nil, err
 	}
+	cmd.progress.SayUploadRows(len(s.rows), cmd.file.Name, s.title)
 
 	//
 	// --refill

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/gurgeous/gshoot/google"
@@ -17,9 +16,8 @@ import (
 //
 
 const (
-	gridPadding   = 2         // empty rows/columns kept around uploaded data
-	layoutPadding = 20        // extra pixels added after auto-sizing columns
-	sheetPrefix   = "gsheet_" // prefix for generated upload sheet names
+	gridPadding   = 2  // empty rows/columns kept around uploaded data
+	layoutPadding = 20 // extra pixels added after auto-sizing columns
 )
 
 var (
@@ -64,10 +62,12 @@ func newUploader(
 
 func (s *uploader) resolveTargetSheet() (int64, error) {
 	// already present?
-	for _, sheet := range s.spreadsheet.Sheets {
-		if strings.EqualFold(sheet.Title, s.title) {
+	if sheet := findSheet(s.spreadsheet, s.title); sheet != nil {
+		if s.cmd.Refill || s.cmd.Replace {
 			return sheet.ID, nil
 		}
+		s.title = nextAvailableSheetTitle(s.spreadsheet, s.title)
+		return s.addSheet()
 	}
 
 	// is this an empty file?
@@ -347,21 +347,34 @@ func hasLeadingZeroNumber(values []string) bool {
 
 // sheetTitle returns the requested or generated destination sheet name.
 func sheetTitle(cmd *UpCmd, spreadsheet *google.Spreadsheet) string {
-	if cmd.Sheet != "" {
-		return cmd.Sheet
+	title := cmd.Sheet
+	if title == "" {
+		title = "gshoot"
 	}
 	if cmd.Refill || cmd.Replace {
-		return "gsheet_up"
+		return title
+	}
+	return nextAvailableSheetTitle(spreadsheet, title)
+}
+
+func nextAvailableSheetTitle(spreadsheet *google.Spreadsheet, title string) string {
+	if findSheet(spreadsheet, title) == nil {
+		return title
 	}
 
-	nxt := 1
-	for _, sheet := range spreadsheet.Sheets {
-		if suffix, ok := strings.CutPrefix(sheet.Title, sheetPrefix); ok {
-			n, err := strconv.Atoi(suffix)
-			if err == nil {
-				nxt = max(nxt, n+1)
-			}
+	for ii := 2; ; ii++ {
+		nxt := fmt.Sprintf("%s_%d", title, ii)
+		if findSheet(spreadsheet, nxt) == nil {
+			return nxt
 		}
 	}
-	return fmt.Sprintf("%s%d", sheetPrefix, nxt)
+}
+
+func findSheet(spreadsheet *google.Spreadsheet, title string) *google.Sheet {
+	for _, sheet := range spreadsheet.Sheets {
+		if strings.EqualFold(sheet.Title, title) {
+			return sheet
+		}
+	}
+	return nil
 }

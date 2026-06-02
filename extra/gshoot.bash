@@ -39,7 +39,7 @@ _gshoot() {
           *) _gshoot_words "--help" ;;
         esac
         ;;
-      down) _gshoot_words "-o --output --help" ;;
+      down) _gshoot_words "-o --output --sheet --help" ;;
       up) _gshoot_words "--sheet --refill --replace --filter --layout --numeric --open --help" ;;
       wipe) _gshoot_words "-f --force --help" ;;
       *) _gshoot_words "--help" ;;
