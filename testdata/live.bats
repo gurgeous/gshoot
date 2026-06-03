@@ -56,10 +56,10 @@ banner() {
   grep -q "alice,1,denver" "$BATS_TEST_TMPDIR/basic.out.csv"
   grep -q "bob,2,austin" "$BATS_TEST_TMPDIR/basic.out.csv"
 
-  # default upload should add a new sheet
+  # default upload should use the CSV basename as the sheet name
   banner "up..."
   printf 'name,score,city\ncara,3,miami\ndrew,4,seattle\n' >"$BATS_TEST_TMPDIR/default.csv"
-  run "$BIN" up --sheet default "$SHEET" "$BATS_TEST_TMPDIR/default.csv"
+  run "$BIN" up "$SHEET" "$BATS_TEST_TMPDIR/default.csv"
   [ "$status" -eq 0 ]
 
   banner "down..."
