@@ -2,6 +2,7 @@ package util
 
 import (
 	"bufio"
+	"cmp"
 	"crypto/rand"
 	"encoding/csv"
 	"encoding/hex"
@@ -32,6 +33,11 @@ const (
 	ST       = ESC + "\\"
 	ellipsis = "…"
 )
+
+// Clamp bounds v between lo and hi.
+func Clamp[T cmp.Ordered](v, lo, hi T) T {
+	return min(max(v, lo), hi)
+}
 
 //
 // shell
