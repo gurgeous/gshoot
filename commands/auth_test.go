@@ -40,3 +40,26 @@ func TestAuthStatus(t *testing.T) {
 	assert.NotContains(t, stdout, "<b>")
 	assert.NotContains(t, stdout, "</b>")
 }
+
+func TestAuthLogout(t *testing.T) {
+	err, stdout, _ := testCommandWithSetup(t, &AuthLogoutCmd{}, nil, func(home string) {
+		writeAuthFiles(t, home)
+	})
+
+	assert.NoError(t, err)
+	assert.Contains(t, stdout, "logged out")
+	assert.Contains(t, stdout, "auth status")
+	assert.Contains(t, stdout, "Client secrets file:")
+	assert.Contains(t, stdout, "Token file:")
+}
+
+func TestAuthLogoutPurge(t *testing.T) {
+	err, stdout, _ := testCommandWithSetup(t, &AuthLogoutCmd{Purge: true}, nil, func(home string) {
+		writeAuthFiles(t, home)
+	})
+
+	assert.NoError(t, err)
+	assert.Contains(t, stdout, "logged out")
+	assert.Contains(t, stdout, "auth status")
+	assert.Contains(t, stdout, "client secrets")
+}

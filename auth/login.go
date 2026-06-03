@@ -46,12 +46,16 @@ func (m *Manager) Login(ctx context.Context, smoke bool, out io.Writer) error {
 }
 
 //
-// logout (delete token but leave client secrets)
+// logout (delete token, optionally deleting client secrets too)
 //
 
-func (m *Manager) Logout() {
+func (m *Manager) Logout(purge bool) {
 	os.Remove(m.TokenPath)
 	m.token = nil
+	if purge {
+		os.Remove(m.ClientPath)
+		m.client = nil
+	}
 }
 
 // browserLoginFlow performs the browser round trip and code exchange.

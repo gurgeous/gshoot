@@ -47,7 +47,7 @@ func Main(args []string, version string) error {
 	if (isFirstRun && isNaked) || isWelcome {
 		// show welcome movie, then auth status
 		if app.Env.Smoke {
-			fmt.Fprintln(os.Stdout, "welcome")
+			fmt.Println("welcome")
 		} else {
 			_ = gmv.Demo(context.Background())
 		}
@@ -77,7 +77,7 @@ func Main(args []string, version string) error {
 		var parseErr *kong.ParseError
 		if errors.As(err, &parseErr) && parseErr.Context != nil {
 			_ = parseErr.Context.PrintUsage(false)
-			fmt.Fprintln(os.Stdout)
+			fmt.Println()
 		}
 		return err
 	}
