@@ -126,6 +126,17 @@ func (s staticTokenSource) Token() (*oauth2.Token, error) {
 func TestLogout(t *testing.T) {
 	client := withAuthHome(t)
 	writeAuthToken(t, futureToken())
-	client.Logout()
+	client.Logout(false)
 	assert.False(t, util.FileExists(client.TokenPath))
+}
+
+func TestLogoutPurgeDeletesClientSecrets(t *testing.T) {
+	client := withAuthHome(t)
+	writeClient(t, `{"installed":{"client_id":"cid","redirect_uris":["http://127.0.0.1/oauth2/callback"]}}`)
+	writeAuthToken(t, futureToken())
+
+	client.Logout(true)
+
+	assert.False(t, util.FileExists(client.TokenPath))
+	assert.False(t, util.FileExists(client.ClientPath))
 }

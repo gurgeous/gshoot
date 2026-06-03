@@ -44,7 +44,7 @@ func (c *UpCmd) Run() (err error) {
 
 	// print url and maybe open
 	url := util.SpreadsheetURL(file.ID) + "/edit"
-	fmt.Fprintln(os.Stdout, url)
+	fmt.Println(url)
 	if c.Open {
 		util.OpenBrowserURL(url)
 	}

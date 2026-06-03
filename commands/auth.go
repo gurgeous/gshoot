@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"charm.land/lipgloss/v2"
 	"github.com/gurgeous/gshoot/app"
 	"github.com/gurgeous/gshoot/auth"
 	"github.com/gurgeous/gshoot/ux"
@@ -25,7 +26,9 @@ type (
 	AuthLoginCmd struct {
 		ClientSecretPath string `name:"client-secret" type:"path" help:"Path to a Google Desktop app OAuth client JSON."`
 	}
-	AuthLogoutCmd struct{}
+	AuthLogoutCmd struct {
+		Purge bool `help:"Delete saved client secrets too."`
+	}
 	AuthStatusCmd struct{}
 )
 
@@ -44,8 +47,8 @@ func (c *AuthLoginCmd) Run() error {
 		if err = manager.SaveOClient(c.ClientSecretPath); err != nil {
 			return err
 		}
-		fmt.Fprintln(os.Stdout, ux.Success.Render("gshoot: copied to "+manager.ClientPath))
-		fmt.Fprintln(os.Stdout)
+		fmt.Println(ux.Success.Render("gshoot: copied to " + manager.ClientPath))
+		fmt.Println()
 	}
 
 	// can't proceed with login without client secrets
@@ -65,7 +68,13 @@ func (c *AuthLogoutCmd) Run() error {
 	if err != nil {
 		return err
 	}
-	client.Logout()
+	client.Logout(c.Purge)
+
+	msg := "gshoot: You are now " + ux.Warn.Render("logged out") + ","
+	msg += " here is your updated status."
+	_, _ = fmt.Println(lipgloss.Wrap(msg, 72, " "))
+	fmt.Println()
+	ShowAuthStatus()
 	return nil
 }
 

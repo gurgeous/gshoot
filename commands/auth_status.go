@@ -2,7 +2,6 @@ package commands
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/gurgeous/gshoot/auth"
 	"github.com/gurgeous/gshoot/util"
@@ -19,7 +18,11 @@ func ShowAuthStatus() error {
 		return err
 	}
 
-	fmt.Fprintln(os.Stdout, ux.Success.Render("--- gshoot auth status ---"))
+	fmt.Println(ux.Success.Render("--- gshoot auth status ---"))
+
+	fmt.Println()
+	fmt.Println("Client secrets file: " + authFileStatus(m.ClientPath))
+	fmt.Println("Token file:          " + authFileStatus(m.TokenPath))
 
 	if !m.LoggedIn() {
 		intro := "Authenticating with Google Sheets is quite tricky. Don't blame me, I have no idea why they made it so hard!"
@@ -30,22 +33,16 @@ func ShowAuthStatus() error {
 			intro += "\n\n*{\"installed\":{ <secret stuff> }}*"
 			intro += "\n\nOnce you have that file from Google, import it into gshoot:\n\n**$ gshoot auth login --client-secret <client_secret_XXXXXXXXX.json>**"
 		}
-		fmt.Fprintln(os.Stdout)
-		fmt.Fprintln(os.Stdout, ux.Markdown(intro))
+		fmt.Println()
+		fmt.Println(ux.Markdown(intro))
 	}
 
-	if m.HasClientSecrets() {
-		fmt.Fprintln(os.Stdout)
-		fmt.Fprintln(os.Stdout, "Client secrets file: "+authFileStatus(m.ClientPath))
-		fmt.Fprintln(os.Stdout, "Token file:          "+authFileStatus(m.TokenPath))
-	}
-
-	fmt.Fprintln(os.Stdout)
+	fmt.Println()
 	if !m.LoggedIn() {
 		outro := "See our [GitHub README](" + auth.AuthReadmeURL + ") for full instructions."
-		fmt.Fprintln(os.Stdout, ux.Markdown(outro))
+		fmt.Println(ux.Markdown(outro))
 	} else {
-		fmt.Fprintln(os.Stdout, "You are logged in and gshoot commands should work.")
+		fmt.Println("You are logged in and gshoot commands should work.")
 	}
 
 	return nil
