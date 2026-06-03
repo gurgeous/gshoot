@@ -46,3 +46,15 @@ func TestDownCommand(t *testing.T) {
 	data, _ := os.ReadFile(path)
 	assert.Equal(t, "name,count\nalpha,1\n", string(data))
 }
+
+func TestDownCommandMissingSpreadsheet(t *testing.T) {
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/drive/v3/files", r.URL.Path)
+		_ = json.NewEncoder(w).Encode(map[string]any{"files": []any{}})
+	}
+
+	err, _, _ := testCommand(t, &DownCmd{Spreadsheet: "Missing Budget"}, handler)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "Missing Budget")
+	assert.Contains(t, err.Error(), "gshoot list")
+}

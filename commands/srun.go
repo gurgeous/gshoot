@@ -45,6 +45,13 @@ func srunStart(w io.Writer, opts srunOptions) (*srun, error) {
 	} else {
 		progress.SayFindSpreadsheet(opts.spreadsheet)
 		file, err = client.FindSpreadsheetFile(ctx, opts.spreadsheet)
+		if file == nil && err == nil {
+			progress.Cancel()
+			return nil, fmt.Errorf(
+				"looked for spreadsheet file named '%s', but could't find it.\nhint: run `gshoot list` to list spreadsheet files",
+				opts.spreadsheet,
+			)
+		}
 	}
 	if err != nil {
 		progress.Cancel()
