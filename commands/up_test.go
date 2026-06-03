@@ -13,7 +13,7 @@ import (
 )
 
 func TestUpCommandRenamesBlankDefaultSheet(t *testing.T) {
-	csvPath := writeCSV(t, "name,count\nalpha,1\n")
+	csvPath := writeNamedCSV(t, "Something Awesome.tsv", "name,count\nalpha,1\n")
 	batches := []map[string]any{}
 
 	err, stdout, _ := testCommand(t, &UpCmd{Spreadsheet: "Budget", CSVPath: csvPath}, func(w http.ResponseWriter, r *http.Request) {
@@ -36,7 +36,7 @@ func TestUpCommandRenamesBlankDefaultSheet(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, "https://docs.google.com/spreadsheets/d/sheet-1/edit\n", stdout)
-	assertBatchContains(t, batches, "updateSheetProperties", `"sheetId":0`, `"title":"gshoot"`)
+	assertBatchContains(t, batches, "updateSheetProperties", `"sheetId":0`, `"title":"Something Awesome"`)
 	assertBatchContains(t, batches, "pasteData", `"data":"name,count\nalpha,1\n"`)
 }
 
@@ -44,7 +44,7 @@ func TestUpCommandReplaceClearsExistingSheet(t *testing.T) {
 	csvPath := writeCSV(t, "name,count\nalpha,1\n")
 	batches := []map[string]any{}
 
-	err, _, _ := testCommand(t, &UpCmd{Spreadsheet: "Budget", CSVPath: csvPath, Replace: true}, func(w http.ResponseWriter, r *http.Request) {
+	err, _, _ := testCommand(t, &UpCmd{Spreadsheet: "Budget", Sheet: "gshoot", CSVPath: csvPath, Replace: true}, func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.URL.Path == "/drive/v3/files":
 			_ = json.NewEncoder(w).Encode(map[string]any{
@@ -94,6 +94,35 @@ func TestUpCommandCustomSheetAddsSheetWhenDefaultBlank(t *testing.T) {
 
 	assert.NoError(t, err)
 	assertBatchContains(t, batches, "addSheet", `"title":"Monthly"`)
+}
+
+func TestUpCommandDefaultSheetChoosesAvailableBasename(t *testing.T) {
+	csvPath := writeNamedCSV(t, "Something Awesome.tsv", "name,count\nalpha,1\n")
+	batches := []map[string]any{}
+
+	err, _, _ := testCommand(t, &UpCmd{Spreadsheet: "Budget", CSVPath: csvPath}, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/drive/v3/files":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"files": []map[string]string{{"id": "sheet-1", "name": "Budget"}},
+			})
+		case r.URL.Path == "/v4/spreadsheets/sheet-1":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"sheets": []map[string]any{
+					{"properties": map[string]any{"sheetId": 3, "title": "Something Awesome"}},
+					{"properties": map[string]any{"sheetId": 4, "title": "Something Awesome_2"}},
+				},
+			})
+		case r.URL.Path == "/v4/spreadsheets/sheet-1:batchUpdate":
+			batches = append(batches, readBatch(t, r))
+			writeBatchReply(w)
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	})
+
+	assert.NoError(t, err)
+	assertBatchContains(t, batches, "addSheet", `"title":"Something Awesome_3"`)
 }
 
 func TestUpCommandCustomSheetChoosesAvailableName(t *testing.T) {
@@ -159,7 +188,7 @@ func TestUpCommandRefillMergesAndExtendsFormulas(t *testing.T) {
 	csvPath := writeCSV(t, "id,name\na,Ada\nb,Bob\nc,Cyd\nd,Dee\n")
 	batches := []map[string]any{}
 
-	err, _, _ := testCommand(t, &UpCmd{Spreadsheet: "Budget", CSVPath: csvPath, Refill: true}, func(w http.ResponseWriter, r *http.Request) {
+	err, _, _ := testCommand(t, &UpCmd{Spreadsheet: "Budget", Sheet: "gshoot", CSVPath: csvPath, Refill: true}, func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.URL.Path == "/drive/v3/files":
 			_ = json.NewEncoder(w).Encode(map[string]any{
@@ -199,7 +228,7 @@ func TestUpCommandRefillExtendsFormulasWithBlankDisplayValues(t *testing.T) {
 	csvPath := writeCSV(t, "id,name\na,Ada\nb,Bob\nc,Cyd\n")
 	batches := []map[string]any{}
 
-	err, _, _ := testCommand(t, &UpCmd{Spreadsheet: "Budget", CSVPath: csvPath, Refill: true}, func(w http.ResponseWriter, r *http.Request) {
+	err, _, _ := testCommand(t, &UpCmd{Spreadsheet: "Budget", Sheet: "gshoot", CSVPath: csvPath, Refill: true}, func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.URL.Path == "/drive/v3/files":
 			_ = json.NewEncoder(w).Encode(map[string]any{
@@ -235,7 +264,7 @@ func TestUpCommandRefillExtendsFormulasWithBlankDisplayValues(t *testing.T) {
 func TestUpCommandRefillRejectsDuplicateHeaders(t *testing.T) {
 	csvPath := writeCSV(t, "id,id\na,b\n")
 
-	err, _, _ := testCommand(t, &UpCmd{Spreadsheet: "Budget", CSVPath: csvPath, Refill: true}, func(w http.ResponseWriter, r *http.Request) {
+	err, _, _ := testCommand(t, &UpCmd{Spreadsheet: "Budget", Sheet: "gshoot", CSVPath: csvPath, Refill: true}, func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.URL.Path == "/drive/v3/files":
 			_ = json.NewEncoder(w).Encode(map[string]any{
@@ -262,7 +291,7 @@ func TestUpCommandRefillRejectsDuplicateHeaders(t *testing.T) {
 func TestUpCommandRefillRejectsDuplicateHeadersOnEmptyRemote(t *testing.T) {
 	csvPath := writeCSV(t, "id,id\na,b\n")
 
-	err, _, _ := testCommand(t, &UpCmd{Spreadsheet: "Budget", CSVPath: csvPath, Refill: true}, func(w http.ResponseWriter, r *http.Request) {
+	err, _, _ := testCommand(t, &UpCmd{Spreadsheet: "Budget", Sheet: "gshoot", CSVPath: csvPath, Refill: true}, func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.URL.Path == "/drive/v3/files":
 			_ = json.NewEncoder(w).Encode(map[string]any{
@@ -287,7 +316,7 @@ func TestUpCommandRefillRejectsDuplicateHeadersOnEmptyRemote(t *testing.T) {
 func TestUpCommandRefillRejectsDuplicateRemoteHeaders(t *testing.T) {
 	csvPath := writeCSV(t, "id,name\na,Ada\n")
 
-	err, _, _ := testCommand(t, &UpCmd{Spreadsheet: "Budget", CSVPath: csvPath, Refill: true}, func(w http.ResponseWriter, r *http.Request) {
+	err, _, _ := testCommand(t, &UpCmd{Spreadsheet: "Budget", Sheet: "gshoot", CSVPath: csvPath, Refill: true}, func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.URL.Path == "/drive/v3/files":
 			_ = json.NewEncoder(w).Encode(map[string]any{
@@ -315,7 +344,7 @@ func TestUpCommandRefillPreservesExtraRemoteRows(t *testing.T) {
 	csvPath := writeCSV(t, "id,name\na,Ada\n")
 	batches := []map[string]any{}
 
-	err, _, _ := testCommand(t, &UpCmd{Spreadsheet: "Budget", CSVPath: csvPath, Refill: true}, func(w http.ResponseWriter, r *http.Request) {
+	err, _, _ := testCommand(t, &UpCmd{Spreadsheet: "Budget", Sheet: "gshoot", CSVPath: csvPath, Refill: true}, func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.URL.Path == "/drive/v3/files":
 			_ = json.NewEncoder(w).Encode(map[string]any{
@@ -352,7 +381,7 @@ func TestUpCommandRefillWithoutNewRowsOnlyClearsPadding(t *testing.T) {
 	csvPath := writeCSV(t, "id,name\na,Ada\n")
 	batches := []map[string]any{}
 
-	err, _, _ := testCommand(t, &UpCmd{Spreadsheet: "Budget", CSVPath: csvPath, Refill: true}, func(w http.ResponseWriter, r *http.Request) {
+	err, _, _ := testCommand(t, &UpCmd{Spreadsheet: "Budget", Sheet: "gshoot", CSVPath: csvPath, Refill: true}, func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.URL.Path == "/drive/v3/files":
 			_ = json.NewEncoder(w).Encode(map[string]any{
@@ -509,9 +538,13 @@ func TestUpCommandNumericSkipsLeadingZeroColumns(t *testing.T) {
 }
 
 func writeCSV(t *testing.T, content string) string {
+	return writeNamedCSV(t, "upload.csv", content)
+}
+
+func writeNamedCSV(t *testing.T, name, content string) string {
 	t.Helper()
 
-	path := filepath.Join(t.TempDir(), "upload.csv")
+	path := filepath.Join(t.TempDir(), name)
 	err := os.WriteFile(path, []byte(content), 0o644)
 	assert.NoError(t, err)
 	return path

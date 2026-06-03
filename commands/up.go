@@ -14,7 +14,7 @@ import (
 //
 
 type UpCmd struct {
-	Sheet       string `default:"gshoot" help:"Destination sheet name."`
+	Sheet       string `help:"Destination sheet name."`
 	Refill      bool   `help:"Merge CSV data INTO the sheet."`
 	Replace     bool   `help:"Create or overwrite the destination sheet."`
 	Filter      bool   `help:"Add a standard Google Sheets filter."`

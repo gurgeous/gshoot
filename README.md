@@ -68,11 +68,11 @@ Commands:
 
 There are three different modes for `gshoot up`.
 
-1. **safe** (default). A new sheet will be added to the file. When run repeatedly, you will see new sheets like `gshoot`, `gshoot_2`, `gshoot_3`...
+1. **safe** (default). A new sheet will be added to the file. The sheet name comes from the CSV filename, so `Something Awesome.tsv` becomes `Something Awesome`. When run repeatedly, you will see new sheets like `Something Awesome`, `Something Awesome_2`, `Something Awesome_3`...
 2. **`--replace`** will find/create the sheet in that file and overwrite it with the CSV data.
 3. **`--refill`** will merge the CSV data into an existing sheet. It will update old rows and add new ones as necessary. gshoot won't really mess with unknown columns, but it will _extend_ formulas and formatting into new rows.
 
-When using `up`, gshoot will find or create the spreadsheet file as necessary. The target sheet name will be `gshoot`, which you can override with `--sheet`. I almost always use `--filter`, `--layout`, `--numeric` and `--open` too.
+When using `up`, gshoot will find or create the spreadsheet file as necessary. The target sheet name comes from the CSV filename, which you can override with `--sheet`. I almost always use `--filter`, `--layout`, `--numeric` and `--open` too.
 
 ### Down, Down, Down
 

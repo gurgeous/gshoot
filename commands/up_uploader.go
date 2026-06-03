@@ -3,6 +3,7 @@ package commands
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -349,12 +350,17 @@ func hasLeadingZeroNumber(values []string) bool {
 func sheetTitle(cmd *UpCmd, spreadsheet *google.Spreadsheet) string {
 	title := cmd.Sheet
 	if title == "" {
-		title = "gshoot"
+		title = csvSheetTitle(cmd.CSVPath)
 	}
 	if cmd.Refill || cmd.Replace {
 		return title
 	}
 	return nextAvailableSheetTitle(spreadsheet, title)
+}
+
+func csvSheetTitle(path string) string {
+	base := filepath.Base(path)
+	return strings.TrimSuffix(base, filepath.Ext(base))
 }
 
 func nextAvailableSheetTitle(spreadsheet *google.Spreadsheet, title string) string {
