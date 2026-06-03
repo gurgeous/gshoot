@@ -14,7 +14,9 @@ import (
 // List Google spreadsheet files.
 //
 
-type ListCmd struct{}
+type ListCmd struct {
+	Limit int `help:"Maximum number of spreadsheet files to list." default:"20"`
+}
 
 func (c *ListCmd) Run() error {
 	// fetch
@@ -52,7 +54,7 @@ func (c *ListCmd) run0() (files []*google.File, err error) {
 	}
 
 	progress.SayListFiles()
-	files, err = client.ListSpreadsheetFiles(ctx, 20)
+	files, err = client.ListSpreadsheetFiles(ctx, util.Clamp(c.Limit, 1, 100))
 	if err != nil {
 		return nil, err
 	}

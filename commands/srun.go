@@ -28,16 +28,23 @@ type srun struct {
 }
 
 // srunStart connects to Google and opens a spreadsheet file by name.
-func srunStart(w io.Writer, opts srunOptions) (*srun, error) {
+func srunStart(w io.Writer, opts srunOptions) (_ *srun, err error) {
 	ctx := context.Background()
+
+	// start progress, but cancel if something goes awry
 	progress := ux.StartProgress(w, "connecting to Google Sheets...")
+	defer func() {
+		if err != nil {
+			progress.Cancel()
+		}
+	}()
 
 	client, err := google.NewClient(ctx)
 	if err != nil {
-		progress.Cancel()
 		return nil, err
 	}
 
+	// create or find file
 	var file *google.File
 	if opts.create {
 		progress.SayFindOrCreateSpreadsheet(opts.spreadsheet)
@@ -47,20 +54,16 @@ func srunStart(w io.Writer, opts srunOptions) (*srun, error) {
 		file, err = client.FindSpreadsheetFile(ctx, opts.spreadsheet)
 	}
 	if err != nil {
-		progress.Cancel()
 		return nil, err
 	}
 	if file == nil {
-		progress.Cancel()
-		return nil, fmt.Errorf("could not find spreadsheet file named '%s'", opts.spreadsheet)
+		return nil, fmt.Errorf(
+			"looked for spreadsheet file named '%s', but couldn't find it.\nhint: try `gshoot list` to list spreadsheet files",
+			opts.spreadsheet,
+		)
 	}
 
-	return &srun{
-		ctx:      ctx,
-		client:   client,
-		progress: progress,
-		file:     file,
-	}, nil
+	return &srun{ctx: ctx, client: client, progress: progress, file: file}, nil
 }
 
 func (c *srun) stop(err error) {

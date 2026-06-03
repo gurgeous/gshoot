@@ -57,6 +57,12 @@ func TestFormatInt(t *testing.T) {
 	assert.Equal(t, "1,234,567", FormatInt(1234567))
 }
 
+func TestClamp(t *testing.T) {
+	assert.Equal(t, 1, Clamp(0, 1, 100))
+	assert.Equal(t, 50, Clamp(50, 1, 100))
+	assert.Equal(t, 100, Clamp(101, 1, 100))
+}
+
 func TestRenderHyperlink(t *testing.T) {
 	got := RenderHyperlink("https://example.com", "Alpha")
 	want := OSC + "8;;https://example.com" + ST + "Alpha" + OSC + "8;;" + ST

@@ -76,18 +76,16 @@ func (c *Client) CreateSpreadsheetFile(ctx context.Context, name string) (*File,
 	return &res, nil
 }
 
-// FindSpreadsheetFile returns the most recent spreadsheet with this name (case insensitive).
+// FindSpreadsheetFile returns the most recent spreadsheet with this exact name.
 func (c *Client) FindSpreadsheetFile(ctx context.Context, name string) (*File, error) {
-	items, err := c.ListSpreadsheetFiles(ctx, 0)
+	items, err := c.search(ctx, fmt.Sprintf("name = '%s'", driveQueryString(name)), 1)
 	if err != nil {
 		return nil, err
 	}
-	for _, item := range items {
-		if strings.EqualFold(item.Name, name) {
-			return item, nil
-		}
+	if len(items) == 0 {
+		return nil, nil
 	}
-	return nil, nil
+	return items[0], nil
 }
 
 // FindOrCreateSpreadsheetFile returns a spreadsheet with this name, creating one if needed.
@@ -102,12 +100,21 @@ func (c *Client) FindOrCreateSpreadsheetFile(ctx context.Context, name string) (
 // ListSpreadsheetFiles returns recently modified spreadsheets.
 // https://developers.google.com/workspace/drive/api/reference/rest/v3/files/list
 func (c *Client) ListSpreadsheetFiles(ctx context.Context, limit int) ([]*File, error) {
+	return c.search(ctx, "", limit)
+}
+
+func (c *Client) search(ctx context.Context, condition string, limit int) ([]*File, error) {
 	if limit <= 0 {
 		limit = 100
 	}
 
+	query := fmt.Sprintf("mimeType='%s' and trashed=false", spreadsheetMimeType)
+	if condition != "" {
+		query += " and " + condition
+	}
+
 	q := url.Values{}
-	q.Set("q", fmt.Sprintf("mimeType='%s' and trashed=false", spreadsheetMimeType))
+	q.Set("q", query)
 	q.Set("orderBy", "modifiedByMeTime desc, name")
 	q.Set("pageSize", fmt.Sprint(limit))
 	q.Set("fields", "files(id,name,modifiedByMeTime)")
@@ -119,6 +126,11 @@ func (c *Client) ListSpreadsheetFiles(ctx context.Context, limit int) ([]*File, 
 		return nil, err
 	}
 	return res.Files, nil
+}
+
+func driveQueryString(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	return strings.ReplaceAll(s, `'`, `\'`)
 }
 
 //

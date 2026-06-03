@@ -67,22 +67,30 @@ func TestClientRoutesRequestsByService(t *testing.T) {
 	assert.Equal(t, 1, sheetsHits)
 }
 
-func TestFindSpreadsheetFile(t *testing.T) {
+func TestFindSpreadsheetFileUsesExactNameSearch(t *testing.T) {
+	var gotQuery string
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotQuery = r.URL.Query().Get("q")
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"files": []map[string]string{
-				{"id": "1", "name": "Alpha", "modifiedByMeTime": "2026-05-07T12:00:00Z"},
-				{"id": "2", "name": "Budget", "modifiedByMeTime": "2026-05-07T11:00:00Z"},
+				{"id": "1", "name": "hi/codex", "modifiedByMeTime": "2026-05-07T12:00:00Z"},
 			},
 		})
 	}))
 	defer server.Close()
 
 	client := newTestClient(t, server.URL)
-	file, err := client.FindSpreadsheetFile(context.Background(), "budget")
+	file, err := client.FindSpreadsheetFile(context.Background(), "hi/codex")
 	assert.NoError(t, err)
 	assert.NotNil(t, file)
-	assert.Equal(t, "2", file.ID)
+	assert.Equal(t, "1", file.ID)
+	assert.Contains(t, gotQuery, "name = 'hi/codex'")
+	assert.Contains(t, gotQuery, "trashed=false")
+}
+
+func TestDriveQueryString(t *testing.T) {
+	assert.Equal(t, `Bob\'s \\ Budget`, driveQueryString(`Bob's \ Budget`))
 }
 
 func TestFindOrCreateSpreadsheetFileCreatesMissingFile(t *testing.T) {
