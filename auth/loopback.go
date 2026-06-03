@@ -16,7 +16,10 @@ import (
 // Temporary localhost OAuth callback server
 //
 
-const oauthReadHeaderTimeout = 5 * time.Second
+const (
+	oauthReadHeaderTimeout = 5 * time.Second
+	oauthShutdownTimeout   = 5 * time.Second
+)
 
 type Loopback struct {
 	RedirectURL string // redirect URL sent to Google after binding an ephemeral port
@@ -88,6 +91,9 @@ func (l *Loopback) Start() error {
 			return
 		}
 		fmt.Fprintln(w, "gshoot: login complete, you can close this tab.") // HTTP response
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
 		l.codeCh <- code
 	})
 
@@ -102,7 +108,7 @@ func (l *Loopback) Start() error {
 
 // Wait returns the first successful code, callback error, or caller cancellation.
 func (l *Loopback) Wait(ctx context.Context) (string, error) {
-	defer l.server.Close()
+	defer l.shutdown()
 	select {
 	case code := <-l.codeCh:
 		return code, nil
@@ -111,4 +117,10 @@ func (l *Loopback) Wait(ctx context.Context) (string, error) {
 	case <-ctx.Done():
 		return "", ctx.Err()
 	}
+}
+
+func (l *Loopback) shutdown() {
+	ctx, cancel := context.WithTimeout(context.Background(), oauthShutdownTimeout)
+	defer cancel()
+	_ = l.server.Shutdown(ctx)
 }

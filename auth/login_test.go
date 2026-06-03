@@ -223,6 +223,9 @@ func sendOAuthCallback(t *testing.T, authURL, code string) {
 	}
 	defer resp.Body.Close()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	body, err := io.ReadAll(resp.Body)
+	assert.NoError(t, err)
+	assert.Contains(t, string(body), "you can close this tab")
 }
 
 // withAuthHome points auth at a fresh temporary HOME directory.
