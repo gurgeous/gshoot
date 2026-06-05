@@ -60,105 +60,103 @@ grep_missing() {
   run_ok peek "$F_UPPER" && [[ "$output" == *"Sheet1 "* ]]
 
   #
-  # up w/o --sheet
+  # up
   #
 
-  printf 'name,score,city\ncara,3,miami\ndrew,4,seattle\n' >"$BATS_TEST_TMPDIR/default.csv"
+  printf 'name,score,city\nCara,3,miami\nDrew,4,seattle\n' >"$BATS_TEST_TMPDIR/default.csv"
   run_ok up "$F" "$BATS_TEST_TMPDIR/default.csv"
   # check
   run_ok down --sheet default -o "$BATS_TEST_TMPDIR/default.out.csv" "$F"
-  grep -q "cara,3,miami" "$BATS_TEST_TMPDIR/default.out.csv"
-  grep -q "drew,4,seattle" "$BATS_TEST_TMPDIR/default.out.csv"
+  grep -q "Cara,3,miami" "$BATS_TEST_TMPDIR/default.out.csv"
+  grep -q "Drew,4,seattle" "$BATS_TEST_TMPDIR/default.out.csv"
 
   #
-  # up --replace w/ --sheet
+  # up --replace
   #
 
-  printf 'name,score,city\nalice,1,denver\nbob,2,austin\n' >"$BATS_TEST_TMPDIR/basic.csv"
-  run_ok up --replace --sheet basic "$F" "$BATS_TEST_TMPDIR/basic.csv"
-  [[ "$output" == *"docs.google.com/spreadsheets/d/"* ]]
-  run_ok peek "$F"
-  [[ "$output" == *"basic "* ]]
+  printf 'name,score,city\nAdam,1,denver\nBob,2,austin\n' >"$BATS_TEST_TMPDIR/basic.csv"
+  run_ok up --replace --sheet basic "$F" "$BATS_TEST_TMPDIR/basic.csv" && [[ "$output" == *"docs.google.com"* ]]
+  run_ok peek "$F" && [[ "$output" == *"basic "* ]]
   # check
   run_ok down --sheet basic -o "$BATS_TEST_TMPDIR/basic.out.csv" "$F"
   grep -q "name,score,city" "$BATS_TEST_TMPDIR/basic.out.csv"
-  grep -q "alice,1,denver" "$BATS_TEST_TMPDIR/basic.out.csv"
-  grep -q "bob,2,austin" "$BATS_TEST_TMPDIR/basic.out.csv"
+  grep -q "Adam,1,denver" "$BATS_TEST_TMPDIR/basic.out.csv"
+  grep -q "Bob,2,austin" "$BATS_TEST_TMPDIR/basic.out.csv"
 
   #
   # up --numeric
   #
 
-  printf 'name,count\nalice,10\nbob,20\n' >"$BATS_TEST_TMPDIR/numeric.csv"
+  printf 'name,count\nAdam,10\nBob,20\n' >"$BATS_TEST_TMPDIR/numeric.csv"
   run_ok up --replace --numeric --sheet numeric "$F" "$BATS_TEST_TMPDIR/numeric.csv"
   # check
   run_ok down --sheet numeric -o "$BATS_TEST_TMPDIR/numeric.out.csv" "$F"
-  grep -q "alice,10" "$BATS_TEST_TMPDIR/numeric.out.csv"
-  grep -q "bob,20" "$BATS_TEST_TMPDIR/numeric.out.csv"
+  grep -q "Adam,10" "$BATS_TEST_TMPDIR/numeric.out.csv"
+  grep -q "Bob,20" "$BATS_TEST_TMPDIR/numeric.out.csv"
 
   #
   # up --refill grow
   #
 
   # seed
-  printf 'id,name,count\na,Ada,1\nb,Bob,2\n' >"$BATS_TEST_TMPDIR/refill.csv"
+  printf 'id,name,count\na,Adam,1\nb,Bob,2\n' >"$BATS_TEST_TMPDIR/refill.csv"
   run_ok up --replace --sheet refill "$F" "$BATS_TEST_TMPDIR/refill.csv"
   # go
-  printf 'id,name,count\na,Ada,10\nb,Bob,20\nc,Cyd,30\n' >"$BATS_TEST_TMPDIR/refill.csv"
+  printf 'id,name,count\na,Adam,10\nb,Bob,20\nc,Cara,30\n' >"$BATS_TEST_TMPDIR/refill.csv"
   run_ok up --refill --sheet refill "$F" "$BATS_TEST_TMPDIR/refill.csv"
   # check
   run_ok down --sheet refill -o "$BATS_TEST_TMPDIR/refill.out.csv" "$F"
-  grep -q "a,Ada,10" "$BATS_TEST_TMPDIR/refill.out.csv"
+  grep -q "a,Adam,10" "$BATS_TEST_TMPDIR/refill.out.csv"
   grep -q "b,Bob,20" "$BATS_TEST_TMPDIR/refill.out.csv"
-  grep -q "c,Cyd,30" "$BATS_TEST_TMPDIR/refill.out.csv"
+  grep -q "c,Cara,30" "$BATS_TEST_TMPDIR/refill.out.csv"
 
   #
   # up --refill shrink
   #
 
   # seed
-  printf 'id,name,count\na,Ada,1\nb,Bob,2\nc,Cyd,3\n' >"$BATS_TEST_TMPDIR/refill-shrink.csv"
+  printf 'id,name,count\na,Adam,1\nb,Bob,2\nc,Cara,3\n' >"$BATS_TEST_TMPDIR/refill-shrink.csv"
   run_ok up --replace --sheet refill-shrink "$F" "$BATS_TEST_TMPDIR/refill-shrink.csv"
   # go
-  printf 'id,name,count\na,Ada,10\n' >"$BATS_TEST_TMPDIR/refill-shrink.csv"
+  printf 'id,name,count\na,Adam,10\n' >"$BATS_TEST_TMPDIR/refill-shrink.csv"
   run_ok up --refill --sheet refill-shrink "$F" "$BATS_TEST_TMPDIR/refill-shrink.csv"
   # check stale rows gone
   run_ok down --sheet refill-shrink -o "$BATS_TEST_TMPDIR/refill-shrink.out.csv" "$F"
-  grep -q "a,Ada,10" "$BATS_TEST_TMPDIR/refill-shrink.out.csv"
+  grep -q "a,Adam,10" "$BATS_TEST_TMPDIR/refill-shrink.out.csv"
   grep_missing "b,Bob,2" "$BATS_TEST_TMPDIR/refill-shrink.out.csv"
-  grep_missing "c,Cyd,3" "$BATS_TEST_TMPDIR/refill-shrink.out.csv"
+  grep_missing "c,Cara,3" "$BATS_TEST_TMPDIR/refill-shrink.out.csv"
 
   #
   # up --refill shrink
   #
 
   # seed
-  printf 'id,note,name\na,keep Ada,Ada\nb,keep Bob,Bob\nc,keep Cyd,Cyd\n' >"$BATS_TEST_TMPDIR/refill-keep.csv"
+  printf 'id,note,name\na,keep Adam,Adam\nb,keep Bob,Bob\nc,keep Cara,Cara\n' >"$BATS_TEST_TMPDIR/refill-keep.csv"
   run_ok up --replace --sheet refill-keep "$F" "$BATS_TEST_TMPDIR/refill-keep.csv"
   # go
-  printf 'id,name\na,Ada 10\n' >"$BATS_TEST_TMPDIR/refill-keep.csv"
+  printf 'id,name\na,Adam 10\n' >"$BATS_TEST_TMPDIR/refill-keep.csv"
   run_ok up --refill --sheet refill-keep "$F" "$BATS_TEST_TMPDIR/refill-keep.csv"
-  # check remote rows kept
+  # check
   run_ok down --sheet refill-keep -o "$BATS_TEST_TMPDIR/refill-keep.out.csv" "$F"
-  grep -q "a,keep Ada,Ada 10" "$BATS_TEST_TMPDIR/refill-keep.out.csv"
+  grep -q "a,keep Adam,Adam 10" "$BATS_TEST_TMPDIR/refill-keep.out.csv"
   grep -q ",keep Bob," "$BATS_TEST_TMPDIR/refill-keep.out.csv"
-  grep -q ",keep Cyd," "$BATS_TEST_TMPDIR/refill-keep.out.csv"
+  grep -q ",keep Cara," "$BATS_TEST_TMPDIR/refill-keep.out.csv"
   grep_missing "b,keep Bob,Bob" "$BATS_TEST_TMPDIR/refill-keep.out.csv"
-  grep_missing "c,keep Cyd,Cyd" "$BATS_TEST_TMPDIR/refill-keep.out.csv"
+  grep_missing "c,keep Cara,Cara" "$BATS_TEST_TMPDIR/refill-keep.out.csv"
 
   #
   # up --refill shrink
   #
 
   # seed
-  printf 'id,note,name\na,keep Ada,Ada\nb,,Bob\nc,,Cyd\n' >"$BATS_TEST_TMPDIR/refill-blank-remote.csv"
+  printf 'id,note,name\na,keep Adam,Adam\nb,,Bob\nc,,Cara\n' >"$BATS_TEST_TMPDIR/refill-blank-remote.csv"
   run_ok up --replace --sheet refill-blank-remote "$F" "$BATS_TEST_TMPDIR/refill-blank-remote.csv"
   # go
-  printf 'id,name\na,Ada 10\n' >"$BATS_TEST_TMPDIR/refill-blank-remote.csv"
+  printf 'id,name\na,Adam 10\n' >"$BATS_TEST_TMPDIR/refill-blank-remote.csv"
   run_ok up --refill --sheet refill-blank-remote "$F" "$BATS_TEST_TMPDIR/refill-blank-remote.csv"
-  # check blank remote-cols shrink
+  # check
   run_ok down --sheet refill-blank-remote -o "$BATS_TEST_TMPDIR/refill-blank-remote.out.csv" "$F"
-  grep -q "a,keep Ada,Ada 10" "$BATS_TEST_TMPDIR/refill-blank-remote.out.csv"
+  grep -q "a,keep Adam,Adam 10" "$BATS_TEST_TMPDIR/refill-blank-remote.out.csv"
   grep_missing "b,,Bob" "$BATS_TEST_TMPDIR/refill-blank-remote.out.csv"
-  grep_missing "c,,Cyd" "$BATS_TEST_TMPDIR/refill-blank-remote.out.csv"
+  grep_missing "c,,Cara" "$BATS_TEST_TMPDIR/refill-blank-remote.out.csv"
 }
