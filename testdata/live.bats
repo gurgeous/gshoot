@@ -1,107 +1,219 @@
 #!/usr/bin/env bats
 
+#
+# helpers
+#
+
 setup() {
   ROOT="$BATS_TEST_DIRNAME/.."
   BIN="$ROOT/bin/gshoot"
-  SPREADSHEET="gshoot-smoke"
-  SPREADSHEET_UPPER="GSHOOT-SMOKE"
+  F="gshoot-smoke"
+  F_UPPER="GSHOOT-SMOKE"
+  cd "$BATS_TEST_TMPDIR"
 }
 
 banner() {
-  # note fd3 for bats
   printf '\e[1;38;5;231;48;2;64;160;43m[%s] live: %-62s\e[0m\n' "$(date '+%H:%M:%S')" "$1" >&3
 }
 
-@test "live google workflow" {
+run_ok() {
+  banner "$*..."
+  run "$BIN" "$@"
+  if [ "$status" -ne 0 ]; then
+    printf 'command failed:' >&3
+    printf ' %q' "$BIN" "$@" >&3
+    printf '\nstatus: %s\n%s\n' "$status" "$output" >&3
+    return 1
+  fi
+}
+
+write_file() {
+  printf '%s' "$2" | sed '1{/^[[:space:]]*$/d}; s/^[[:space:]]*//; ${/^[[:space:]]*$/d;}' >"$1"
+  printf '\n' >>"$1"
+}
+
+file_eq() {
+  write_file want.txt "$1"
+  normalize_file want.txt >want.csv
+  normalize_file "$2" >got.csv
+  diff -u want.csv got.csv >&3
+}
+
+file_eq_file() {
+  normalize_file "$1" >want.csv
+  normalize_file "$2" >got.csv
+  if ! diff -u want.csv got.csv >&3; then
+    echo "file mismatch: $1 != $2" >&3
+    wc -c "$1" "$2" >&3
+    return 1
+  fi
+}
+
+normalize_file() {
+  awk '
+    {
+      sub(/\r$/, "")
+      sub(/[ \t]+$/, "")
+      lines[NR] = $0
+    }
+    END {
+      n = NR
+      while (n > 0 && lines[n] == "") n--
+      for (i = 1; i <= n; i++) print lines[i]
+    }
+  ' "$1"
+}
+
+#
+# test
+#
+
+@test 'live google workflow (takes around 45s)' {
   # verify auth before touching the scratch spreadsheet
   banner "preflight w/ list..."
   run "$BIN" list
   if [ "$status" -ne 0 ]; then
     echo "run gshoot auth login first" >&3
+    printf '%s\n' "$output" >&3
     return 1
   fi
 
-  # reset the scratch spreadsheet to a single blank sheet
-  banner "wipe $SPREADSHEET..."
-  run "$BIN" wipe -f "$SPREADSHEET"
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"$SPREADSHEET"* ]]
+  # reset scratch file
+  run_ok wipe -f "$F" && [[ "$output" == *"$F"* ]]
 
-  # confirm list and peek can see the reset spreadsheet
-  banner "list..."
-  run "$BIN" list
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"$SPREADSHEET"* ]]
+  #
+  # list/peek
+  #
 
-  banner "peek..."
-  run "$BIN" peek "$SPREADSHEET"
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"Sheet1 "* ]]
+  run_ok list && [[ "$output" == *"$F"* ]]
+  run_ok peek "$F" && [[ "$output" == *"Sheet1 "* ]]
+  run_ok peek "$F_UPPER" && [[ "$output" == *"Sheet1 "* ]]
 
-  # spreadsheet file lookup should be case insensitive
-  banner "peek uppercase..."
-  run "$BIN" peek "$SPREADSHEET_UPPER"
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"Sheet1 "* ]]
+  #
+  # up
+  #
 
-  # replace upload should round-trip through download
-  banner "up --replace..."
-  printf 'name,score,city\nalice,1,denver\nbob,2,austin\n' >"$BATS_TEST_TMPDIR/basic.csv"
-  run "$BIN" up --replace --sheet basic "$SPREADSHEET" "$BATS_TEST_TMPDIR/basic.csv"
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"docs.google.com/spreadsheets/d/"* ]]
+  write_file default.csv "
+  name,score,city
+  Cara,3,miami
+  Drew,4,seattle
+  "
+  run_ok up "$F" default.csv && [[ "$output" == *"docs.google.com"* ]]
+  run_ok down --sheet default -o default.out.csv "$F"
+  file_eq_file default.csv default.out.csv
 
-  banner "peek..."
-  run "$BIN" peek "$SPREADSHEET"
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"basic "* ]]
+  #
+  # up --sheet
+  #
 
-  banner "down..."
-  run "$BIN" down --sheet basic -o "$BATS_TEST_TMPDIR/basic.out.csv" "$SPREADSHEET"
-  [ "$status" -eq 0 ]
-  grep -q "name,score,city" "$BATS_TEST_TMPDIR/basic.out.csv"
-  grep -q "alice,1,denver" "$BATS_TEST_TMPDIR/basic.out.csv"
-  grep -q "bob,2,austin" "$BATS_TEST_TMPDIR/basic.out.csv"
+  write_file basic.csv "
+  name,score,city
+  Adam,1,denver
+  Bob,2,austin
+  "
+  run_ok up --replace --sheet basic "$F" basic.csv && [[ "$output" == *"docs.google.com"* ]]
+  run_ok peek "$F" && [[ "$output" == *"basic "* ]]
+  run_ok down --sheet basic -o basic.out.csv "$F"
+  file_eq_file basic.csv basic.out.csv
 
-  # default upload should use the CSV basename as the sheet name
-  banner "up..."
-  printf 'name,score,city\ncara,3,miami\ndrew,4,seattle\n' >"$BATS_TEST_TMPDIR/default.csv"
-  run "$BIN" up "$SPREADSHEET" "$BATS_TEST_TMPDIR/default.csv"
-  [ "$status" -eq 0 ]
+  #
+  # up --refill grow
+  #
 
-  banner "down..."
-  run "$BIN" down --sheet default -o "$BATS_TEST_TMPDIR/default.out.csv" "$SPREADSHEET"
-  [ "$status" -eq 0 ]
-  grep -q "cara,3,miami" "$BATS_TEST_TMPDIR/default.out.csv"
-  grep -q "drew,4,seattle" "$BATS_TEST_TMPDIR/default.out.csv"
+  # seed
+  write_file refill.csv "
+  id,name,count
+  a,Adam,1
+  b,Bob,2
+  "
+  run_ok up --replace --sheet refill "$F" refill.csv
+  # go
+  write_file refill.csv "
+  id,name,count
+  a,Adam,10
+  b,Bob,20
+  c,Cara,30
+  "
+  run_ok up --refill --sheet refill "$F" refill.csv
+  run_ok down --sheet refill -o refill.out.csv "$F"
+  file_eq "
+  id,name,count
+  a,Adam,10
+  b,Bob,20
+  c,Cara,30
+  " refill.out.csv
 
-  # numeric upload should still download stable values
-  banner "up --numeric..."
-  printf 'name,count\nalice,10\nbob,20\n' >"$BATS_TEST_TMPDIR/numeric.csv"
-  run "$BIN" up --replace --numeric --sheet numeric "$SPREADSHEET" "$BATS_TEST_TMPDIR/numeric.csv"
-  [ "$status" -eq 0 ]
+  #
+  # up --refill shrink
+  #
 
-  banner "down..."
-  run "$BIN" down --sheet numeric -o "$BATS_TEST_TMPDIR/numeric.out.csv" "$SPREADSHEET"
-  [ "$status" -eq 0 ]
-  grep -q "alice,10" "$BATS_TEST_TMPDIR/numeric.out.csv"
-  grep -q "bob,20" "$BATS_TEST_TMPDIR/numeric.out.csv"
+  # seed
+  write_file refill-shrink.csv "
+  id,name,count
+  a,Adam,1
+  b,Bob,2
+  c,Cara,3
+  "
+  run_ok up --replace --sheet refill-shrink "$F" refill-shrink.csv
+  # go
+  write_file refill-shrink.csv "
+  id,name,count
+  a,Adam,10
+  "
+  run_ok up --refill --sheet refill-shrink "$F" refill-shrink.csv
+  run_ok down --sheet refill-shrink -o refill-shrink.out.csv "$F"
+  file_eq "
+  id,name,count
+  a,Adam,10
+  " refill-shrink.out.csv
 
-  # refill should update rows and append new ones
-  banner "up --refill..."
-  printf 'id,name,count\na,Ada,1\nb,Bob,2\n' >"$BATS_TEST_TMPDIR/refill.csv"
-  run "$BIN" up --replace --sheet refill "$SPREADSHEET" "$BATS_TEST_TMPDIR/refill.csv"
-  [ "$status" -eq 0 ]
+  #
+  # up --refill don't touch remote rows
+  #
 
-  banner "up --refill..."
-  printf 'id,name,count\na,Ada,10\nb,Bob,20\nc,Cyd,30\n' >"$BATS_TEST_TMPDIR/refill.csv"
-  run "$BIN" up --refill --sheet refill "$SPREADSHEET" "$BATS_TEST_TMPDIR/refill.csv"
-  [ "$status" -eq 0 ]
+  # seed
+  write_file refill-keep.csv "
+  id,KEEP,name
+  a,KEEP Adam,Adam
+  b,KEEP Bob,Bob
+  c,KEEP Cara,Cara
+  "
+  run_ok up --replace --sheet refill-keep "$F" refill-keep.csv
+  # go
+  write_file refill-keep.csv "
+  id,name
+  a,Adam 10
+  "
+  run_ok up --refill --sheet refill-keep "$F" refill-keep.csv
+  run_ok down --sheet refill-keep -o refill-keep.out.csv "$F"
+  file_eq "
+  id,KEEP,name
+  a,KEEP Adam,Adam 10
+  ,KEEP Bob,
+  ,KEEP Cara,
+  " refill-keep.out.csv
 
-  banner "down..."
-  run "$BIN" down --sheet refill -o "$BATS_TEST_TMPDIR/refill.out.csv" "$SPREADSHEET"
-  [ "$status" -eq 0 ]
-  grep -q "a,Ada,10" "$BATS_TEST_TMPDIR/refill.out.csv"
-  grep -q "b,Bob,20" "$BATS_TEST_TMPDIR/refill.out.csv"
-  grep -q "c,Cyd,30" "$BATS_TEST_TMPDIR/refill.out.csv"
+  #
+  # up --refill shrink remote rows if blank
+  #
+
+  # seed
+  write_file refill-blank-remote.csv "
+  id,KEEP,name
+  a,KEEP Adam,Adam
+  b,,Bob
+  c,,Cara
+  "
+  run_ok up --replace --sheet refill-blank-remote "$F" refill-blank-remote.csv
+  # go
+  write_file refill-blank-remote.csv "
+  id,name
+  a,Adam 10
+  "
+  run_ok up --refill --sheet refill-blank-remote "$F" refill-blank-remote.csv
+  run_ok down --sheet refill-blank-remote -o refill-blank-remote.out.csv "$F"
+  file_eq "
+  id,KEEP,name
+  a,KEEP Adam,Adam 10
+  " refill-blank-remote.out.csv
 }

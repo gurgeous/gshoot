@@ -145,7 +145,7 @@ func (p *Progress) SayListedSpreadsheets(n int) {
 //
 
 func (p *Progress) SayFetchSpreadsheet(spreadsheet string) {
-	p.set(fmt.Sprintf("fetching spreadsheet file %s...", Brand.Render(spreadsheet)))
+	p.set(fmt.Sprintf("examining spreadsheet file %s...", Brand.Render(spreadsheet)))
 }
 
 func (p *Progress) SayFindSpreadsheet(spreadsheet string) {

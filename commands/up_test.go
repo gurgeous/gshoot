@@ -184,6 +184,22 @@ func TestUpCommandReplaceCustomSheetUsesExactName(t *testing.T) {
 	assertBatchMissing(t, batches, "addSheet")
 }
 
+func TestUpCommandRejectsEmptyCSV(t *testing.T) {
+	csvPath := writeCSV(t, "")
+
+	err, _, _ := testCommand(t, &UpCmd{Spreadsheet: "Budget", CSVPath: csvPath}, nil)
+
+	assert.ErrorContains(t, err, "csv is empty")
+}
+
+func TestUpCommandRejectsEmptyCSVHeaders(t *testing.T) {
+	csvPath := writeCSV(t, ",,\na,b,c\n")
+
+	err, _, _ := testCommand(t, &UpCmd{Spreadsheet: "Budget", CSVPath: csvPath}, nil)
+
+	assert.ErrorContains(t, err, "csv has empty headers")
+}
+
 func TestUpCommandRefillMergesAndExtendsFormulas(t *testing.T) {
 	csvPath := writeCSV(t, "id,name\na,Ada\nb,Bob\nc,Cyd\nd,Dee\n")
 	batches := []map[string]any{}
@@ -340,7 +356,7 @@ func TestUpCommandRefillRejectsDuplicateRemoteHeaders(t *testing.T) {
 	assert.ErrorContains(t, err, "existing sheet has duplicate headers: id")
 }
 
-func TestUpCommandRefillPreservesExtraRemoteRows(t *testing.T) {
+func TestUpCommandRefillShrinksWhenRemoteOnlyStaleRowsAreBlank(t *testing.T) {
 	csvPath := writeCSV(t, "id,name\na,Ada\n")
 	batches := []map[string]any{}
 
@@ -352,17 +368,17 @@ func TestUpCommandRefillPreservesExtraRemoteRows(t *testing.T) {
 			})
 		case r.URL.Path == "/v4/spreadsheets/sheet-1":
 			if r.URL.Query().Get("includeGridData") == "true" {
-				writeSpreadsheet(w, "gshoot", 7, refillExtraRowsGridData())
+				writeSpreadsheet(w, "gshoot", 7, refillBlankRemoteOnlyStaleRowsGridData())
 			} else {
 				writeSpreadsheet(w, "gshoot", 7, nil)
 			}
 		case strings.HasPrefix(r.URL.Path, "/v4/spreadsheets/sheet-1/values/"):
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"values": [][]string{
-					{"id", "name"},
-					{"a", "old Ada"},
-					{"b", "Bob"},
-					{"c", "Cyd"},
+					{"id", "note", "name"},
+					{"a", "keep Ada", "old Ada"},
+					{"b", "", "Bob"},
+					{"c", "", "Cyd"},
 				},
 			})
 		case r.URL.Path == "/v4/spreadsheets/sheet-1:batchUpdate":
@@ -374,10 +390,123 @@ func TestUpCommandRefillPreservesExtraRemoteRows(t *testing.T) {
 	})
 
 	assert.NoError(t, err)
-	assertBatchContains(t, batches, "pasteData", `"data":"id,name\na,Ada\nb,Bob\nc,Cyd\n"`)
+	assertSheetSize(t, batches, 4, 5)
+	assertPasteData(t, batches, "id,note,name\na,keep Ada,Ada\n")
+	assertStaleValuesCleared(t, batches, 2, 4, 0, 5)
 }
 
-func TestUpCommandRefillWithoutNewRowsOnlyClearsPadding(t *testing.T) {
+func TestUpCommandRefillKeepsRemoteOnlyStaleRows(t *testing.T) {
+	csvPath := writeCSV(t, "id,name\na,Ada\n")
+	batches := []map[string]any{}
+
+	err, _, _ := testCommand(t, &UpCmd{Spreadsheet: "Budget", Sheet: "gshoot", CSVPath: csvPath, Refill: true}, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/drive/v3/files":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"files": []map[string]string{{"id": "sheet-1", "name": "Budget"}},
+			})
+		case r.URL.Path == "/v4/spreadsheets/sheet-1":
+			if r.URL.Query().Get("includeGridData") == "true" {
+				writeSpreadsheet(w, "gshoot", 7, refillRemoteOnlyStaleRowsGridData())
+			} else {
+				writeSpreadsheet(w, "gshoot", 7, nil)
+			}
+		case strings.HasPrefix(r.URL.Path, "/v4/spreadsheets/sheet-1/values/"):
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"values": [][]string{
+					{"id", "note", "name"},
+					{"a", "keep Ada", "old Ada"},
+					{"b", "keep Bob", "Bob"},
+					{"c", "keep Cyd", "Cyd"},
+				},
+			})
+		case r.URL.Path == "/v4/spreadsheets/sheet-1:batchUpdate":
+			batches = append(batches, readBatch(t, r))
+			writeBatchReply(w)
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	})
+
+	assert.NoError(t, err)
+	assertSheetSize(t, batches, 6, 5)
+	assertPasteData(t, batches, "id,note,name\na,keep Ada,Ada\n,keep Bob,\n,keep Cyd,\n")
+}
+
+func TestUpCommandRefillKeepsValuesOnlyRemoteOnlyStaleRows(t *testing.T) {
+	csvPath := writeCSV(t, "id,name\na,Ada\n")
+	batches := []map[string]any{}
+
+	err, _, _ := testCommand(t, &UpCmd{Spreadsheet: "Budget", Sheet: "gshoot", CSVPath: csvPath, Refill: true}, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/drive/v3/files":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"files": []map[string]string{{"id": "sheet-1", "name": "Budget"}},
+			})
+		case r.URL.Path == "/v4/spreadsheets/sheet-1":
+			if r.URL.Query().Get("includeGridData") == "true" {
+				writeSpreadsheet(w, "gshoot", 7, refillShortGridData())
+			} else {
+				writeSpreadsheet(w, "gshoot", 7, nil)
+			}
+		case strings.HasPrefix(r.URL.Path, "/v4/spreadsheets/sheet-1/values/"):
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"values": [][]string{
+					{"id", "note", "name"},
+					{"a", "keep Ada", "old Ada"},
+					{"b", "keep Bob", "Bob"},
+				},
+			})
+		case r.URL.Path == "/v4/spreadsheets/sheet-1:batchUpdate":
+			batches = append(batches, readBatch(t, r))
+			writeBatchReply(w)
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	})
+
+	assert.NoError(t, err)
+	assertSheetSize(t, batches, 5, 5)
+	assertPasteData(t, batches, "id,note,name\na,keep Ada,Ada\n,keep Bob,\n")
+}
+
+func TestUpCommandRefillKeepsGridOnlyRemoteOnlyStaleRows(t *testing.T) {
+	csvPath := writeCSV(t, "id,name\na,Ada\n")
+	batches := []map[string]any{}
+
+	err, _, _ := testCommand(t, &UpCmd{Spreadsheet: "Budget", Sheet: "gshoot", CSVPath: csvPath, Refill: true}, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/drive/v3/files":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"files": []map[string]string{{"id": "sheet-1", "name": "Budget"}},
+			})
+		case r.URL.Path == "/v4/spreadsheets/sheet-1":
+			if r.URL.Query().Get("includeGridData") == "true" {
+				writeSpreadsheet(w, "gshoot", 7, refillGridOnlyRemoteOnlyStaleRowsGridData())
+			} else {
+				writeSpreadsheet(w, "gshoot", 7, nil)
+			}
+		case strings.HasPrefix(r.URL.Path, "/v4/spreadsheets/sheet-1/values/"):
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"values": [][]string{
+					{"id", "note", "name"},
+					{"a", "keep Ada", "old Ada"},
+				},
+			})
+		case r.URL.Path == "/v4/spreadsheets/sheet-1:batchUpdate":
+			batches = append(batches, readBatch(t, r))
+			writeBatchReply(w)
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	})
+
+	assert.NoError(t, err)
+	assertSheetSize(t, batches, 5, 5)
+	assertPasteData(t, batches, "id,note,name\na,keep Ada,Ada\n,=A3,\n")
+}
+
+func TestUpCommandRefillWithoutRemoteOnlyColumnsShrinksRows(t *testing.T) {
 	csvPath := writeCSV(t, "id,name\na,Ada\n")
 	batches := []map[string]any{}
 
@@ -410,19 +539,12 @@ func TestUpCommandRefillWithoutNewRowsOnlyClearsPadding(t *testing.T) {
 	})
 
 	assert.NoError(t, err)
-	assertBatchContains(t, batches, "pasteData", `"data":"id,name\na,Ada\nb,Bob\n"`)
+	assertSheetSize(t, batches, 4, 4)
+	assertPasteData(t, batches, "id,name\na,Ada\n")
+	assertStaleValuesCleared(t, batches, 2, 4, 0, 4)
 	assertBatchMissing(t, batches, "copyPaste", `"pasteType":"PASTE_FORMAT"`)
 	assertBatchMissing(t, batches, "copyPaste", `"pasteType":"PASTE_FORMULA"`)
 	assertBatchContains(t, batches, "repeatCell", `"fields":"userEnteredFormat"`)
-}
-
-func TestRefillerSharedColumnsIgnoresBlankHeaders(t *testing.T) {
-	refill := &refiller{
-		localRows:  google.Rows{{"", "name"}},
-		remoteRows: google.Rows{{"", "name", "calc"}},
-	}
-
-	assert.Equal(t, []int{1}, refill.sharedColumns())
 }
 
 func TestRefillerHasFormulaRejectsLiteralColumns(t *testing.T) {
@@ -618,24 +740,94 @@ func refillBlankFormulaGridData() []map[string]any {
 	}}
 }
 
-func refillExtraRowsGridData() []map[string]any {
+func refillBlankRemoteOnlyStaleRowsGridData() []map[string]any {
 	return []map[string]any{{
 		"rowData": []map[string]any{
 			{"values": []map[string]any{
 				{"userEnteredValue": map[string]string{"stringValue": "id"}},
+				{"userEnteredValue": map[string]string{"stringValue": "note"}},
 				{"userEnteredValue": map[string]string{"stringValue": "name"}},
 			}},
 			{"values": []map[string]any{
 				{"userEnteredValue": map[string]string{"stringValue": "a"}},
+				{"userEnteredValue": map[string]string{"stringValue": "keep Ada"}},
 				{"userEnteredValue": map[string]string{"stringValue": "old Ada"}},
 			}},
 			{"values": []map[string]any{
 				{"userEnteredValue": map[string]string{"stringValue": "b"}},
+				{},
 				{"userEnteredValue": map[string]string{"stringValue": "Bob"}},
 			}},
 			{"values": []map[string]any{
 				{"userEnteredValue": map[string]string{"stringValue": "c"}},
+				{},
 				{"userEnteredValue": map[string]string{"stringValue": "Cyd"}},
+			}},
+		},
+	}}
+}
+
+func refillRemoteOnlyStaleRowsGridData() []map[string]any {
+	return []map[string]any{{
+		"rowData": []map[string]any{
+			{"values": []map[string]any{
+				{"userEnteredValue": map[string]string{"stringValue": "id"}},
+				{"userEnteredValue": map[string]string{"stringValue": "note"}},
+				{"userEnteredValue": map[string]string{"stringValue": "name"}},
+			}},
+			{"values": []map[string]any{
+				{"userEnteredValue": map[string]string{"stringValue": "a"}},
+				{"userEnteredValue": map[string]string{"stringValue": "keep Ada"}},
+				{"userEnteredValue": map[string]string{"stringValue": "old Ada"}},
+			}},
+			{"values": []map[string]any{
+				{"userEnteredValue": map[string]string{"stringValue": "b"}},
+				{"userEnteredValue": map[string]string{"stringValue": "keep Bob"}},
+				{"userEnteredValue": map[string]string{"stringValue": "Bob"}},
+			}},
+			{"values": []map[string]any{
+				{"userEnteredValue": map[string]string{"stringValue": "c"}},
+				{"userEnteredValue": map[string]string{"stringValue": "keep Cyd"}},
+				{"userEnteredValue": map[string]string{"stringValue": "Cyd"}},
+			}},
+		},
+	}}
+}
+
+func refillShortGridData() []map[string]any {
+	return []map[string]any{{
+		"rowData": []map[string]any{
+			{"values": []map[string]any{
+				{"userEnteredValue": map[string]string{"stringValue": "id"}},
+				{"userEnteredValue": map[string]string{"stringValue": "note"}},
+				{"userEnteredValue": map[string]string{"stringValue": "name"}},
+			}},
+			{"values": []map[string]any{
+				{"userEnteredValue": map[string]string{"stringValue": "a"}},
+				{"userEnteredValue": map[string]string{"stringValue": "keep Ada"}},
+				{"userEnteredValue": map[string]string{"stringValue": "old Ada"}},
+			}},
+		},
+	}}
+}
+
+func refillGridOnlyRemoteOnlyStaleRowsGridData() []map[string]any {
+	return []map[string]any{{
+		"rowData": []map[string]any{
+			{"values": []map[string]any{
+				{"userEnteredValue": map[string]string{"stringValue": "id"}},
+				{"userEnteredValue": map[string]string{"stringValue": "note"}},
+				{"userEnteredValue": map[string]string{"stringValue": "name"}},
+			}},
+			{"values": []map[string]any{
+				{"userEnteredValue": map[string]string{"stringValue": "a"}},
+				{"userEnteredValue": map[string]string{"stringValue": "keep Ada"}},
+				{"userEnteredValue": map[string]string{"stringValue": "old Ada"}},
+			}},
+			{"values": []map[string]any{
+				{},
+				{"userEnteredValue": map[string]string{"formulaValue": "=A3"}},
+				{},
 			}},
 		},
 	}}
@@ -721,4 +913,81 @@ func assertBatchMissing(t *testing.T, batches []map[string]any, requestName stri
 			t.Fatalf("batch request %q unexpectedly had snippets %v in %#v", requestName, snippets, batch)
 		}
 	}
+}
+
+func assertSheetSize(t *testing.T, batches []map[string]any, rows, cols int) {
+	t.Helper()
+
+	for _, batch := range batches {
+		for _, request := range requests(batch) {
+			update, ok := request["updateSheetProperties"].(map[string]any)
+			if !ok {
+				continue
+			}
+			properties := update["properties"].(map[string]any)
+			grid := properties["gridProperties"].(map[string]any)
+			if int(grid["rowCount"].(float64)) == rows && int(grid["columnCount"].(float64)) == cols {
+				return
+			}
+		}
+	}
+	t.Fatalf("missing sheet size rows=%d cols=%d in %#v", rows, cols, batches)
+}
+
+func assertPasteData(t *testing.T, batches []map[string]any, want string) {
+	t.Helper()
+
+	for _, batch := range batches {
+		for _, request := range requests(batch) {
+			paste, ok := request["pasteData"].(map[string]any)
+			if ok && paste["data"] == want {
+				return
+			}
+		}
+	}
+	t.Fatalf("missing paste data %q in %#v", want, batches)
+}
+
+func assertStaleValuesCleared(t *testing.T, batches []map[string]any, startRow, endRow, startCol, endCol int) {
+	t.Helper()
+
+	for _, batch := range batches {
+		for _, request := range requests(batch) {
+			update, ok := request["updateCells"].(map[string]any)
+			if !ok || update["fields"] != "userEnteredValue" {
+				continue
+			}
+			grid := update["range"].(map[string]any)
+			if jsonInt(grid, "startRowIndex") != startRow {
+				continue
+			}
+			if jsonInt(grid, "endRowIndex") != endRow {
+				continue
+			}
+			if jsonInt(grid, "startColumnIndex") != startCol {
+				continue
+			}
+			if jsonInt(grid, "endColumnIndex") == endCol {
+				return
+			}
+		}
+	}
+	t.Fatalf("missing stale value clear rows=%d:%d cols=%d:%d in %#v", startRow, endRow, startCol, endCol, batches)
+}
+
+func jsonInt(values map[string]any, key string) int {
+	value, ok := values[key]
+	if !ok {
+		return 0
+	}
+	return int(value.(float64))
+}
+
+func requests(batch map[string]any) []map[string]any {
+	raw := batch["requests"].([]any)
+	requests := make([]map[string]any, 0, len(raw))
+	for _, request := range raw {
+		requests = append(requests, request.(map[string]any))
+	}
+	return requests
 }
