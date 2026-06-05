@@ -8,6 +8,7 @@
 ## Project
 
 - After any non-Markdown change, run `just check`
+- For `testdata/live.bats`-only edits, skip `just check` unless asked
 - Use `just format` instead of `gofmt` directly
 - If user-facing text changes, ask before reverting it; usually fix tests instead
 - Use `mv` for file moves/renames; use patches for content edits
