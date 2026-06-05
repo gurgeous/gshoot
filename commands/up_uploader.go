@@ -170,10 +170,7 @@ func (s *uploader) prepareRefiller() (*refiller, error) {
 	if err != nil {
 		return nil, err
 	}
-	s.rows, err = refill.mergedRows()
-	if err != nil {
-		return nil, err
-	}
+	s.rows = refill.pasteRows()
 	return refill, nil
 }
 

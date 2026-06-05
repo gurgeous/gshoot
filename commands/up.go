@@ -35,6 +35,9 @@ func (c *UpCmd) Run() (err error) {
 	if err != nil {
 		return err
 	}
+	if err := validateHeaders(rows[0], "csv"); err != nil {
+		return err
+	}
 
 	// upload
 	file, err := c.run0(google.Rows(rows))
