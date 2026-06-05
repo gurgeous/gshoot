@@ -398,7 +398,7 @@ func validateHeaders(headers []string, label string) error {
 		}
 	}
 	if len(counts) == 0 {
-		return fmt.Errorf("%s has empty headers", label)
+		return fmt.Errorf("%s has no headers", label)
 	}
 	duplicates := []string{}
 	for header, count := range counts {

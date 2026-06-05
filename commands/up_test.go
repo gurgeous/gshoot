@@ -197,7 +197,7 @@ func TestUpCommandRejectsEmptyCSVHeaders(t *testing.T) {
 
 	err, _, _ := testCommand(t, &UpCmd{Spreadsheet: "Budget", CSVPath: csvPath}, nil)
 
-	assert.ErrorContains(t, err, "csv has empty headers")
+	assert.ErrorContains(t, err, "csv has no headers")
 }
 
 func TestUpCommandRefillMergesAndExtendsFormulas(t *testing.T) {
