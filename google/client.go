@@ -329,6 +329,9 @@ func (c *Client) reqJSON(ctx context.Context, baseURL string, method string, pat
 	}
 	res, err := c.httpClient.Do(req)
 	if err != nil {
+		if auth.IsInvalidGrant(err) {
+			return auth.ErrLoginExpired
+		}
 		return err
 	}
 	defer res.Body.Close()
