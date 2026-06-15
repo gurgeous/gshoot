@@ -11,7 +11,7 @@ import (
 // Helpers for turning OAuth failures into user-facing auth guidance.
 //
 
-var ErrLoginExpired = errors.New("Your Google login has expired. You'll need to log in again.\nhint: run `gshoot auth login` to log in again")
+var ErrLoginExpired = errors.New("Your Google login has expired. These usually only last a week. You'll need to log in again.\nhint: run `gshoot auth login` to log in again")
 
 // IsInvalidGrant reports whether err came from a revoked or expired refresh token.
 func IsInvalidGrant(err error) bool {
