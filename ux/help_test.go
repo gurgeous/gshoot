@@ -28,7 +28,7 @@ func TestColorizeColorsSectionsCommandsAndFlags(t *testing.T) {
 		"      --sheet=STRING    Destination sheet name.",
 		"",
 		"Commands:",
-		"  auth login     Run browser OAuth login.",
+		"  down           Download a Google Sheet as CSV.",
 	}, "\n") + "\n"
 
 	colored := Restyle(help, helpRules())
@@ -37,7 +37,7 @@ func TestColorizeColorsSectionsCommandsAndFlags(t *testing.T) {
 	assert.Contains(t, colored, Success.Render("Arguments:"))
 	assert.Contains(t, colored, Success.Render("Flags:"))
 	assert.Contains(t, colored, Brand.Render("gshoot")+" up")
-	assert.Contains(t, colored, Brand.Render("auth login"))
+	assert.Contains(t, colored, Brand.Render("down"))
 	assert.Contains(t, colored, Warn.Render("--help"))
 	assert.Contains(t, colored, Warn.Render("--sheet=STRING"))
 	assert.Contains(t, colored, "<spreadsheet>")
@@ -48,9 +48,9 @@ func TestColorizeColorsSectionsCommandsAndFlags(t *testing.T) {
 }
 
 func TestColorHelpLeavesCommandLikeProseAlone(t *testing.T) {
-	colored := Restyle("auth login runs browser OAuth login.\n", helpRules())
+	colored := Restyle("down downloads spreadsheet data.\n", helpRules())
 
-	assert.Equal(t, "auth login runs browser OAuth login.\n", colored)
+	assert.Equal(t, "down downloads spreadsheet data.\n", colored)
 }
 
 func helpRules() []RestyleRule {

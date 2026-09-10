@@ -75,13 +75,14 @@ func newRefiller(u *uploader) (*refiller, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(s.remoteRows) == 0 {
+		s.pasteHeaders = append([]string(nil), s.localHeaders...)
+		s.remoteSheetData = &google.SheetData{}
+		return s, nil
+	}
 	s.remoteHeaders = s.remoteRows[0]
 	if err := validateHeaders(s.remoteHeaders, "existing sheet"); err != nil {
 		return nil, err
-	}
-	if len(s.remoteRows) == 0 {
-		s.pasteHeaders = append([]string(nil), s.localHeaders...)
-		return s, nil
 	}
 
 	// grid data (formulas, filters, formats, etc)

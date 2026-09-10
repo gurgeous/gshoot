@@ -21,7 +21,7 @@ type UpCmd struct {
 	Layout      bool   `help:"Auto-size column width to fit cells."`
 	Numeric     bool   `help:"Format obvious numeric columns."`
 	Open        bool   `help:"Open the sheet URL when done."`
-	Spreadsheet string `arg:"" name:"spreadsheet" help:"Spreadsheet file name."`
+	Spreadsheet string `arg:"" name:"spreadsheet" help:"Spreadsheet name, ID, or URL."`
 	CSVPath     string `arg:"" name:"csv" type:"path" help:"CSV file to upload."`
 }
 

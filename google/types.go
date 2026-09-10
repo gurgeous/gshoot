@@ -38,12 +38,14 @@ type Sheet struct {
 // Spreadsheet is sheet metadata plus optional grid data.
 type Spreadsheet struct {
 	ID     string
+	Title  string
 	Sheets []*Sheet
 	Data   map[int64]*SheetData
 }
 
 type spreadsheetResponse struct {
 	SpreadsheetID string          `json:"spreadsheetId"`
+	Title         string          `json:"title"`
 	Sheets        []sheetResponse `json:"sheets"`
 }
 
@@ -60,8 +62,9 @@ type sheetDataResponse struct {
 
 func (r spreadsheetResponse) spreadsheet() *Spreadsheet {
 	spreadsheet := &Spreadsheet{
-		ID:   r.SpreadsheetID,
-		Data: map[int64]*SheetData{},
+		ID:    r.SpreadsheetID,
+		Title: r.Title,
+		Data:  map[int64]*SheetData{},
 	}
 	for _, item := range r.Sheets {
 		if item.Properties != nil {

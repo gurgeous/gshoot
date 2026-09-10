@@ -1,74 +1,55 @@
 #!/usr/bin/env bats
 
-# setup hook
 setup() {
   ROOT="$BATS_TEST_DIRNAME/.."
   BIN="$ROOT/bin/gshoot"
-  export HOME="$BATS_TEST_TMPDIR/home"
-  export GSHOOT_SMOKE=true
-  mkdir -p "$HOME"
 }
 
-#
-# helpers
-#
-
-login() {
-  "$BIN" auth login --client-secret "$ROOT/testdata/oauth-client.json" >/dev/null
-}
-
-#
-# tests
-#
-
-@test "welcome" {
+@test "bare command shows help" {
   run "$BIN"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"welcome"* ]]
-  [[ "$output" == *"gshoot auth status"* ]]
+  [[ "$output" == *"Commands:"* ]]
+  [[ "$output" == *"up"* ]]
+  [[ "$output" != *"auth login"* ]]
+  [[ "$output" != *"welcome"* ]]
 }
 
-@test "login (no secrets)" {
-  run "$BIN" auth login
+@test "help describes spreadsheet references" {
+  run "$BIN" down --help
   [ "$status" -eq 0 ]
-  [[ "$output" == *"gshoot auth status"* ]]
-  [[ "$output" == *"client secrets file"* ]]
-  [ ! -f "$HOME/.config/gshoot/oauth-token.json" ]
+  [[ "$output" == *"Spreadsheet name, ID, or URL."* ]]
 }
 
-@test "login --client-secret" {
-  run "$BIN" auth login --client-secret "$ROOT/testdata/oauth-client.json"
+@test "command aliases" {
+  run "$BIN" d --help
   [ "$status" -eq 0 ]
-  [[ "$output" == *"token copied"* ]]
-  [ -f "$HOME/.config/gshoot/oauth-client.json" ]
-  [ -f "$HOME/.config/gshoot/oauth-token.json" ]
-}
+  [[ "$output" == *"down (d)"* ]]
 
-@test "auth status" {
-  login
-  run "$BIN" auth status
+  run "$BIN" u --help
   [ "$status" -eq 0 ]
-  [[ "$output" == *"Client secrets file:"* ]]
-  [[ "$output" == *"Token file:"* ]]
+  [[ "$output" == *"up (u)"* ]]
+
+  run "$BIN" ls --help
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"list (ls)"* ]]
 }
 
-@test "no auth - show status" {
-  run "$BIN" list
-  [[ "$output" == *"you must authenticate first"* ]]
-  run "$BIN" down smoke
-  [[ "$output" == *"you must authenticate first"* ]]
-  run "$BIN" up smoke bogus.csv
-  [[ "$output" == *"you must authenticate first"* ]]
+@test "missing gog has an actionable error" {
+  run env PATH=/nonexistent "$BIN" list
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"gog is required"* ]]
+  [[ "$output" == *"openclaw/tap/gogcli"* ]]
 }
 
-@test "no token - show status" {
-  login
-  rm "$HOME/.config/gshoot/oauth-token.json"
-
-  run "$BIN" list
-  [[ "$output" == *"complete \`gshoot auth login\` first"* ]]
-  run "$BIN" down smoke
-  [[ "$output" == *"complete \`gshoot auth login\` first"* ]]
-  run "$BIN" up smoke bogus.csv
-  [[ "$output" == *"complete \`gshoot auth login\` first"* ]]
+@test "zsh completion lists spreadsheet commands" {
+  run zsh -fc '
+    function compdef() {}
+    function _arguments() { state=command; return 1 }
+    function _describe() { print -rl -- "${commands[@]}" }
+    source '"$ROOT"'/extra/_gshoot
+    _gshoot
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"up:Upload a CSV"* ]]
+  [[ "$output" != *"auth:"* ]]
 }

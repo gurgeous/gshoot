@@ -59,7 +59,7 @@
 - Do not reuse old deps just because they appear in sibling repos
 - `../vectro`, `../gohttpdisk`, and `../old_iconmap` are style/tooling references only
 - Re-evaluate current options before choosing deps
-- Keep the dependency graph small, use `golang.org/x/oauth2` unless clear reason not to
+- Keep the dependency graph small; Google API access goes through `gog`
 
 ## Tests
 

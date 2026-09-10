@@ -69,11 +69,11 @@ normalize_file() {
 #
 
 @test 'live google workflow (takes around 45s)' {
-  # verify auth before touching the scratch spreadsheet
+  # verify gog auth before touching the scratch spreadsheet
   banner "preflight w/ list..."
   run "$BIN" list
   if [ "$status" -ne 0 ]; then
-    echo "run gshoot auth login first" >&3
+    echo "configure gog auth first" >&3
     printf '%s\n' "$output" >&3
     return 1
   fi

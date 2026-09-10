@@ -3,52 +3,10 @@ package util
 import (
 	"os"
 	"path/filepath"
-	"regexp"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
-
-func TestWritePrivateFile(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "nested", "secret.txt")
-	if err := WritePrivateFile(path, []byte("top secret\n")); err != nil {
-		t.Fatalf("WritePrivateFile() error = %v", err)
-	}
-
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("ReadFile() error = %v", err)
-	}
-	if got, want := string(data), "top secret\n"; got != want {
-		t.Fatalf("file contents = %q, want %q", got, want)
-	}
-
-	info, err := os.Stat(path)
-	if err != nil {
-		t.Fatalf("Stat() error = %v", err)
-	}
-	if got, want := info.Mode().Perm(), os.FileMode(0o600); got != want {
-		t.Fatalf("file mode = %#o, want %#o", got, want)
-	}
-}
-
-func TestConfigDirUsesHomeDotConfig(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "ignored"))
-
-	assert.Equal(t, filepath.Join(home, ".config", "gshoot"), ConfigDir())
-}
-
-func TestRandomHex(t *testing.T) {
-	got := RandomHex(16)
-	if len(got) != 32 {
-		t.Fatalf("len(RandomHex()) = %d, want 32", len(got))
-	}
-	if !regexp.MustCompile(`^[0-9a-f]+$`).MatchString(got) {
-		t.Fatalf("RandomHex() = %q, want lowercase hex", got)
-	}
-}
 
 func TestFormatInt(t *testing.T) {
 	assert.Equal(t, "0", FormatInt(0))

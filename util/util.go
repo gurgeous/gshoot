@@ -3,15 +3,11 @@ package util
 import (
 	"bufio"
 	"cmp"
-	"crypto/rand"
 	"encoding/csv"
-	"encoding/hex"
 	"fmt"
-	"image"
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"regexp"
 	"runtime"
 	"strconv"
@@ -40,61 +36,8 @@ func Clamp[T cmp.Ordered](v, lo, hi T) T {
 }
 
 //
-// shell
-//
-
-// FileExists reports whether path exists.
-func FileExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
-}
-
-// WritePrivateFile atomically writes data to path with 0600 permissions.
-func WritePrivateFile(path string, data []byte) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return err
-	}
-	tmp, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".tmp-*")
-	if err != nil {
-		return err
-	}
-	tmpPath := tmp.Name()
-	defer os.Remove(tmpPath)
-
-	if _, err := tmp.Write(data); err != nil {
-		_ = tmp.Close()
-		return err
-	}
-	if err := tmp.Chmod(0o600); err != nil {
-		_ = tmp.Close()
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		return err
-	}
-	return os.Rename(tmpPath, path)
-}
-
-//
 // terminal
 //
-
-// EnterRawMode enters stdin raw mode and switches stdout to alt screen.
-func EnterRawMode() (func(), error) {
-	oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
-	if err != nil {
-		return nil, err
-	}
-	fmt.Fprint(os.Stdout, ansi.SetModeAltScreenSaveCursor, ansi.EraseEntireScreen, ansi.ResetModeTextCursorEnable)
-
-	cleanup := func() {
-		fmt.Fprint(os.Stdout, ansi.ResetModeSynchronizedOutput)
-		fmt.Fprint(os.Stdout, ansi.ResetStyle, ansi.SetModeTextCursorEnable, ansi.ResetModeAltScreenSaveCursor)
-		_ = term.Restore(int(os.Stdin.Fd()), oldState)
-	}
-
-	return cleanup, nil
-}
 
 // SetCursorVisible shows or hides the terminal cursor.
 func SetCursorVisible(w io.Writer, visible bool) {
@@ -139,15 +82,6 @@ func Confirm(prompt string) {
 func IsTty(w io.Writer) bool {
 	file, ok := w.(*os.File)
 	return ok && term.IsTerminal(int(file.Fd()))
-}
-
-// TerminalSize returns the current stdout size or the fallback.
-func TerminalSize(fallback image.Point) image.Point {
-	termW, termH, err := term.GetSize(int(os.Stdout.Fd()))
-	if err != nil {
-		return fallback
-	}
-	return image.Pt(termW, termH)
 }
 
 //
@@ -287,30 +221,12 @@ func CSVString(rows [][]string) string {
 // misc
 //
 
-// ConfigDir returns the gshoot config directory.
-func ConfigDir() string {
-	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".config", "gshoot")
-}
-
 // OpenBrowserURL opens rawURL in the default browser for the current OS.
 // There's no point to returning an error IMO, this can fail brutally on headless
 // machines.
 func OpenBrowserURL(url string) {
 	name, args := browserCommandArgs(runtime.GOOS, url)
 	_ = exec.Command(name, args...).Start()
-}
-
-// RandomHex returns a lowercase hex string with n bytes worth of characters.
-func RandomHex(n int) string {
-	if n <= 0 {
-		return ""
-	}
-	var buf strings.Builder
-	for buf.Len() < n*2 {
-		buf.WriteString(hex.EncodeToString([]byte(rand.Text())))
-	}
-	return buf.String()[:n*2]
 }
 
 // SpreadsheetURL builds a Google Sheets URL from an ID.

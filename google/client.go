@@ -3,129 +3,138 @@ package google
 import (
 	"bytes"
 	"context"
+	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"net/url"
+	"os/exec"
+	"slices"
+	"strconv"
 	"strings"
 
-	"github.com/gurgeous/gshoot/auth"
 	"github.com/gurgeous/gshoot/util"
 )
 
 //
-// Small Google Drive and Sheets API client. I didn't want to use the standard
-// Google API lib because it adds 10mb to our binary. This was not super hard to
-// embed.
+// Google Sheets operations implemented through the gog command-line client.
 //
-
-const spreadsheetMimeType = "application/vnd.google-apps.spreadsheet"
 
 const (
-	driveBaseURL  = "https://www.googleapis.com"
-	sheetsBaseURL = "https://sheets.googleapis.com"
+	sheetsCommand       = "sheets"
+	spreadsheetMimeType = "application/vnd.google-apps.spreadsheet"
 )
 
-//
-// Google API client
-//
-
 type Client struct {
-	httpClient    *http.Client
-	driveBaseURL  string
-	sheetsBaseURL string
+	gog string
 }
 
-// NewClient creates a Google API client with saved auth.
-func NewClient(ctx context.Context) (*Client, error) {
-	manager, err := auth.NewManager()
+// NewClient locates gog. gog owns authentication and account selection.
+func NewClient(_ context.Context) (*Client, error) {
+	path, err := exec.LookPath("gog")
 	if err != nil {
-		return nil, err
+		return nil, errors.New("gog is required; install it with `brew install openclaw/tap/gogcli`")
 	}
-	httpClient, err := manager.HTTPClient(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return &Client{
-		httpClient:    httpClient,
-		driveBaseURL:  driveBaseURL,
-		sheetsBaseURL: sheetsBaseURL,
-	}, nil
+	return &Client{gog: path}, nil
 }
 
-//
-// Spreadsheet file operations
-//
-
-// CreateSpreadsheetFile creates a Google Sheets file.
-// https://developers.google.com/drive/api/reference/rest/v3/files/create
 func (c *Client) CreateSpreadsheetFile(ctx context.Context, name string) (*File, error) {
-	q := url.Values{}
-	q.Set("fields", "id,name")
-
-	body := File{
-		Name:     name,
-		MimeType: spreadsheetMimeType,
+	var out struct {
+		ID   string `json:"spreadsheetId"`
+		Name string `json:"title"`
 	}
-	var res File
-	if err := c.driveReqJSON(ctx, http.MethodPost, "/drive/v3/files", q, body, &res); err != nil {
+	if err := c.runJSON(ctx, nil, &out, sheetsCommand, "create", name); err != nil {
 		return nil, err
 	}
-	return &res, nil
+	return &File{ID: out.ID, Name: out.Name, MimeType: spreadsheetMimeType}, nil
 }
 
-// FindSpreadsheetFile returns the most recent spreadsheet with this exact name.
-func (c *Client) FindSpreadsheetFile(ctx context.Context, name string) (*File, error) {
-	items, err := c.search(ctx, fmt.Sprintf("name = '%s'", driveQueryString(name)), 1)
-	if err != nil {
-		return nil, err
+// FindSpreadsheetFile accepts a spreadsheet name, ID, or URL.
+func (c *Client) FindSpreadsheetFile(ctx context.Context, ref string) (*File, error) {
+	if strings.Contains(ref, "://") {
+		id := spreadsheetID(ref)
+		if id == "" {
+			return nil, fmt.Errorf("invalid Google Sheets URL %q", ref)
+		}
+		spreadsheet, err := c.GetSpreadsheet(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		return &File{ID: id, Name: spreadsheet.Title, MimeType: spreadsheetMimeType}, nil
 	}
-	if len(items) == 0 {
-		return nil, nil
+
+	files, err := c.listFiles(ctx, "name = '"+driveQueryString(ref)+"'")
+	if err != nil || len(files) == 0 {
+		if err != nil {
+			return nil, err
+		}
+		id := spreadsheetID(ref)
+		if id == "" {
+			return nil, nil
+		}
+		spreadsheet, err := c.GetSpreadsheet(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		return &File{ID: id, Name: spreadsheet.Title, MimeType: spreadsheetMimeType}, nil
 	}
-	return items[0], nil
+	return files[0], nil
 }
 
-// FindOrCreateSpreadsheetFile returns a spreadsheet with this name, creating one if needed.
-func (c *Client) FindOrCreateSpreadsheetFile(ctx context.Context, name string) (*File, error) {
-	file, err := c.FindSpreadsheetFile(ctx, name)
+func (c *Client) FindOrCreateSpreadsheetFile(ctx context.Context, ref string) (*File, error) {
+	file, err := c.FindSpreadsheetFile(ctx, ref)
 	if err != nil || file != nil {
 		return file, err
 	}
-	return c.CreateSpreadsheetFile(ctx, name)
+	return c.CreateSpreadsheetFile(ctx, ref)
 }
 
-// ListSpreadsheetFiles returns recently modified spreadsheets.
-// https://developers.google.com/workspace/drive/api/reference/rest/v3/files/list
 func (c *Client) ListSpreadsheetFiles(ctx context.Context, limit int) ([]*File, error) {
-	return c.search(ctx, "", limit)
+	files, err := c.listFiles(ctx, "")
+	if err != nil {
+		return nil, err
+	}
+	limit = util.Clamp(limit, 1, 100)
+	return files[:min(limit, len(files))], nil
 }
 
-func (c *Client) search(ctx context.Context, condition string, limit int) ([]*File, error) {
-	if limit <= 0 {
-		limit = 100
-	}
-
+func (c *Client) listFiles(ctx context.Context, condition string) ([]*File, error) {
 	query := fmt.Sprintf("mimeType='%s' and trashed=false", spreadsheetMimeType)
 	if condition != "" {
 		query += " and " + condition
 	}
 
-	q := url.Values{}
-	q.Set("q", query)
-	q.Set("orderBy", "modifiedByMeTime desc, name")
-	q.Set("pageSize", fmt.Sprint(limit))
-	q.Set("fields", "files(id,name,modifiedByMeTime)")
-
-	var res struct {
-		Files []*File `json:"files"`
+	files := []*File{}
+	page := ""
+	for {
+		var out struct {
+			Files         []*File `json:"files"`
+			NextPageToken string  `json:"nextPageToken"`
+		}
+		args := []string{
+			"drive", "ls", "--all", "--max", "1000", "--query", query,
+			"--fields", "nextPageToken,files(id,name,mimeType,modifiedByMeTime)",
+		}
+		if page != "" {
+			args = append(args, "--page", page)
+		}
+		if err := c.runJSON(ctx, nil, &out, args...); err != nil {
+			return nil, err
+		}
+		files = append(files, out.Files...)
+		page = out.NextPageToken
+		if page == "" {
+			break
+		}
 	}
-	if err := c.driveReq(ctx, "/drive/v3/files", q, &res); err != nil {
-		return nil, err
-	}
-	return res.Files, nil
+	slices.SortStableFunc(files, func(a, b *File) int {
+		if n := strings.Compare(b.ModifiedByMeTime, a.ModifiedByMeTime); n != 0 {
+			return n
+		}
+		return strings.Compare(a.Name, b.Name)
+	})
+	return files, nil
 }
 
 func driveQueryString(s string) string {
@@ -133,226 +142,392 @@ func driveQueryString(s string) string {
 	return strings.ReplaceAll(s, `'`, `\'`)
 }
 
-//
-// Spreadsheet operations
-//
-
-// GetSpreadsheet returns spreadsheet metadata.
-// https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets/get
-func (c *Client) GetSpreadsheet(ctx context.Context, spreadsheetID string) (*Spreadsheet, error) {
-	return c.getSpreadsheet(ctx, spreadsheetID, false)
+func spreadsheetID(ref string) string {
+	ref = strings.TrimSpace(ref)
+	if u, err := url.Parse(ref); err == nil && strings.EqualFold(u.Host, "docs.google.com") {
+		parts := strings.Split(strings.Trim(u.Path, "/"), "/")
+		for i := 0; i+1 < len(parts); i++ {
+			if parts[i] == "d" {
+				return parts[i+1]
+			}
+		}
+	}
+	if len(ref) >= 20 && !strings.ContainsAny(ref, " ./") {
+		return ref
+	}
+	return ""
 }
 
-// GetSpreadsheetWithGridData returns spreadsheet metadata plus grid data for ranges.
-// https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets/get
-func (c *Client) GetSpreadsheetWithGridData(ctx context.Context, spreadsheetID string, ranges ...string) (*Spreadsheet, error) {
-	return c.getSpreadsheet(ctx, spreadsheetID, true, ranges...)
+func (c *Client) GetSpreadsheet(ctx context.Context, id string) (*Spreadsheet, error) {
+	return c.getSpreadsheet(ctx, id, false)
 }
 
-// WipeSpreadsheet replaces all existing sheets with one blank Sheet1.
-func (c *Client) WipeSpreadsheet(ctx context.Context, spreadsheetID string) error {
-	spreadsheet, err := c.GetSpreadsheet(ctx, spreadsheetID)
+func (c *Client) GetSpreadsheetWithGridData(ctx context.Context, id string, _ ...string) (*Spreadsheet, error) {
+	return c.getSpreadsheet(ctx, id, true)
+}
+
+func (c *Client) getSpreadsheet(ctx context.Context, id string, grid bool) (*Spreadsheet, error) {
+	var out spreadsheetResponse
+	args := []string{sheetsCommand, "metadata", id}
+	if grid {
+		args = []string{sheetsCommand, "raw", id, "--include-grid-data"}
+	}
+	if err := c.runJSON(ctx, nil, &out, args...); err != nil {
+		return nil, err
+	}
+	return out.spreadsheet(), nil
+}
+
+func (c *Client) WipeSpreadsheet(ctx context.Context, id string) error {
+	spreadsheet, err := c.GetSpreadsheet(ctx, id)
 	if err != nil {
 		return err
 	}
-
-	requests := []Request{}
-	for _, sheet := range spreadsheet.Sheets {
-		if strings.EqualFold(sheet.Title, "Sheet1") {
-			requests = append(requests, Request{
-				UpdateSheetProperties: &UpdateSheetPropertiesRequest{
-					Properties: SheetProperties{
-						SheetID: new(sheet.ID),
-						Title:   "gshoot-wipe-" + util.RandomHex(4),
-					},
-					Fields: "title",
-				},
-			})
+	title := "gshoot-wipe"
+	for findSheet(spreadsheet.Sheets, title) != nil {
+		title += "-x"
+	}
+	if sheet := findSheet(spreadsheet.Sheets, "Sheet1"); sheet != nil {
+		if err := c.runJSON(ctx, nil, nil, sheetsCommand, "rename-tab", id, sheet.Title, title); err != nil {
+			return err
 		}
 	}
-	requests = append(requests, Request{
-		AddSheet: &AddSheetRequest{
-			Properties: SheetProperties{
-				Title: "Sheet1",
-				Index: new(0),
-			},
-		},
-	})
-	for _, sheet := range spreadsheet.Sheets {
-		requests = append(requests, Request{
-			DeleteSheet: &DeleteSheetRequest{SheetID: sheet.ID},
-		})
+	if err := c.runJSON(ctx, nil, nil, sheetsCommand, "add-tab", id, "Sheet1", "--index", "0"); err != nil {
+		return err
 	}
-
-	_, err = c.BatchUpdate(ctx, spreadsheetID, requests)
-	return err
+	for _, sheet := range spreadsheet.Sheets {
+		name := sheet.Title
+		if strings.EqualFold(name, "Sheet1") {
+			name = title
+		}
+		if err := c.runJSON(ctx, nil, nil, sheetsCommand, "delete-tab", id, name, "--force"); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-//
-// Sheet operations
-//
-
-// FindSheet returns the sheet with this name, or the first sheet when name is empty.
-func (c *Client) FindSheet(ctx context.Context, spreadsheetID, name string) (*Sheet, error) {
-	items, err := c.GetSheets(ctx, spreadsheetID)
+func (c *Client) FindSheet(ctx context.Context, id, name string) (*Sheet, error) {
+	sheets, err := c.GetSheets(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 	if name == "" {
-		return items[0], nil
-	}
-	for _, item := range items {
-		if strings.EqualFold(item.Title, name) {
-			return item, nil
+		if len(sheets) == 0 {
+			return nil, nil
 		}
+		return sheets[0], nil
 	}
-	return nil, nil
+	return findSheet(sheets, name), nil
 }
 
-// GetSheets returns the sheets (tabs) in a spreadsheet.
-// https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets/get
-func (c *Client) GetSheets(ctx context.Context, spreadsheetID string) ([]*Sheet, error) {
-	spreadsheet, err := c.GetSpreadsheet(ctx, spreadsheetID)
+func findSheet(sheets []*Sheet, name string) *Sheet {
+	for _, sheet := range sheets {
+		if strings.EqualFold(sheet.Title, name) {
+			return sheet
+		}
+	}
+	return nil
+}
+
+func (c *Client) GetSheets(ctx context.Context, id string) ([]*Sheet, error) {
+	spreadsheet, err := c.GetSpreadsheet(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 	return spreadsheet.Sheets, nil
 }
 
-// GetRows returns stringified cell values for a sheet.
-// https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets.values/get
-func (c *Client) GetRows(ctx context.Context, spreadsheetID string, sheetTitle string) (Rows, error) {
-	path := fmt.Sprintf(
-		"/v4/spreadsheets/%s/values/%s",
-		url.PathEscape(spreadsheetID),
-		url.PathEscape(sheetRange(sheetTitle)),
-	)
-
-	var res struct {
+func (c *Client) GetRows(ctx context.Context, id, title string) (Rows, error) {
+	var out struct {
 		Values [][]any `json:"values"`
 	}
-	if err := c.sheetsReq(ctx, path, nil, &res); err != nil {
+	if err := c.runJSON(ctx, nil, &out, sheetsCommand, "get", id, sheetRange(title)); err != nil {
 		return nil, err
 	}
-
-	rows := make([][]string, 0, len(res.Values))
-	for _, row := range res.Values {
+	rows := make([][]string, 0, len(out.Values))
+	for _, row := range out.Values {
 		cells := make([]string, 0, len(row))
 		for _, cell := range row {
 			cells = append(cells, fmt.Sprint(cell))
 		}
 		rows = append(rows, cells)
 	}
-
 	return Rows(util.CSVRectangularize(rows)), nil
 }
 
-// BatchUpdate sends one or more Sheets mutation requests and returns API replies.
-// https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets/batchUpdate
-func (c *Client) BatchUpdate(ctx context.Context, spreadsheetID string, requests []Request) (*BatchUpdateResponse, error) {
-	path := fmt.Sprintf("/v4/spreadsheets/%s:batchUpdate", url.PathEscape(spreadsheetID))
-	body := map[string]any{"requests": requests}
-	var res BatchUpdateResponse
-	if err := c.sheetsReqJSON(ctx, http.MethodPost, path, nil, body, &res); err != nil {
-		return nil, err
-	}
-	return &res, nil
-}
-
-func (c *Client) getSpreadsheet(ctx context.Context, spreadsheetID string, includeGridData bool, ranges ...string) (*Spreadsheet, error) {
-	path := fmt.Sprintf("/v4/spreadsheets/%s", url.PathEscape(spreadsheetID))
-	q := url.Values{}
-	fields := "sheets(properties(sheetId,title,gridProperties))"
-	if includeGridData {
-		fields = "sheets(properties(sheetId,title,gridProperties),basicFilter,data(rowData(values(userEnteredValue)),columnMetadata(pixelSize)))"
-		q.Set("includeGridData", "true")
-	}
-	q.Set("fields", fields)
-	for _, rng := range ranges {
-		q.Add("ranges", rng)
-	}
-
-	var res spreadsheetResponse
-	if err := c.sheetsReq(ctx, path, q, &res); err != nil {
-		return nil, err
-	}
-	return res.spreadsheet(), nil
-}
-
-//
-// low-level req helpers
-//
-
-// driveReq sends a Drive GET request and decodes JSON.
-func (c *Client) driveReq(ctx context.Context, path string, q url.Values, dst any) error {
-	return c.driveReqJSON(ctx, http.MethodGet, path, q, nil, dst)
-}
-
-// driveReqJSON sends a Drive JSON request.
-func (c *Client) driveReqJSON(ctx context.Context, method string, path string, q url.Values, body any, dst any) error {
-	return c.reqJSON(ctx, c.driveBaseURL, method, path, q, body, dst)
-}
-
-// sheetsReq sends a Sheets GET request and decodes JSON.
-func (c *Client) sheetsReq(ctx context.Context, path string, q url.Values, dst any) error {
-	return c.sheetsReqJSON(ctx, http.MethodGet, path, q, nil, dst)
-}
-
-// sheetsReqJSON sends a Sheets JSON request.
-func (c *Client) sheetsReqJSON(ctx context.Context, method string, path string, q url.Values, body any, dst any) error {
-	return c.reqJSON(ctx, c.sheetsBaseURL, method, path, q, body, dst)
-}
-
-// reqJSON sends a JSON request, checks Google errors, and decodes JSON.
-func (c *Client) reqJSON(ctx context.Context, baseURL string, method string, path string, q url.Values, body any, dst any) error {
-	// path+q => url
-	url := strings.TrimRight(baseURL, "/") + path
-	if len(q) > 0 {
-		url += "?" + q.Encode()
-	}
-
-	var bodyReader io.Reader
-	if body != nil {
-		var buf bytes.Buffer
-		if err := json.NewEncoder(&buf).Encode(body); err != nil {
-			return fmt.Errorf("encode Google API request: %w", err)
+// BatchUpdate translates gshoot's narrow request model to named gog commands.
+func (c *Client) BatchUpdate(ctx context.Context, id string, requests []Request) (*BatchUpdateResponse, error) {
+	response := &BatchUpdateResponse{}
+	for _, request := range requests {
+		reply, err := c.applyRequest(ctx, id, request)
+		if err != nil {
+			return nil, err
 		}
-		bodyReader = &buf
+		response.Replies = append(response.Replies, reply)
 	}
+	return response, nil
+}
 
-	req, err := http.NewRequestWithContext(ctx, method, url, bodyReader)
+func (c *Client) applyRequest(ctx context.Context, id string, request Request) (Reply, error) {
+	spreadsheet, err := c.GetSpreadsheet(ctx, id)
 	if err != nil {
-		return err
+		return Reply{}, err
 	}
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
-	res, err := c.httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode < http.StatusOK || res.StatusCode >= http.StatusMultipleChoices {
-		body, _ := io.ReadAll(io.LimitReader(res.Body, 4<<10))
-		msg := strings.TrimSpace(string(body))
-		if msg == "" {
-			msg = res.Status
+	sheetName := func(sheetID int64) (string, error) {
+		for _, sheet := range spreadsheet.Sheets {
+			if sheet.ID == sheetID {
+				return sheet.Title, nil
+			}
 		}
-		return fmt.Errorf("Google API: %s", msg)
+		return "", fmt.Errorf("sheet id %d not found", sheetID)
 	}
 
-	if dst == nil {
-		return nil
+	switch {
+	case request.AddSheet != nil:
+		p := request.AddSheet.Properties
+		args := []string{sheetsCommand, "add-tab", id, p.Title}
+		if p.Index != nil {
+			args = append(args, "--index", strconv.Itoa(*p.Index))
+		}
+		var out struct {
+			SheetID int64 `json:"sheetId"`
+		}
+		if err := c.runJSON(ctx, nil, &out, args...); err != nil {
+			return Reply{}, err
+		}
+		if p.GridProperties != nil {
+			if err := c.resizeGrid(ctx, id, p.Title, p.GridProperties, nil); err != nil {
+				return Reply{}, err
+			}
+		}
+		return Reply{AddSheet: &AddSheetReply{Properties: Sheet{ID: out.SheetID, Title: p.Title}}}, nil
+
+	case request.DeleteSheet != nil:
+		name, err := sheetName(request.DeleteSheet.SheetID)
+		if err != nil {
+			return Reply{}, err
+		}
+		return Reply{}, c.runJSON(ctx, nil, nil, sheetsCommand, "delete-tab", id, name, "--force")
+
+	case request.UpdateSheetProperties != nil:
+		p := request.UpdateSheetProperties.Properties
+		name, err := sheetName(*p.SheetID)
+		if err != nil {
+			return Reply{}, err
+		}
+		if strings.Contains(request.UpdateSheetProperties.Fields, "title") {
+			if err := c.runJSON(ctx, nil, nil, sheetsCommand, "rename-tab", id, name, p.Title); err != nil {
+				return Reply{}, err
+			}
+			name = p.Title
+		}
+		if p.GridProperties != nil {
+			return Reply{}, c.resizeGrid(ctx, id, name, p.GridProperties, findSheet(spreadsheet.Sheets, name))
+		}
+		return Reply{}, nil
+
+	case request.UpdateCells != nil:
+		name, err := sheetName(request.UpdateCells.Range.SheetID)
+		if err != nil {
+			return Reply{}, err
+		}
+		rng := gridRange(name, request.UpdateCells.Range, spreadsheet)
+		if err := c.runJSON(ctx, nil, nil, sheetsCommand, "clear", id, rng); err != nil {
+			return Reply{}, err
+		}
+		if request.UpdateCells.Fields == "*" {
+			for _, args := range [][]string{
+				{sheetsCommand, "format", id, rng, "--format-json", "{}", "--format-fields", "userEnteredFormat"},
+				{sheetsCommand, "validation", "clear", id, rng, "--filtered-rows-included"},
+				{sheetsCommand, "update-note", id, rng, "--note", ""},
+			} {
+				if err := c.runJSON(ctx, nil, nil, args...); err != nil {
+					return Reply{}, err
+				}
+			}
+		}
+		return Reply{}, nil
+
+	case request.PasteData != nil:
+		name, err := sheetName(request.PasteData.Coordinate.SheetID)
+		if err != nil {
+			return Reply{}, err
+		}
+		reader := csv.NewReader(strings.NewReader(request.PasteData.Data))
+		rows, err := reader.ReadAll()
+		if err != nil {
+			return Reply{}, err
+		}
+		data, err := json.Marshal(rows)
+		if err != nil {
+			return Reply{}, err
+		}
+		input := "USER_ENTERED"
+		if request.PasteData.Type == "PASTE_VALUES" {
+			input = "RAW"
+		}
+		cell := a1Cell(name, request.PasteData.Coordinate.RowIndex, request.PasteData.Coordinate.ColumnIndex)
+		return Reply{}, c.runJSON(ctx, bytes.NewReader(data), nil, sheetsCommand, "update", id, cell, "--values-json", "@-", "--input", input)
+
+	case request.SetBasicFilter != nil:
+		filter := request.SetBasicFilter.Filter.Range
+		name, err := sheetName(filter.SheetID)
+		if err != nil {
+			return Reply{}, err
+		}
+		return Reply{}, c.runJSON(ctx, nil, nil, sheetsCommand, "filter", "set", id, gridRange(name, filter, spreadsheet), "--force")
+
+	case request.RepeatCell != nil:
+		repeat := request.RepeatCell
+		name, err := sheetName(repeat.Range.SheetID)
+		if err != nil {
+			return Reply{}, err
+		}
+		rng := gridRange(name, repeat.Range, spreadsheet)
+		if repeat.Cell.UserEnteredFormat != nil && repeat.Cell.UserEnteredFormat.NumberFormat != nil {
+			format := repeat.Cell.UserEnteredFormat.NumberFormat
+			return Reply{}, c.runJSON(ctx, nil, nil, sheetsCommand, "number-format", id, rng, "--type", format.Type, "--pattern", format.Pattern)
+		}
+		return Reply{}, c.runJSON(ctx, nil, nil, sheetsCommand, "format", id, rng, "--format-json", "{}", "--format-fields", "userEnteredFormat")
+
+	case request.AutoResizeDimensions != nil:
+		dim := request.AutoResizeDimensions.Dimensions
+		name, err := sheetName(dim.SheetID)
+		if err != nil {
+			return Reply{}, err
+		}
+		return Reply{}, c.runJSON(ctx, nil, nil, sheetsCommand, "resize-columns", id, columnRange(name, dim), "--auto")
+
+	case request.UpdateDimensionProperties != nil:
+		update := request.UpdateDimensionProperties
+		name, err := sheetName(update.Range.SheetID)
+		if err != nil {
+			return Reply{}, err
+		}
+		return Reply{}, c.runJSON(ctx, nil, nil, sheetsCommand, "resize-columns", id, columnRange(name, update.Range), "--width", strconv.Itoa(update.Properties.PixelSize))
+
+	case request.CopyPaste != nil:
+		copyReq := request.CopyPaste
+		sourceName, err := sheetName(copyReq.Source.SheetID)
+		if err != nil {
+			return Reply{}, err
+		}
+		destName, err := sheetName(copyReq.Destination.SheetID)
+		if err != nil {
+			return Reply{}, err
+		}
+		return Reply{}, c.runJSON(ctx, nil, nil, sheetsCommand, "copy-paste", id,
+			gridRange(sourceName, copyReq.Source, spreadsheet), gridRange(destName, copyReq.Destination, spreadsheet),
+			"--type", strings.TrimPrefix(copyReq.PasteType, "PASTE_"))
+	default:
+		return Reply{}, errors.New("unsupported Sheets update")
 	}
-	if err := json.NewDecoder(res.Body).Decode(dst); err != nil {
-		return fmt.Errorf("decode Google API response: %w", err)
+}
+
+func (c *Client) resizeGrid(ctx context.Context, id, name string, want *GridProperties, current *Sheet) error {
+	if current == nil {
+		spreadsheet, err := c.GetSpreadsheet(ctx, id)
+		if err != nil {
+			return err
+		}
+		current = findSheet(spreadsheet.Sheets, name)
+	}
+	if current == nil {
+		return fmt.Errorf("sheet %q not found", name)
+	}
+	for _, dim := range []struct {
+		label string
+		have  int
+		want  int
+	}{
+		{label: "rows", have: current.GridProperties.RowCount, want: want.RowCount},
+		{label: "cols", have: current.GridProperties.ColumnCount, want: want.ColumnCount},
+	} {
+		if dim.want == 0 || dim.have == dim.want {
+			continue
+		}
+		if dim.have < dim.want {
+			if err := c.runJSON(ctx, nil, nil, sheetsCommand, "insert", id, name, dim.label, strconv.Itoa(dim.have), "--after", "--count", strconv.Itoa(dim.want-dim.have)); err != nil {
+				return err
+			}
+			continue
+		}
+		apiDim := strings.ToUpper(dim.label)
+		if dim.label == "cols" {
+			apiDim = "COLUMNS"
+		}
+		if err := c.runJSON(ctx, nil, nil, sheetsCommand, "delete-dimension", id, name, "--dimension", apiDim,
+			"--start", strconv.Itoa(dim.want+1), "--end", strconv.Itoa(dim.have), "--force"); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-// Turn sheet title into a quoted range for Values.Get.
-func sheetRange(sheetTitle string) string {
-	escaped := strings.ReplaceAll(sheetTitle, "'", "''")
-	return fmt.Sprintf("'%s'", escaped)
+func (c *Client) runJSON(ctx context.Context, stdin io.Reader, dst any, args ...string) error {
+	base := make([]string, 0, 3+len(args))
+	base = append(base, "--json", "--no-input", "--color=never")
+	base = append(base, args...)
+	// #nosec G204 -- arguments are passed directly without a shell.
+	cmd := exec.CommandContext(ctx, c.gog, base...)
+	cmd.Stdin = stdin
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		msg := strings.TrimSpace(stderr.String())
+		if msg == "" {
+			msg = err.Error()
+		}
+		return fmt.Errorf("gog: %s", msg)
+	}
+	if dst == nil || stdout.Len() == 0 {
+		return nil
+	}
+	if err := json.Unmarshal(stdout.Bytes(), dst); err != nil {
+		return fmt.Errorf("decode gog output: %w", err)
+	}
+	return nil
+}
+
+func sheetRange(title string) string {
+	return quoteSheet(title)
+}
+
+func quoteSheet(title string) string {
+	return "'" + strings.ReplaceAll(title, "'", "''") + "'"
+}
+
+func a1Cell(title string, row, column int) string {
+	return fmt.Sprintf("%s!%s%d", quoteSheet(title), columnName(column), row+1)
+}
+
+func gridRange(title string, rng GridRange, spreadsheet *Spreadsheet) string {
+	rows, cols := 1, 1
+	if sheet := findSheet(spreadsheet.Sheets, title); sheet != nil {
+		rows = sheet.GridProperties.RowCount
+		cols = sheet.GridProperties.ColumnCount
+	}
+	endRow, endCol := rng.EndRowIndex, rng.EndColumnIndex
+	if endRow == 0 {
+		endRow = rows
+	}
+	if endCol == 0 {
+		endCol = cols
+	}
+	return fmt.Sprintf("%s!%s%d:%s%d", quoteSheet(title), columnName(rng.StartColumnIndex), rng.StartRowIndex+1, columnName(endCol-1), endRow)
+}
+
+func columnRange(title string, rng DimensionRange) string {
+	return fmt.Sprintf("%s!%s:%s", quoteSheet(title), columnName(rng.StartIndex), columnName(rng.EndIndex-1))
+}
+
+func columnName(index int) string {
+	name := ""
+	for index >= 0 {
+		name = string(rune('A'+index%26)) + name
+		index = index/26 - 1
+	}
+	return name
 }

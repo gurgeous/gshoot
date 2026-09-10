@@ -15,7 +15,6 @@ var Env Config
 
 // Config contains gshoot environment variables.
 type Config struct {
-	Smoke bool   `env:"GSHOOT_SMOKE"` // use deterministic smoke-test behavior
 	Theme string `env:"GSHOOT_THEME"` // force light or dark UI theme
 }
 
