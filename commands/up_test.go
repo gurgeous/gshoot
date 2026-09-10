@@ -626,6 +626,7 @@ func TestUpCommandAppliesFilterNumericAndLayout(t *testing.T) {
 	assertBatchContains(t, batches, "repeatCell", `"pattern":"#,##0.00"`)
 	assertBatchContains(t, batches, "autoResizeDimensions", `"dimension":"COLUMNS"`)
 	assertBatchContains(t, batches, "updateDimensionProperties", `"pixelSize":140`)
+	assertBatchContains(t, batches, "updateDimensionProperties", `"pixelSize":300`)
 }
 
 func TestUpCommandNumericSkipsLeadingZeroColumns(t *testing.T) {
@@ -864,7 +865,7 @@ func layoutGridData() []map[string]any {
 	return []map[string]any{{
 		"columnMetadata": []map[string]any{
 			{"pixelSize": 120},
-			{"pixelSize": 80},
+			{"pixelSize": 340},
 			{"pixelSize": 100},
 		},
 	}}

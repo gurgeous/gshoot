@@ -17,8 +17,9 @@ import (
 //
 
 const (
-	gridPadding   = 2  // empty rows/columns kept around uploaded data
-	layoutPadding = 20 // extra pixels added after auto-sizing columns
+	gridPadding    = 2   // empty rows/columns kept around uploaded data
+	layoutPadding  = 20  // extra pixels added after auto-sizing columns
+	layoutMaxWidth = 300 // maximum column width after auto-sizing
 )
 
 var (
@@ -280,7 +281,7 @@ func (s *uploader) layoutWidthRequests() ([]google.Request, error) {
 					StartIndex: c,
 					EndIndex:   c + 1,
 				},
-				Properties: google.DimensionProperties{PixelSize: pixelSize + layoutPadding},
+				Properties: google.DimensionProperties{PixelSize: util.Clamp(pixelSize+layoutPadding, 0, layoutMaxWidth)},
 				Fields:     "pixelSize",
 			},
 		})
