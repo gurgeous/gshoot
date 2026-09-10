@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/gurgeous/gshoot/google"
+	"github.com/gurgeous/gshoot/gog"
 	"github.com/gurgeous/gshoot/util"
 )
 
@@ -40,7 +40,7 @@ func (c *UpCmd) Run() (err error) {
 	}
 
 	// upload
-	file, err := c.run0(google.Rows(rows))
+	file, err := c.run0(gog.Rows(rows))
 	if err != nil {
 		return err
 	}
@@ -55,7 +55,7 @@ func (c *UpCmd) Run() (err error) {
 }
 
 // run0 runs the complete run0 workflow.
-func (c *UpCmd) run0(rows google.Rows) (*google.File, error) {
+func (c *UpCmd) run0(rows gog.Rows) (*gog.File, error) {
 	//
 	// init
 	//

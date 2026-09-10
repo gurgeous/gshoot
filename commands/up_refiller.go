@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gurgeous/gshoot/google"
+	"github.com/gurgeous/gshoot/gog"
 	"github.com/gurgeous/gshoot/util"
 )
 
@@ -35,15 +35,15 @@ type refiller struct {
 	sheet *uploader
 
 	// local CSV data
-	localHeaders []string    // CSV header row
-	localRows    google.Rows // CSV rows from disk
+	localHeaders []string // CSV header row
+	localRows    gog.Rows // CSV rows from disk
 
 	// remote file
-	remoteHeaders   []string          // remote header row
-	remoteRows      google.Rows       // remote display values from the values API
-	remoteGridRows  google.Rows       // grid rows, preserving formulas
-	remoteSheetData *google.SheetData // grid data for formulas, formats, filters, metadata
-	remoteCols      []int             // remote-only column indexes
+	remoteHeaders   []string       // remote header row
+	remoteRows      gog.Rows       // remote display values from the values API
+	remoteGridRows  gog.Rows       // grid rows, preserving formulas
+	remoteSheetData *gog.SheetData // grid data for formulas, formats, filters, metadata
+	remoteCols      []int          // remote-only column indexes
 
 	pasteHeaders []string // remote headers plus new CSV headers
 	sharedCols   []int    // remote column indexes also present in the CSV
@@ -77,7 +77,7 @@ func newRefiller(u *uploader) (*refiller, error) {
 	}
 	if len(s.remoteRows) == 0 {
 		s.pasteHeaders = append([]string(nil), s.localHeaders...)
-		s.remoteSheetData = &google.SheetData{}
+		s.remoteSheetData = &gog.SheetData{}
 		return s, nil
 	}
 	s.remoteHeaders = s.remoteRows[0]
@@ -127,7 +127,7 @@ func newRefiller(u *uploader) (*refiller, error) {
 // calculate paste rows
 //
 
-func (s *refiller) pasteRows() google.Rows {
+func (s *refiller) pasteRows() gog.Rows {
 	if len(s.remoteRows) == 0 {
 		return s.localRows
 	}
@@ -137,7 +137,7 @@ func (s *refiller) pasteRows() google.Rows {
 		height = len(s.localRows)
 	}
 
-	rows := make(google.Rows, height)
+	rows := make(gog.Rows, height)
 	for r := range rows {
 		rows[r] = make([]string, len(s.pasteHeaders))
 	}
@@ -178,23 +178,23 @@ func (s *refiller) pasteRows() google.Rows {
 //
 
 func (s *refiller) extend() error {
-	requests := []google.Request{}
+	operations := []gog.Operation{}
 	remoteDataRows := s.remoteDataHeight()
 	if len(s.sheet.rows) > remoteDataRows && remoteDataRows >= 2 {
 		// extend formats
-		requests = append(requests, s.extendRowsRequests(s.allColumns(), remoteDataRows, "PASTE_FORMAT")...)
+		operations = append(operations, s.extendRowsOperations(s.allColumns(), remoteDataRows, "FORMAT")...)
 
 		// extend formulas
 		formulaColumns := s.formulaColumns()
-		requests = append(requests, s.extendRowsRequests(formulaColumns, remoteDataRows, "PASTE_FORMULA")...)
+		operations = append(operations, s.extendRowsOperations(formulaColumns, remoteDataRows, "FORMULA")...)
 	}
 
-	requests = append(requests, s.clearStaleValueRequests()...)
+	operations = append(operations, s.clearStaleValueOperations()...)
 
 	// clear padding row/column formats
-	requests = append(requests, s.clearPaddingRequests()...)
+	operations = append(operations, s.clearPaddingOperations()...)
 
-	_, err := s.sheet.client.BatchUpdate(s.sheet.ctx, s.sheet.file.ID, requests)
+	_, err := s.sheet.client.Apply(s.sheet.ctx, s.sheet.file.ID, operations)
 	if err != nil {
 		return err
 	}
@@ -203,52 +203,50 @@ func (s *refiller) extend() error {
 }
 
 //
-// build CopyPaste requests from the final remote row into refilled rows.
+// build copy operations from the final remote row into refilled rows.
 //
 
-func (s *refiller) extendRowsRequests(columns []int, remoteRows int, pasteType string) []google.Request {
-	requests := make([]google.Request, 0, len(columns))
+func (s *refiller) extendRowsOperations(columns []int, remoteRows int, pasteType string) []gog.Operation {
+	operations := make([]gog.Operation, 0, len(columns))
 	sourceRow := remoteRows - 1
 	for _, c := range columns {
-		requests = append(requests, google.Request{
-			CopyPaste: &google.CopyPasteRequest{
-				Source: google.GridRange{
+		operations = append(operations, gog.Operation{
+			CopyCells: &gog.CopyCellsOperation{
+				Source: gog.GridRange{
 					SheetID:          s.sheet.id,
 					StartRowIndex:    sourceRow,
 					EndRowIndex:      sourceRow + 1,
 					StartColumnIndex: c,
 					EndColumnIndex:   c + 1,
 				},
-				Destination: google.GridRange{
+				Destination: gog.GridRange{
 					SheetID:          s.sheet.id,
 					StartRowIndex:    remoteRows,
 					EndRowIndex:      len(s.sheet.rows),
 					StartColumnIndex: c,
 					EndColumnIndex:   c + 1,
 				},
-				PasteType:        pasteType,
-				PasteOrientation: "NORMAL",
+				Type: pasteType,
 			},
 		})
 	}
-	return requests
+	return operations
 }
 
-func (s *refiller) clearStaleValueRequests() []google.Request {
+func (s *refiller) clearStaleValueOperations() []gog.Operation {
 	rowCount, colCount := len(s.sheet.rows), len(s.sheet.rows[0])
 	if rowCount >= s.remoteHeight() || !s.canShrink() {
 		return nil
 	}
-	return []google.Request{{
-		UpdateCells: &google.UpdateCellsRequest{
-			Range: google.GridRange{
+	return []gog.Operation{{
+		ClearCells: &gog.ClearCellsOperation{
+			Range: gog.GridRange{
 				SheetID:          s.sheet.id,
 				StartRowIndex:    rowCount,
 				EndRowIndex:      rowCount + gridPadding,
 				StartColumnIndex: 0,
 				EndColumnIndex:   colCount + gridPadding,
 			},
-			Fields: "userEnteredValue",
 		},
 	}}
 }
@@ -257,33 +255,29 @@ func (s *refiller) clearStaleValueRequests() []google.Request {
 // clears formatting outside the refilled data area.
 //
 
-func (s *refiller) clearPaddingRequests() []google.Request {
+func (s *refiller) clearPaddingOperations() []gog.Operation {
 	rowCount, colCount := len(s.sheet.rows), len(s.sheet.rows[0])
-	return []google.Request{
+	return []gog.Operation{
 		{
-			RepeatCell: &google.RepeatCellRequest{
-				Range: google.GridRange{
+			FormatCells: &gog.FormatCellsOperation{
+				Range: gog.GridRange{
 					SheetID:          s.sheet.id,
 					StartRowIndex:    rowCount,
 					EndRowIndex:      rowCount + gridPadding,
 					StartColumnIndex: 0,
 					EndColumnIndex:   colCount + gridPadding,
 				},
-				Cell:   google.CellData{UserEnteredFormat: &google.CellFormat{}},
-				Fields: "userEnteredFormat",
 			},
 		},
 		{
-			RepeatCell: &google.RepeatCellRequest{
-				Range: google.GridRange{
+			FormatCells: &gog.FormatCellsOperation{
+				Range: gog.GridRange{
 					SheetID:          s.sheet.id,
 					StartRowIndex:    0,
 					EndRowIndex:      rowCount,
 					StartColumnIndex: colCount,
 					EndColumnIndex:   colCount + gridPadding,
 				},
-				Cell:   google.CellData{UserEnteredFormat: &google.CellFormat{}},
-				Fields: "userEnteredFormat",
 			},
 		},
 	}
@@ -367,8 +361,8 @@ func (s *refiller) hasFormula(c int) bool {
 // remoteDataHeight returns remote rows covered by the filter or data.
 func (s *refiller) remoteDataHeight() int {
 	count := len(s.remoteRows)
-	if s.remoteSheetData.BasicFilter != nil && s.remoteSheetData.BasicFilter.Range.EndRowIndex > 0 {
-		count = s.remoteSheetData.BasicFilter.Range.EndRowIndex
+	if s.remoteSheetData.FilterEndRow > 0 {
+		count = s.remoteSheetData.FilterEndRow
 	}
 	return min(count, len(s.remoteRows))
 }
@@ -378,8 +372,8 @@ func (s *refiller) remoteDataHeight() int {
 //
 
 // gridRows extracts strings and formulas from grid data.
-func gridRows(data *google.SheetData) google.Rows {
-	rows := make(google.Rows, 0, len(data.Rows))
+func gridRows(data *gog.SheetData) gog.Rows {
+	rows := make(gog.Rows, 0, len(data.Rows))
 	for _, row := range data.Rows {
 		values := make([]string, 0, len(row.Values))
 		for _, cell := range row.Values {
@@ -387,7 +381,7 @@ func gridRows(data *google.SheetData) google.Rows {
 		}
 		rows = append(rows, values)
 	}
-	return google.Rows(util.CSVRectangularize(rows))
+	return gog.Rows(util.CSVRectangularize(rows))
 }
 
 // validateHeaders rejects duplicate headers.

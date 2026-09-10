@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/gurgeous/gshoot/google"
+	"github.com/gurgeous/gshoot/gog"
 	"github.com/gurgeous/gshoot/util"
 )
 
@@ -29,23 +29,23 @@ var (
 )
 
 type uploader struct {
-	ctx         context.Context     // request context for Google calls
-	client      *google.Client      // Google API client
-	file        *google.File        // spreadsheet Drive file
-	spreadsheet *google.Spreadsheet // current spreadsheet metadata
-	cmd         *UpCmd              // upload command options
-	title       string              // target sheet title
-	id          int64               // target sheet ID after ensure
-	rows        google.Rows         // rows to paste into the target sheet
+	ctx         context.Context  // request context for Google calls
+	client      *gog.Client      // Google API client
+	file        *gog.File        // spreadsheet Drive file
+	spreadsheet *gog.Spreadsheet // current spreadsheet metadata
+	cmd         *UpCmd           // upload command options
+	title       string           // target sheet title
+	id          int64            // target sheet ID after ensure
+	rows        gog.Rows         // rows to paste into the target sheet
 }
 
 func newUploader(
 	ctx context.Context,
-	client *google.Client,
-	file *google.File,
-	spreadsheet *google.Spreadsheet,
+	client *gog.Client,
+	file *gog.File,
+	spreadsheet *gog.Spreadsheet,
 	cmd *UpCmd,
-	rows google.Rows,
+	rows gog.Rows,
 ) *uploader {
 	return &uploader{
 		ctx:         ctx,
@@ -87,32 +87,27 @@ func (s *uploader) resolveTargetSheet() (int64, error) {
 
 func (s *uploader) addSheet() (int64, error) {
 	nrows, ncols := len(s.rows), len(s.rows[0])
-	res, err := s.client.BatchUpdate(s.ctx, s.file.ID, []google.Request{{
-		AddSheet: &google.AddSheetRequest{
-			Properties: google.SheetProperties{
-				Title: s.title,
-				Index: new(0),
-				GridProperties: &google.GridProperties{
-					RowCount:    nrows + gridPadding,
-					ColumnCount: ncols + gridPadding,
-				},
+	results, err := s.client.Apply(s.ctx, s.file.ID, []gog.Operation{{
+		AddSheet: &gog.AddSheetOperation{
+			Title: s.title,
+			Index: new(0),
+			GridProperties: &gog.GridProperties{
+				RowCount:    nrows + gridPadding,
+				ColumnCount: ncols + gridPadding,
 			},
 		},
 	}})
 	if err != nil {
 		return 0, err
 	}
-	return res.Replies[0].AddSheet.Properties.ID, nil
+	return results[0].AddedSheet.ID, nil
 }
 
 func (s *uploader) renameSheet(sheetID int64) (int64, error) {
-	_, err := s.client.BatchUpdate(s.ctx, s.file.ID, []google.Request{{
-		UpdateSheetProperties: &google.UpdateSheetPropertiesRequest{
-			Properties: google.SheetProperties{
-				SheetID: new(sheetID),
-				Title:   s.title,
-			},
-			Fields: "title",
+	_, err := s.client.Apply(s.ctx, s.file.ID, []gog.Operation{{
+		UpdateSheet: &gog.UpdateSheetOperation{
+			SheetID: sheetID,
+			Title:   &s.title,
 		},
 	}})
 	return sheetID, err
@@ -123,10 +118,10 @@ func (s *uploader) renameSheet(sheetID int64) (int64, error) {
 //
 
 func (s *uploader) clearSheet() error {
-	_, err := s.client.BatchUpdate(s.ctx, s.file.ID, []google.Request{{
-		UpdateCells: &google.UpdateCellsRequest{
-			Range:  google.GridRange{SheetID: s.id},
-			Fields: "*",
+	_, err := s.client.Apply(s.ctx, s.file.ID, []gog.Operation{{
+		ClearCells: &gog.ClearCellsOperation{
+			Range: gog.GridRange{SheetID: s.id},
+			All:   true,
 		},
 	}})
 	return err
@@ -135,31 +130,23 @@ func (s *uploader) clearSheet() error {
 // growSheet expands the target grid to fit data plus padding.
 func (s *uploader) growSheet() error {
 	nrows, ncols := len(s.rows), len(s.rows[0])
-	_, err := s.client.BatchUpdate(s.ctx, s.file.ID, []google.Request{{
-		UpdateSheetProperties: &google.UpdateSheetPropertiesRequest{
-			Properties: google.SheetProperties{
-				SheetID: new(s.id),
-				GridProperties: &google.GridProperties{
-					RowCount:    nrows + gridPadding,
-					ColumnCount: ncols + gridPadding,
-				},
+	_, err := s.client.Apply(s.ctx, s.file.ID, []gog.Operation{{
+		UpdateSheet: &gog.UpdateSheetOperation{
+			SheetID: s.id,
+			GridProperties: &gog.GridProperties{
+				RowCount:    nrows + gridPadding,
+				ColumnCount: ncols + gridPadding,
 			},
-			Fields: "gridProperties.rowCount,gridProperties.columnCount",
 		},
 	}})
 	return err
 }
 
 func (s *uploader) pasteCSV() error {
-	pasteType := "PASTE_NORMAL"
-	if s.cmd.Refill {
-		pasteType = "PASTE_VALUES"
-	}
-	_, err := s.client.BatchUpdate(s.ctx, s.file.ID, []google.Request{{
-		PasteData: &google.PasteDataRequest{
-			Coordinate: google.GridCoordinate{SheetID: s.id},
-			Rows:       s.rows,
-			Type:       pasteType,
+	_, err := s.client.Apply(s.ctx, s.file.ID, []gog.Operation{{
+		PasteRows: &gog.PasteRowsOperation{
+			SheetID: s.id,
+			Rows:    s.rows,
 		},
 	}})
 	return err
@@ -180,17 +167,11 @@ func (s *uploader) prepareRefiller() (*refiller, error) {
 
 func (s *uploader) applyFilter() error {
 	nrows, ncols := len(s.rows), len(s.rows[0])
-	_, err := s.client.BatchUpdate(s.ctx, s.file.ID, []google.Request{{
-		SetBasicFilter: &google.SetBasicFilterRequest{
-			Filter: google.BasicFilter{
-				Range: google.GridRange{
-					SheetID:          s.id,
-					EndRowIndex:      nrows,
-					EndColumnIndex:   ncols,
-					StartRowIndex:    0,
-					StartColumnIndex: 0,
-				},
-			},
+	_, err := s.client.Apply(s.ctx, s.file.ID, []gog.Operation{{
+		SetFilter: &gog.GridRange{
+			SheetID:        s.id,
+			EndRowIndex:    nrows,
+			EndColumnIndex: ncols,
 		},
 	}})
 	return err
@@ -199,30 +180,25 @@ func (s *uploader) applyFilter() error {
 func (s *uploader) applyNumeric() error {
 	nrows := len(s.rows)
 	formats := s.numericFormats()
-	requests := make([]google.Request, 0, len(formats))
+	operations := make([]gog.Operation, 0, len(formats))
 	if len(formats) == 0 {
 		return nil
 	}
 	for c, pattern := range formats {
-		requests = append(requests, google.Request{
-			RepeatCell: &google.RepeatCellRequest{
-				Range: google.GridRange{
+		operations = append(operations, gog.Operation{
+			FormatCells: &gog.FormatCellsOperation{
+				Range: gog.GridRange{
 					SheetID:          s.id,
 					StartRowIndex:    1,
 					EndRowIndex:      nrows,
 					StartColumnIndex: c,
 					EndColumnIndex:   c + 1,
 				},
-				Cell: google.CellData{
-					UserEnteredFormat: &google.CellFormat{
-						NumberFormat: &google.NumberFormat{Type: "NUMBER", Pattern: pattern},
-					},
-				},
-				Fields: "userEnteredFormat.numberFormat",
+				NumberFormat: &gog.NumberFormat{Type: "NUMBER", Pattern: pattern},
 			},
 		})
 	}
-	_, err := s.client.BatchUpdate(s.ctx, s.file.ID, requests)
+	_, err := s.client.Apply(s.ctx, s.file.ID, operations)
 	if err != nil {
 		return err
 	}
@@ -231,33 +207,30 @@ func (s *uploader) applyNumeric() error {
 
 func (s *uploader) applyLayout() error {
 	ncols := len(s.rows[0])
-	_, err := s.client.BatchUpdate(s.ctx, s.file.ID, []google.Request{{
-		AutoResizeDimensions: &google.AutoResizeDimensionsRequest{
-			Dimensions: google.DimensionRange{
-				SheetID:    s.id,
-				Dimension:  "COLUMNS",
-				StartIndex: 0,
-				EndIndex:   ncols,
-			},
+	_, err := s.client.Apply(s.ctx, s.file.ID, []gog.Operation{{
+		AutoResizeColumns: &gog.ColumnRange{
+			SheetID:    s.id,
+			StartIndex: 0,
+			EndIndex:   ncols,
 		},
 	}})
 	if err != nil {
 		return err
 	}
 
-	requests, err := s.layoutWidthRequests()
+	operations, err := s.layoutWidthOperations()
 	if err != nil {
 		return err
 	}
-	if len(requests) == 0 {
+	if len(operations) == 0 {
 		return nil
 	}
-	_, err = s.client.BatchUpdate(s.ctx, s.file.ID, requests)
+	_, err = s.client.Apply(s.ctx, s.file.ID, operations)
 	return err
 }
 
-// layoutWidthRequests builds padding requests from autosized column widths.
-func (s *uploader) layoutWidthRequests() ([]google.Request, error) {
+// layoutWidthOperations builds padding operations from autosized column widths.
+func (s *uploader) layoutWidthOperations() ([]gog.Operation, error) {
 	ncols := len(s.rows[0])
 	spreadsheet, err := s.client.GetSpreadsheetWithGridData(s.ctx, s.file.ID)
 	if err != nil {
@@ -271,27 +244,25 @@ func (s *uploader) layoutWidthRequests() ([]google.Request, error) {
 	if len(data.ColumnMetadata) < ncols {
 		return nil, fmt.Errorf("sheet %q has column metadata for %d of %d columns", s.title, len(data.ColumnMetadata), ncols)
 	}
-	requests := []google.Request{}
+	operations := []gog.Operation{}
 	for c := range ncols {
 		meta := data.ColumnMetadata[c]
 		pixelSize := meta.PixelSize
 		if pixelSize == 0 {
 			pixelSize = 100
 		}
-		requests = append(requests, google.Request{
-			UpdateDimensionProperties: &google.UpdateDimensionPropertiesRequest{
-				Range: google.DimensionRange{
+		operations = append(operations, gog.Operation{
+			ResizeColumns: &gog.ResizeColumnsOperation{
+				Range: gog.ColumnRange{
 					SheetID:    s.id,
-					Dimension:  "COLUMNS",
 					StartIndex: c,
 					EndIndex:   c + 1,
 				},
-				Properties: google.DimensionProperties{PixelSize: util.Clamp(pixelSize+layoutPadding, 0, layoutMaxWidth)},
-				Fields:     "pixelSize",
+				PixelSize: util.Clamp(pixelSize+layoutPadding, 0, layoutMaxWidth),
 			},
 		})
 	}
-	return requests, nil
+	return operations, nil
 }
 
 // numericFormats returns target column indexes and Sheets number patterns.
@@ -350,7 +321,7 @@ func hasLeadingZeroNumber(values []string) bool {
 }
 
 // sheetTitle returns the requested or generated destination sheet name.
-func sheetTitle(cmd *UpCmd, spreadsheet *google.Spreadsheet) string {
+func sheetTitle(cmd *UpCmd, spreadsheet *gog.Spreadsheet) string {
 	title := cmd.Sheet
 	if title == "" {
 		title = csvSheetTitle(cmd.CSVPath)
@@ -366,7 +337,7 @@ func csvSheetTitle(path string) string {
 	return strings.TrimSuffix(base, filepath.Ext(base))
 }
 
-func nextAvailableSheetTitle(spreadsheet *google.Spreadsheet, title string) string {
+func nextAvailableSheetTitle(spreadsheet *gog.Spreadsheet, title string) string {
 	if findSheet(spreadsheet, title) == nil {
 		return title
 	}
@@ -379,7 +350,7 @@ func nextAvailableSheetTitle(spreadsheet *google.Spreadsheet, title string) stri
 	}
 }
 
-func findSheet(spreadsheet *google.Spreadsheet, title string) *google.Sheet {
+func findSheet(spreadsheet *gog.Spreadsheet, title string) *gog.Sheet {
 	for _, sheet := range spreadsheet.Sheets {
 		if strings.EqualFold(sheet.Title, title) {
 			return sheet

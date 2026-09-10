@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gurgeous/gshoot/google"
+	"github.com/gurgeous/gshoot/gog"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -109,7 +109,7 @@ func TestUpCommandLayoutRejectsMissingColumnMetadata(t *testing.T) {
 }
 
 func TestUploadNames(t *testing.T) {
-	spreadsheet := &google.Spreadsheet{Sheets: []*google.Sheet{{Title: "input"}, {Title: "input_2"}}}
+	spreadsheet := &gog.Spreadsheet{Sheets: []*gog.Sheet{{Title: "input"}, {Title: "input_2"}}}
 	cmd := &UpCmd{CSVPath: "/tmp/input.csv"}
 	assert.Equal(t, "input_3", sheetTitle(cmd, spreadsheet))
 	cmd.Replace = true
@@ -117,7 +117,7 @@ func TestUploadNames(t *testing.T) {
 }
 
 func TestNumericFormats(t *testing.T) {
-	uploader := &uploader{rows: google.Rows{
+	uploader := &uploader{rows: gog.Rows{
 		{"zip", "count", "amount", "name"},
 		{"00123", "1000", "1.25", "Ada"},
 		{"00456", "2000", "2.500", "Bob"},
@@ -128,24 +128,24 @@ func TestNumericFormats(t *testing.T) {
 func TestRefillerKeepsRemoteOnlyColumns(t *testing.T) {
 	refill := &refiller{
 		localHeaders:  []string{"id", "name"},
-		localRows:     google.Rows{{"id", "name"}, {"a", "Ada 2"}},
+		localRows:     gog.Rows{{"id", "name"}, {"a", "Ada 2"}},
 		remoteHeaders: []string{"id", "KEEP", "name"},
-		remoteRows: google.Rows{
+		remoteRows: gog.Rows{
 			{"id", "KEEP", "name"},
 			{"a", "keep a", "Ada"},
 			{"b", "keep b", "Bob"},
 		},
-		remoteGridRows: google.Rows{
+		remoteGridRows: gog.Rows{
 			{"id", "KEEP", "name"},
 			{"a", "keep a", "Ada"},
 			{"b", "keep b", "Bob"},
 		},
-		remoteSheetData: &google.SheetData{Rows: make([]google.RowData, 3)},
+		remoteSheetData: &gog.SheetData{Rows: make([]gog.RowData, 3)},
 		remoteCols:      []int{1},
 		pasteHeaders:    []string{"id", "KEEP", "name"},
 		sharedCols:      []int{0, 2},
 	}
-	assert.Equal(t, google.Rows{
+	assert.Equal(t, gog.Rows{
 		{"id", "KEEP", "name"},
 		{"a", "keep a", "Ada 2"},
 		{"", "keep b", ""},

@@ -101,9 +101,19 @@ These are a few other commands for convenience:
 
 ## Changelog
 
-### 0.1.0 (unreleased)
+### 0.2.0 (unreleased)
+
+- Use [gogcli](https://gogcli.sh/) as client instead of direct api
+
+### 0.1.0 (Jun 2026)
 
 - Initial release.
+
+## Future Work
+
+- `gshoot join` to join a csv into a sheet with a key column
+- `gshoot append` to append a csv to a sheet (cols must be identical)
+- `ghoost hyperlink plaintext_col link_col`, replace plaintext_col with `=hyperlink(plain, link)`. handle blanks, fail fast on bad links too
 
 ## Potential gogcli improvements
 

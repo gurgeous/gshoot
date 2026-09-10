@@ -1,4 +1,4 @@
-package google
+package gog
 
 import (
 	"bytes"
@@ -45,7 +45,7 @@ func (c *Client) CreateSpreadsheetFile(ctx context.Context, name string) (*File,
 	if err := c.runJSON(ctx, nil, &out, sheetsCommand, "create", name); err != nil {
 		return nil, err
 	}
-	return &File{ID: out.ID, Name: out.Name, MimeType: spreadsheetMimeType}, nil
+	return &File{ID: out.ID, Name: out.Name}, nil
 }
 
 // FindSpreadsheetFile accepts a spreadsheet name, ID, or URL.
@@ -59,7 +59,7 @@ func (c *Client) FindSpreadsheetFile(ctx context.Context, ref string) (*File, er
 		if err != nil {
 			return nil, err
 		}
-		return &File{ID: id, Name: spreadsheet.Title, MimeType: spreadsheetMimeType}, nil
+		return &File{ID: id, Name: spreadsheet.Title}, nil
 	}
 
 	files, err := c.listFiles(ctx, "name = '"+driveQueryString(ref)+"'", 1000)
@@ -75,7 +75,7 @@ func (c *Client) FindSpreadsheetFile(ctx context.Context, ref string) (*File, er
 		if err != nil {
 			return nil, err
 		}
-		return &File{ID: id, Name: spreadsheet.Title, MimeType: spreadsheetMimeType}, nil
+		return &File{ID: id, Name: spreadsheet.Title}, nil
 	}
 	return files[0], nil
 }
@@ -231,23 +231,23 @@ func (c *Client) GetRows(ctx context.Context, id, title string) (Rows, error) {
 	return Rows(util.CSVRectangularize(rows)), nil
 }
 
-// BatchUpdate translates gshoot's narrow request model to named gog commands.
-func (c *Client) BatchUpdate(ctx context.Context, id string, requests []Request) (*BatchUpdateResponse, error) {
-	response := &BatchUpdateResponse{}
-	for _, request := range requests {
-		reply, err := c.applyRequest(ctx, id, request)
+// Apply translates gshoot operations to named gog commands.
+func (c *Client) Apply(ctx context.Context, id string, operations []Operation) ([]OperationResult, error) {
+	results := make([]OperationResult, 0, len(operations))
+	for _, operation := range operations {
+		result, err := c.applyOperation(ctx, id, operation)
 		if err != nil {
 			return nil, err
 		}
-		response.Replies = append(response.Replies, reply)
+		results = append(results, result)
 	}
-	return response, nil
+	return results, nil
 }
 
-func (c *Client) applyRequest(ctx context.Context, id string, request Request) (Reply, error) {
+func (c *Client) applyOperation(ctx context.Context, id string, operation Operation) (OperationResult, error) {
 	spreadsheet, err := c.GetSpreadsheet(ctx, id)
 	if err != nil {
-		return Reply{}, err
+		return OperationResult{}, err
 	}
 	sheetByID := func(sheetID int64) (*Sheet, error) {
 		for _, sheet := range spreadsheet.Sheets {
@@ -259,141 +259,134 @@ func (c *Client) applyRequest(ctx context.Context, id string, request Request) (
 	}
 
 	switch {
-	case request.AddSheet != nil:
-		p := request.AddSheet.Properties
-		args := []string{sheetsCommand, "add-tab", id, p.Title}
-		if p.Index != nil {
-			args = append(args, "--index", strconv.Itoa(*p.Index))
+	case operation.AddSheet != nil:
+		add := operation.AddSheet
+		args := []string{sheetsCommand, "add-tab", id, add.Title}
+		if add.Index != nil {
+			args = append(args, "--index", strconv.Itoa(*add.Index))
 		}
 		var out struct {
 			SheetID int64 `json:"sheetId"`
 		}
 		if err := c.runJSON(ctx, nil, &out, args...); err != nil {
-			return Reply{}, err
+			return OperationResult{}, err
 		}
-		if p.GridProperties != nil {
+		if add.GridProperties != nil {
 			// Google creates regular sheets with this default grid size.
 			current := &Sheet{
 				ID:             out.SheetID,
-				Title:          p.Title,
+				Title:          add.Title,
 				GridProperties: &GridProperties{RowCount: 1000, ColumnCount: 26},
 			}
-			if err := c.resizeGrid(ctx, id, p.Title, p.GridProperties, current); err != nil {
-				return Reply{}, err
+			if err := c.resizeGrid(ctx, id, add.Title, add.GridProperties, current); err != nil {
+				return OperationResult{}, err
 			}
 		}
-		return Reply{AddSheet: &AddSheetReply{Properties: Sheet{ID: out.SheetID, Title: p.Title}}}, nil
+		return OperationResult{AddedSheet: &Sheet{ID: out.SheetID, Title: add.Title}}, nil
 
-	case request.DeleteSheet != nil:
-		sheet, err := sheetByID(request.DeleteSheet.SheetID)
+	case operation.UpdateSheet != nil:
+		update := operation.UpdateSheet
+		sheet, err := sheetByID(update.SheetID)
 		if err != nil {
-			return Reply{}, err
+			return OperationResult{}, err
 		}
-		return Reply{}, c.runJSON(ctx, nil, nil, sheetsCommand, "delete-tab", id, sheet.Title, "--force")
-
-	case request.UpdateSheetProperties != nil:
-		p := request.UpdateSheetProperties.Properties
-		sheet, err := sheetByID(*p.SheetID)
-		if err != nil {
-			return Reply{}, err
-		}
-		if strings.Contains(request.UpdateSheetProperties.Fields, "title") {
-			if err := c.runJSON(ctx, nil, nil, sheetsCommand, "rename-tab", id, sheet.Title, p.Title); err != nil {
-				return Reply{}, err
+		if update.Title != nil {
+			if err := c.runJSON(ctx, nil, nil, sheetsCommand, "rename-tab", id, sheet.Title, *update.Title); err != nil {
+				return OperationResult{}, err
 			}
-			sheet.Title = p.Title
+			sheet.Title = *update.Title
 		}
-		if p.GridProperties != nil {
-			return Reply{}, c.resizeGrid(ctx, id, sheet.Title, p.GridProperties, sheet)
+		if update.GridProperties != nil {
+			return OperationResult{}, c.resizeGrid(ctx, id, sheet.Title, update.GridProperties, sheet)
 		}
-		return Reply{}, nil
+		return OperationResult{}, nil
 
-	case request.UpdateCells != nil:
-		sheet, err := sheetByID(request.UpdateCells.Range.SheetID)
+	case operation.ClearCells != nil:
+		clearOp := operation.ClearCells
+		sheet, err := sheetByID(clearOp.Range.SheetID)
 		if err != nil {
-			return Reply{}, err
+			return OperationResult{}, err
 		}
-		rng := gridRange(sheet, request.UpdateCells.Range)
+		rng := gridRange(sheet, clearOp.Range)
 		if err := c.runJSON(ctx, nil, nil, sheetsCommand, "clear", id, rng); err != nil {
-			return Reply{}, err
+			return OperationResult{}, err
 		}
-		if request.UpdateCells.Fields == "*" {
+		if clearOp.All {
 			for _, args := range [][]string{
 				{sheetsCommand, "format", id, rng, "--format-json", "{}", "--format-fields", "userEnteredFormat"},
 				{sheetsCommand, "validation", "clear", id, rng, "--filtered-rows-included"},
 				{sheetsCommand, "update-note", id, rng, "--note", ""},
 			} {
 				if err := c.runJSON(ctx, nil, nil, args...); err != nil {
-					return Reply{}, err
+					return OperationResult{}, err
 				}
 			}
 		}
-		return Reply{}, nil
+		return OperationResult{}, nil
 
-	case request.PasteData != nil:
-		sheet, err := sheetByID(request.PasteData.Coordinate.SheetID)
+	case operation.PasteRows != nil:
+		paste := operation.PasteRows
+		sheet, err := sheetByID(paste.SheetID)
 		if err != nil {
-			return Reply{}, err
+			return OperationResult{}, err
 		}
-		data, err := json.Marshal(request.PasteData.Rows)
+		data, err := json.Marshal(paste.Rows)
 		if err != nil {
-			return Reply{}, err
+			return OperationResult{}, err
 		}
-		cell := a1Cell(sheet.Title, request.PasteData.Coordinate.RowIndex, request.PasteData.Coordinate.ColumnIndex)
-		return Reply{}, c.runJSON(ctx, bytes.NewReader(data), nil, sheetsCommand, "update", id, cell, "--values-json", "@-", "--input", "USER_ENTERED")
+		cell := quoteSheet(sheet.Title) + "!A1"
+		return OperationResult{}, c.runJSON(ctx, bytes.NewReader(data), nil, sheetsCommand, "update", id, cell, "--values-json", "@-", "--input", "USER_ENTERED")
 
-	case request.SetBasicFilter != nil:
-		filter := request.SetBasicFilter.Filter.Range
-		sheet, err := sheetByID(filter.SheetID)
+	case operation.SetFilter != nil:
+		sheet, err := sheetByID(operation.SetFilter.SheetID)
 		if err != nil {
-			return Reply{}, err
+			return OperationResult{}, err
 		}
-		return Reply{}, c.runJSON(ctx, nil, nil, sheetsCommand, "filter", "set", id, gridRange(sheet, filter), "--force")
+		return OperationResult{}, c.runJSON(ctx, nil, nil, sheetsCommand, "filter", "set", id, gridRange(sheet, *operation.SetFilter), "--force")
 
-	case request.RepeatCell != nil:
-		repeat := request.RepeatCell
-		sheet, err := sheetByID(repeat.Range.SheetID)
+	case operation.FormatCells != nil:
+		format := operation.FormatCells
+		sheet, err := sheetByID(format.Range.SheetID)
 		if err != nil {
-			return Reply{}, err
+			return OperationResult{}, err
 		}
-		rng := gridRange(sheet, repeat.Range)
-		if repeat.Cell.UserEnteredFormat != nil && repeat.Cell.UserEnteredFormat.NumberFormat != nil {
-			format := repeat.Cell.UserEnteredFormat.NumberFormat
-			return Reply{}, c.runJSON(ctx, nil, nil, sheetsCommand, "number-format", id, rng, "--type", format.Type, "--pattern", format.Pattern)
+		rng := gridRange(sheet, format.Range)
+		if format.NumberFormat != nil {
+			return OperationResult{}, c.runJSON(ctx, nil, nil, sheetsCommand, "number-format", id, rng,
+				"--type", format.NumberFormat.Type, "--pattern", format.NumberFormat.Pattern)
 		}
-		return Reply{}, c.runJSON(ctx, nil, nil, sheetsCommand, "format", id, rng, "--format-json", "{}", "--format-fields", "userEnteredFormat")
+		return OperationResult{}, c.runJSON(ctx, nil, nil, sheetsCommand, "format", id, rng, "--format-json", "{}", "--format-fields", "userEnteredFormat")
 
-	case request.AutoResizeDimensions != nil:
-		dim := request.AutoResizeDimensions.Dimensions
-		sheet, err := sheetByID(dim.SheetID)
+	case operation.AutoResizeColumns != nil:
+		sheet, err := sheetByID(operation.AutoResizeColumns.SheetID)
 		if err != nil {
-			return Reply{}, err
+			return OperationResult{}, err
 		}
-		return Reply{}, c.runJSON(ctx, nil, nil, sheetsCommand, "resize-columns", id, columnRange(sheet.Title, dim), "--auto")
+		return OperationResult{}, c.runJSON(ctx, nil, nil, sheetsCommand, "resize-columns", id, columnRange(sheet.Title, *operation.AutoResizeColumns), "--auto")
 
-	case request.UpdateDimensionProperties != nil:
-		update := request.UpdateDimensionProperties
+	case operation.ResizeColumns != nil:
+		update := operation.ResizeColumns
 		sheet, err := sheetByID(update.Range.SheetID)
 		if err != nil {
-			return Reply{}, err
+			return OperationResult{}, err
 		}
-		return Reply{}, c.runJSON(ctx, nil, nil, sheetsCommand, "resize-columns", id, columnRange(sheet.Title, update.Range), "--width", strconv.Itoa(update.Properties.PixelSize))
+		return OperationResult{}, c.runJSON(ctx, nil, nil, sheetsCommand, "resize-columns", id, columnRange(sheet.Title, update.Range), "--width", strconv.Itoa(update.PixelSize))
 
-	case request.CopyPaste != nil:
-		copyReq := request.CopyPaste
-		source, err := sheetByID(copyReq.Source.SheetID)
+	case operation.CopyCells != nil:
+		copyOp := operation.CopyCells
+		source, err := sheetByID(copyOp.Source.SheetID)
 		if err != nil {
-			return Reply{}, err
+			return OperationResult{}, err
 		}
-		destination, err := sheetByID(copyReq.Destination.SheetID)
+		destination, err := sheetByID(copyOp.Destination.SheetID)
 		if err != nil {
-			return Reply{}, err
+			return OperationResult{}, err
 		}
-		return Reply{}, c.runJSON(ctx, nil, nil, sheetsCommand, "copy-paste", id,
-			gridRange(source, copyReq.Source), gridRange(destination, copyReq.Destination),
-			"--type", strings.TrimPrefix(copyReq.PasteType, "PASTE_"))
+		return OperationResult{}, c.runJSON(ctx, nil, nil, sheetsCommand, "copy-paste", id,
+			gridRange(source, copyOp.Source), gridRange(destination, copyOp.Destination),
+			"--type", copyOp.Type)
 	default:
-		return Reply{}, errors.New("unsupported Sheets update")
+		return OperationResult{}, errors.New("unsupported Sheets operation")
 	}
 }
 
@@ -467,10 +460,6 @@ func quoteSheet(title string) string {
 	return "'" + strings.ReplaceAll(title, "'", "''") + "'"
 }
 
-func a1Cell(title string, row, column int) string {
-	return fmt.Sprintf("%s!%s%d", quoteSheet(title), columnName(column), row+1)
-}
-
 func gridRange(sheet *Sheet, rng GridRange) string {
 	rows := sheet.GridProperties.RowCount
 	cols := sheet.GridProperties.ColumnCount
@@ -484,7 +473,7 @@ func gridRange(sheet *Sheet, rng GridRange) string {
 	return fmt.Sprintf("%s!%s%d:%s%d", quoteSheet(sheet.Title), columnName(rng.StartColumnIndex), rng.StartRowIndex+1, columnName(endCol-1), endRow)
 }
 
-func columnRange(title string, rng DimensionRange) string {
+func columnRange(title string, rng ColumnRange) string {
 	return fmt.Sprintf("%s!%s:%s", quoteSheet(title), columnName(rng.StartIndex), columnName(rng.EndIndex-1))
 }
 

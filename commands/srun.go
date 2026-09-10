@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/gurgeous/gshoot/google"
+	"github.com/gurgeous/gshoot/gog"
 	"github.com/gurgeous/gshoot/ux"
 )
 
@@ -22,9 +22,9 @@ type srunOptions struct {
 // srun is the shared runtime state for spreadsheet commands.
 type srun struct {
 	ctx      context.Context // request context for Google calls
-	client   *google.Client  // gog-backed Google client
+	client   *gog.Client     // gog-backed Google client
 	progress *ux.Progress    // progress indicator for the command
-	file     *google.File    // resolved spreadsheet file
+	file     *gog.File       // resolved spreadsheet file
 }
 
 // srunStart connects through gog and opens a spreadsheet.
@@ -39,13 +39,13 @@ func srunStart(w io.Writer, opts srunOptions) (_ *srun, err error) {
 		}
 	}()
 
-	client, err := google.NewClient(ctx)
+	client, err := gog.NewClient(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	// create or find file
-	var file *google.File
+	var file *gog.File
 	if opts.create {
 		progress.SayFindOrCreateSpreadsheet(opts.spreadsheet)
 		file, err = client.FindOrCreateSpreadsheetFile(ctx, opts.spreadsheet)

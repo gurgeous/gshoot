@@ -1,4 +1,4 @@
-package google
+package gog
 
 import (
 	"context"
@@ -51,13 +51,13 @@ func TestGetRowsUsesQuotedRange(t *testing.T) {
 	assert.Contains(t, readTestFile(t, filepath.Join(dir, "log")), `sheets get sheet-1 'Bob''s Sheet'`)
 }
 
-func TestBatchUpdateUsesNamedGogCommands(t *testing.T) {
+func TestApplyUsesNamedGogCommands(t *testing.T) {
 	metadata := `{"spreadsheetId":"sheet-1","title":"Budget","sheets":[{"properties":{"sheetId":7,"title":"Data","gridProperties":{"rowCount":10,"columnCount":5}}}]}`
 	client, dir := fakeGog(t, metadata, `{}`, metadata, `{}`, metadata, `{}`)
-	_, err := client.BatchUpdate(context.Background(), "sheet-1", []Request{
-		{PasteData: &PasteDataRequest{Coordinate: GridCoordinate{SheetID: 7}, Rows: Rows{{"name", "count"}, {"alpha", "1"}}, Type: "PASTE_NORMAL"}},
-		{SetBasicFilter: &SetBasicFilterRequest{Filter: BasicFilter{Range: GridRange{SheetID: 7, EndRowIndex: 2, EndColumnIndex: 2}}}},
-		{UpdateDimensionProperties: &UpdateDimensionPropertiesRequest{Range: DimensionRange{SheetID: 7, Dimension: "COLUMNS", EndIndex: 1}, Properties: DimensionProperties{PixelSize: 120}}},
+	_, err := client.Apply(context.Background(), "sheet-1", []Operation{
+		{PasteRows: &PasteRowsOperation{SheetID: 7, Rows: Rows{{"name", "count"}, {"alpha", "1"}}}},
+		{SetFilter: &GridRange{SheetID: 7, EndRowIndex: 2, EndColumnIndex: 2}},
+		{ResizeColumns: &ResizeColumnsOperation{Range: ColumnRange{SheetID: 7, EndIndex: 1}, PixelSize: 120}},
 	})
 	assert.NoError(t, err)
 	log := readTestFile(t, filepath.Join(dir, "log"))
@@ -70,11 +70,10 @@ func TestBatchUpdateUsesNamedGogCommands(t *testing.T) {
 func TestPasteValuesPreservesFormulas(t *testing.T) {
 	metadata := `{"spreadsheetId":"sheet-1","sheets":[{"properties":{"sheetId":7,"title":"Data","gridProperties":{"rowCount":10,"columnCount":5}}}]}`
 	client, dir := fakeGog(t, metadata, `{}`)
-	_, err := client.BatchUpdate(context.Background(), "sheet-1", []Request{{
-		PasteData: &PasteDataRequest{
-			Coordinate: GridCoordinate{SheetID: 7},
-			Rows:       Rows{{"id", "calc"}, {"a", "=A2"}},
-			Type:       "PASTE_VALUES",
+	_, err := client.Apply(context.Background(), "sheet-1", []Operation{{
+		PasteRows: &PasteRowsOperation{
+			SheetID: 7,
+			Rows:    Rows{{"id", "calc"}, {"a", "=A2"}},
 		},
 	}})
 	assert.NoError(t, err)
@@ -86,13 +85,14 @@ func TestAddSheetPreservesExactGridSize(t *testing.T) {
 	before := `{"spreadsheetId":"sheet-1","sheets":[{"properties":{"sheetId":0,"title":"Sheet1","gridProperties":{"rowCount":1000,"columnCount":26}}}]}`
 	after := `{"spreadsheetId":"sheet-1","sheets":[{"properties":{"sheetId":7,"title":"Data","gridProperties":{"rowCount":1000,"columnCount":26}}}]}`
 	client, dir := fakeGog(t, before, `{"sheetId":7}`, after, `{}`, `{}`)
-	_, err := client.BatchUpdate(context.Background(), "sheet-1", []Request{{
-		AddSheet: &AddSheetRequest{Properties: SheetProperties{
+	results, err := client.Apply(context.Background(), "sheet-1", []Operation{{
+		AddSheet: &AddSheetOperation{
 			Title:          "Data",
 			GridProperties: &GridProperties{RowCount: 4, ColumnCount: 3},
-		}},
+		},
 	}})
 	assert.NoError(t, err)
+	assert.Equal(t, int64(7), results[0].AddedSheet.ID)
 	log := readTestFile(t, filepath.Join(dir, "log"))
 	assert.Contains(t, log, "sheets delete-dimension sheet-1 Data --dimension ROWS --start 5 --end 1000 --force")
 	assert.Contains(t, log, "sheets delete-dimension sheet-1 Data --dimension COLUMNS --start 4 --end 26 --force")
@@ -101,8 +101,8 @@ func TestAddSheetPreservesExactGridSize(t *testing.T) {
 func TestReplaceClearsAllCellData(t *testing.T) {
 	metadata := `{"spreadsheetId":"sheet-1","sheets":[{"properties":{"sheetId":7,"title":"Data","gridProperties":{"rowCount":10,"columnCount":5}}}]}`
 	client, dir := fakeGog(t, metadata, `{}`, `{}`, `{}`, `{}`)
-	_, err := client.BatchUpdate(context.Background(), "sheet-1", []Request{{
-		UpdateCells: &UpdateCellsRequest{Range: GridRange{SheetID: 7}, Fields: "*"},
+	_, err := client.Apply(context.Background(), "sheet-1", []Operation{{
+		ClearCells: &ClearCellsOperation{Range: GridRange{SheetID: 7}, All: true},
 	}})
 	assert.NoError(t, err)
 	log := readTestFile(t, filepath.Join(dir, "log"))

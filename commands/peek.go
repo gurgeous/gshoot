@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/gurgeous/gshoot/google"
+	"github.com/gurgeous/gshoot/gog"
 	"github.com/gurgeous/gshoot/util"
 	"github.com/gurgeous/gshoot/ux"
 )
@@ -32,7 +32,7 @@ func (c *PeekCmd) Run() error {
 	return nil
 }
 
-func (c *PeekCmd) run0() (sheets []*google.Sheet, err error) {
+func (c *PeekCmd) run0() (sheets []*gog.Sheet, err error) {
 	cmd, err := srunStart(os.Stderr, srunOptions{spreadsheet: c.Spreadsheet})
 	if err != nil {
 		return nil, err

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/gurgeous/gshoot/google"
+	"github.com/gurgeous/gshoot/gog"
 	"github.com/gurgeous/gshoot/util"
 	"github.com/gurgeous/gshoot/ux"
 )
@@ -37,7 +37,7 @@ func (c *ListCmd) Run() error {
 	return nil
 }
 
-func (c *ListCmd) run0() (files []*google.File, err error) {
+func (c *ListCmd) run0() (files []*gog.File, err error) {
 	progress := ux.StartProgress(os.Stderr, "connecting to Google Sheets...")
 	defer func() {
 		if err == nil {
@@ -48,7 +48,7 @@ func (c *ListCmd) run0() (files []*google.File, err error) {
 	}()
 
 	ctx := context.Background()
-	client, err := google.NewClient(ctx)
+	client, err := gog.NewClient(ctx)
 	if err != nil {
 		return nil, err
 	}
