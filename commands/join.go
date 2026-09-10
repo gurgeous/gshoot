@@ -29,12 +29,14 @@ func (c *JoinCmd) Run() (err error) {
 		return err
 	}
 
+	// fire up progress
 	cmd, err := srunStart(os.Stderr, srunOptions{spreadsheet: c.Spreadsheet})
 	if err != nil {
 		return err
 	}
 	defer func() { cmd.stop(err) }()
 
+	// find spreadsheet
 	cmd.progress.SayFetchSpreadsheet(cmd.file.Name)
 	spreadsheet, err := cmd.client.GetSpreadsheetWithGridData(cmd.ctx, cmd.file.ID)
 	if err != nil {
@@ -49,15 +51,20 @@ func (c *JoinCmd) Run() (err error) {
 	if sheet == nil {
 		return fmt.Errorf("sheet %q not found", c.Sheet)
 	}
+
+	// pull data
 	left, err := cmd.client.GetRows(cmd.ctx, cmd.file.ID, sheet.Title)
 	if err != nil {
 		return err
 	}
 
+	// join
 	join, err := newJoiner(left, gog.Rows(right), c.Key, c.Columns)
 	if err != nil {
 		return err
 	}
+
+	// preview/prompt
 	cmd.stop(nil)
 	join.preview(os.Stdout)
 	if !c.Force {
@@ -66,18 +73,22 @@ func (c *JoinCmd) Run() (err error) {
 	}
 	cmd.progress = ux.StartProgress(os.Stderr, "creating backup and joining...")
 
+	// backup
 	backupTitle := fmt.Sprintf("%s backup %s", cmd.file.Name, time.Now().UTC().Format("2006-01-02 150405 UTC"))
 	backup, err := cmd.client.CopySpreadsheet(cmd.ctx, cmd.file.ID, backupTitle)
 	if err != nil {
 		return fmt.Errorf("create backup: %w", err)
 	}
 	backupURL := util.SpreadsheetURL(backup.ID) + "/edit"
+
+	// apply
 	hasFilter := spreadsheet.Data[sheet.ID].FilterRange != nil
 	if _, err := cmd.client.Apply(cmd.ctx, cmd.file.ID, join.operations(sheet.ID, hasFilter)); err != nil {
 		return fmt.Errorf("join failed: %w\nbackup: %s", err, backupURL)
 	}
 	cmd.stop(nil)
 
+	// done!
 	fmt.Printf("spreadsheet: %s/edit\nbackup: %s\n", util.SpreadsheetURL(cmd.file.ID), backupURL)
 	return nil
 }

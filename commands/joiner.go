@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/gurgeous/gshoot/gog"
-	"github.com/gurgeous/gshoot/util"
 )
 
 //
@@ -49,39 +48,47 @@ type joiner struct {
 	rows         gog.Rows
 }
 
+// ctor
 func newJoiner(left, right gog.Rows, key string, columns []string) (*joiner, error) {
-	if len(left) == 0 || len(right) == 0 {
-		return nil, fmt.Errorf("join inputs must have headers")
-	}
-	if err := validateHeaders(left[0], "sheet"); err != nil {
+	// validate
+	if err := left.ValidateHeaders("sheet"); err != nil {
 		return nil, err
 	}
-	if err := validateHeaders(right[0], "csv"); err != nil {
+	if err := right.ValidateHeaders("csv"); err != nil {
 		return nil, err
 	}
 
+	//
+	// resolve key col
+	//
+
 	leftHeaders, rightHeaders := left[0], right[0]
-	leftKey := util.IndexOfString(leftHeaders, key)
-	if leftKey < 0 {
+	leftIndexes, rightIndexes := left.ColumnIndexes(), right.ColumnIndexes()
+	leftKey, leftHasKey := leftIndexes[key]
+	if !leftHasKey {
 		return nil, fmt.Errorf("sheet has no %q column", key)
 	}
-	rightKey := util.IndexOfString(rightHeaders, key)
-	if rightKey < 0 {
+	rightKey, rightHasKey := rightIndexes[key]
+	if !rightHasKey {
 		return nil, fmt.Errorf("csv has no %q column", key)
 	}
-	if util.ContainsString(leftHeaders, "join") {
+	if _, ok := leftIndexes["join"]; ok {
 		return nil, fmt.Errorf("column %q already exists", "join")
 	}
 
-	selected, err := selectedColumns(rightHeaders, key, columns)
+	//
+	// resolve selected and build row indices
+	//
+
+	selected, err := selectedColumnIndexes(right, key, columns)
 	if err != nil {
 		return nil, err
 	}
-	leftKeys, err := keyedRows(left, leftKey, "sheet")
+	leftKeys, err := left.UniqueRowIndexes(leftKey, "sheet")
 	if err != nil {
 		return nil, err
 	}
-	rightKeys, err := keyedRows(right, rightKey, "csv")
+	rightKeys, err := right.UniqueRowIndexes(rightKey, "csv")
 	if err != nil {
 		return nil, err
 	}
@@ -91,35 +98,38 @@ func newJoiner(left, right gog.Rows, key string, columns []string) (*joiner, err
 		leftKeys: leftKeys, leftWidth: len(leftHeaders), right: right,
 		rightKey: rightKey, rightKeys: rightKeys,
 	}
-	leftHeaderSet := stringIndexes(leftHeaders)
-	rightIndexes := stringIndexes(rightHeaders)
-	selectedSet := map[string]bool{}
-	for _, header := range selected {
-		selectedSet[header] = true
-	}
+
+	//
+	// classify columns into left/match/right
+	//
+
 	for i, header := range leftHeaders {
 		if header == key || header == "" {
 			continue
 		}
-		if !selectedSet[header] {
+		rightIndex, matched := selected[header]
+		if !matched {
 			join.leftColumns = append(join.leftColumns, header)
 			continue
 		}
 		join.matchColumns = append(join.matchColumns, columnMatch{
-			left: i, right: rightIndexes[header], source: header, target: header + "2",
+			left: i, right: rightIndex, source: header, target: header + "2",
 		})
 	}
 	for _, header := range rightHeaders {
-		if !selectedSet[header] {
-			continue
-		}
-		if _, ok := leftHeaderSet[header]; !ok {
+		_, isSelected := selected[header]
+		_, matched := leftIndexes[header]
+		if isSelected && !matched {
 			join.rightColumns = append(join.rightColumns, header)
 		}
 	}
 	if err := join.validateOutputColumns(leftHeaders); err != nil {
 		return nil, err
 	}
+
+	//
+	// build rows and tally for reports
+	//
 
 	join.rows = join.joinRows()
 	for _, row := range join.rows[1:] {
@@ -138,6 +148,7 @@ func newJoiner(left, right gog.Rows, key string, columns []string) (*joiner, err
 	return join, nil
 }
 
+// preview prints column provenance and row counts before mutation.
 func (j *joiner) preview(w io.Writer) {
 	left := strings.Join(j.leftColumns, ", ")
 	right := strings.Join(j.rightColumns, ", ")
@@ -159,9 +170,12 @@ func (j *joiner) preview(w io.Writer) {
 	fmt.Fprintf(w, "Rows\n  left:  %d\n  right: %d\n  match: %d\n", j.rowCounts.left, j.rowCounts.right, j.rowCounts.match)
 }
 
+// operations translates the plan into ordered, non-overwriting mutations.
 func (j *joiner) operations(sheetID int64, hasFilter bool) []gog.Operation {
+	// insert columns
 	operations := []gog.Operation{}
 	matches := append([]columnMatch(nil), j.matchColumns...)
+	// Insert right-to-left so earlier indexes remain valid.
 	sort.Slice(matches, func(i, k int) bool { return matches[i].left > matches[k].left })
 	for _, column := range matches {
 		operations = append(operations, gog.Operation{InsertDimension: &gog.InsertDimensionOperation{
@@ -176,6 +190,8 @@ func (j *joiner) operations(sheetID int64, hasFilter bool) []gog.Operation {
 	operations = append(operations, gog.Operation{InsertDimension: &gog.InsertDimensionOperation{
 		SheetID: sheetID, Dimension: columnsDimension, Start: 1, Count: 1,
 	}})
+
+	// insert right-only rows
 	if j.rowCounts.right > 0 {
 		inherit := true
 		operations = append(operations, gog.Operation{InsertDimension: &gog.InsertDimensionOperation{
@@ -184,12 +200,15 @@ func (j *joiner) operations(sheetID int64, hasFilter bool) []gog.Operation {
 		}})
 	}
 
+	// clear and populate inserted cells
 	inserted := j.insertedColumns()
+	// Remove formatting inherited by inserted columns before populating them.
 	for _, column := range inserted {
 		operations = append(operations, gog.Operation{FormatCells: &gog.FormatCellsOperation{
 			Range: gog.GridRange{SheetID: sheetID, StartColumnIndex: column, EndColumnIndex: column + 1},
 		}})
 	}
+	// Existing rows receive values only in newly inserted columns.
 	for _, column := range inserted {
 		values := make(gog.Rows, j.leftHeight)
 		for row := range values {
@@ -204,6 +223,9 @@ func (j *joiner) operations(sheetID int64, hasFilter bool) []gog.Operation {
 			SheetID: sheetID, RowIndex: j.leftHeight, Rows: j.rows[j.leftHeight:],
 		}})
 	}
+
+	// filter and layout
+	// Reapplying expands the range but discards filter criteria and sorting.
 	if hasFilter {
 		operations = append(operations, gog.Operation{SetFilter: &gog.GridRange{
 			SheetID: sheetID, EndRowIndex: len(j.rows), EndColumnIndex: len(j.rows[0]),
@@ -217,8 +239,10 @@ func (j *joiner) operations(sheetID int64, hasFilter bool) []gog.Operation {
 	return operations
 }
 
+// insertedColumns returns the final indexes of every newly inserted column.
 func (j *joiner) insertedColumns() []int {
-	headers := stringIndexes(j.rows[0])
+	headers := j.rows.ColumnIndexes()
+	// The implicit zero is the leading "join" indicator column.
 	columns := make([]int, 1, 1+len(j.matchColumns)+len(j.rightColumns))
 	for _, match := range j.matchColumns {
 		columns = append(columns, headers[match.target])
@@ -230,19 +254,21 @@ func (j *joiner) insertedColumns() []int {
 	return columns
 }
 
-func selectedColumns(headers []string, key string, columns []string) ([]string, error) {
-	indexes := stringIndexes(headers)
+// selectedColumnIndexes validates selected columns and returns RIGHT indexes.
+func selectedColumnIndexes(rows gog.Rows, key string, columns []string) (map[string]int, error) {
+	headers, indexes := rows[0], rows.ColumnIndexes()
+	selected := map[string]int{}
 	if columns == nil {
-		selected := make([]string, 0, len(headers)-1)
-		for _, header := range headers {
+		// default to every named non-key column
+		for i, header := range headers {
 			if header != key && header != "" {
-				selected = append(selected, header)
+				selected[header] = i
 			}
 		}
 		return selected, nil
 	}
 
-	seen := map[string]bool{}
+	// validate explicit columns
 	for _, column := range columns {
 		if column == "" {
 			return nil, fmt.Errorf("--columns contains an empty column")
@@ -250,47 +276,19 @@ func selectedColumns(headers []string, key string, columns []string) ([]string, 
 		if column == key {
 			return nil, fmt.Errorf("--columns must not include join key %q", key)
 		}
-		if seen[column] {
+		if _, ok := selected[column]; ok {
 			return nil, fmt.Errorf("duplicate --columns value %q", column)
 		}
-		if _, ok := indexes[column]; !ok {
+		index, ok := indexes[column]
+		if !ok {
 			return nil, fmt.Errorf("csv has no %q column", column)
 		}
-		seen[column] = true
-	}
-
-	selected := []string{}
-	for _, header := range headers {
-		if seen[header] {
-			selected = append(selected, header)
-		}
+		selected[column] = index
 	}
 	return selected, nil
 }
 
-func keyedRows(rows gog.Rows, keyColumn int, label string) (map[string]int, error) {
-	keys := map[string]int{}
-	for i := 1; i < len(rows); i++ {
-		key := rows[i][keyColumn]
-		if key == "" {
-			continue
-		}
-		if _, ok := keys[key]; ok {
-			return nil, fmt.Errorf("%s has duplicate key %q", label, key)
-		}
-		keys[key] = i
-	}
-	return keys, nil
-}
-
-func stringIndexes(values []string) map[string]int {
-	indexes := make(map[string]int, len(values))
-	for i, value := range values {
-		indexes[value] = i
-	}
-	return indexes
-}
-
+// validateOutputColumns rejects names that would overwrite planned output.
 func (j *joiner) validateOutputColumns(leftHeaders []string) error {
 	output := map[string]bool{"join": true}
 	for _, header := range leftHeaders {
@@ -311,7 +309,9 @@ func (j *joiner) validateOutputColumns(leftHeaders []string) error {
 	return nil
 }
 
+// joinRows builds output values while preserving LEFT and RIGHT row order.
 func (j *joiner) joinRows() gog.Rows {
+	// build headers and source-to-output column mappings
 	headers := []string{"join"}
 	matchByLeft := map[int]columnMatch{}
 	for _, match := range j.matchColumns {
@@ -327,7 +327,7 @@ func (j *joiner) joinRows() gog.Rows {
 			headers = append(headers, match.target)
 		}
 	}
-	rightIndexes := stringIndexes(j.right[0])
+	rightIndexes := j.right.ColumnIndexes()
 	rightOutput := map[int]int{}
 	for _, header := range j.rightColumns {
 		rightIndex := rightIndexes[header]
@@ -335,6 +335,7 @@ func (j *joiner) joinRows() gog.Rows {
 		headers = append(headers, header)
 	}
 
+	// emit left rows, mixing in matching right values
 	rows := gog.Rows{headers}
 	for i := 1; i < len(j.left); i++ {
 		out := make([]string, len(headers))
@@ -349,6 +350,8 @@ func (j *joiner) joinRows() gog.Rows {
 		}
 		rows = append(rows, out)
 	}
+
+	// append right-only rows
 	for i := 1; i < len(j.right); i++ {
 		key := j.right[i][j.rightKey]
 		if _, matched := j.leftKeys[key]; matched {
@@ -363,6 +366,7 @@ func (j *joiner) joinRows() gog.Rows {
 	return rows
 }
 
+// copyRightValues places selected RIGHT values into their output columns.
 func copyRightValues(out, right []string, matchOutput, rightOutput map[int]int) {
 	for source, target := range matchOutput {
 		out[target] = right[source]

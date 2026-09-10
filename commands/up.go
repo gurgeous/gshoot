@@ -35,7 +35,7 @@ func (c *UpCmd) Run() (err error) {
 	if err != nil {
 		return err
 	}
-	if err := validateHeaders(rows[0], "csv"); err != nil {
+	if err := gog.Rows(rows).ValidateHeaders("csv"); err != nil {
 		return err
 	}
 
