@@ -48,6 +48,19 @@ func (c *Client) CreateSpreadsheetFile(ctx context.Context, name string) (*File,
 	return &File{ID: out.ID, Name: out.Name}, nil
 }
 
+func (c *Client) CopySpreadsheet(ctx context.Context, id, title string) (*File, error) {
+	var out struct {
+		File *File `json:"file"`
+	}
+	if err := c.runJSON(ctx, nil, &out, sheetsCommand, "copy", id, title, "--parent", "root"); err != nil {
+		return nil, err
+	}
+	if out.File == nil {
+		return nil, errors.New("gog returned no copied spreadsheet")
+	}
+	return out.File, nil
+}
+
 // FindSpreadsheetFile accepts a spreadsheet name, ID, or URL.
 func (c *Client) FindSpreadsheetFile(ctx context.Context, ref string) (*File, error) {
 	if strings.Contains(ref, "://") {
@@ -334,8 +347,23 @@ func (c *Client) applyOperation(ctx context.Context, id string, operation Operat
 		if err != nil {
 			return OperationResult{}, err
 		}
-		cell := quoteSheet(sheet.Title) + "!A1"
+		cell := fmt.Sprintf("%s!%s%d", quoteSheet(sheet.Title), columnName(paste.ColumnIndex), paste.RowIndex+1)
 		return OperationResult{}, c.runJSON(ctx, bytes.NewReader(data), nil, sheetsCommand, "update", id, cell, "--values-json", "@-", "--input", "USER_ENTERED")
+
+	case operation.InsertDimension != nil:
+		insert := operation.InsertDimension
+		sheet, err := sheetByID(insert.SheetID)
+		if err != nil {
+			return OperationResult{}, err
+		}
+		args := []string{sheetsCommand, "insert", id, sheet.Title, insert.Dimension, strconv.Itoa(insert.Start), "--count", strconv.Itoa(insert.Count)}
+		if insert.After {
+			args = append(args, "--after")
+		}
+		if insert.InheritFromBefore != nil {
+			args = append(args, fmt.Sprintf("--inherit-from-before=%t", *insert.InheritFromBefore))
+		}
+		return OperationResult{}, c.runJSON(ctx, nil, nil, args...)
 
 	case operation.SetFilter != nil:
 		sheet, err := sheetByID(operation.SetFilter.SheetID)

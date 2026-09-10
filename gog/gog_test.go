@@ -51,20 +51,38 @@ func TestGetRowsUsesQuotedRange(t *testing.T) {
 	assert.Contains(t, readTestFile(t, filepath.Join(dir, "log")), `sheets get sheet-1 'Bob''s Sheet'`)
 }
 
+func TestCopySpreadsheet(t *testing.T) {
+	client, dir := fakeGog(t, `{"file":{"id":"copy-1","name":"Budget backup","webViewLink":"https://example.test/copy-1"}}`)
+	file, err := client.CopySpreadsheet(context.Background(), "sheet-1", "Budget backup")
+	assert.NoError(t, err)
+	assert.Equal(t, &File{ID: "copy-1", Name: "Budget backup", WebViewLink: "https://example.test/copy-1"}, file)
+	assert.Contains(t, readTestFile(t, filepath.Join(dir, "log")), "sheets copy sheet-1 Budget backup --parent root")
+}
+
+func TestGridDataIncludesFilterRange(t *testing.T) {
+	client, _ := fakeGog(t, `{"sheets":[{"properties":{"sheetId":7,"title":"Data","gridProperties":{"rowCount":10,"columnCount":5}},"basicFilter":{"range":{"sheetId":7,"startRowIndex":1,"endRowIndex":8,"startColumnIndex":2,"endColumnIndex":5}}}]}`)
+	spreadsheet, err := client.GetSpreadsheetWithGridData(context.Background(), "sheet-1")
+	assert.NoError(t, err)
+	assert.Equal(t, &GridRange{SheetID: 7, StartRowIndex: 1, EndRowIndex: 8, StartColumnIndex: 2, EndColumnIndex: 5}, spreadsheet.Data[7].FilterRange)
+}
+
 func TestApplyUsesNamedGogCommands(t *testing.T) {
 	metadata := `{"spreadsheetId":"sheet-1","title":"Budget","sheets":[{"properties":{"sheetId":7,"title":"Data","gridProperties":{"rowCount":10,"columnCount":5}}}]}`
-	client, dir := fakeGog(t, metadata, `{}`, metadata, `{}`, metadata, `{}`)
+	client, dir := fakeGog(t, metadata, `{}`, metadata, `{}`, metadata, `{}`, metadata, `{}`)
+	inherit := false
 	_, err := client.Apply(context.Background(), "sheet-1", []Operation{
-		{PasteRows: &PasteRowsOperation{SheetID: 7, Rows: Rows{{"name", "count"}, {"alpha", "1"}}}},
+		{InsertDimension: &InsertDimensionOperation{SheetID: 7, Dimension: "cols", Start: 2, Count: 1, InheritFromBefore: &inherit}},
+		{PasteRows: &PasteRowsOperation{SheetID: 7, RowIndex: 2, ColumnIndex: 1, Rows: Rows{{"alpha", "1"}}}},
 		{SetFilter: &GridRange{SheetID: 7, EndRowIndex: 2, EndColumnIndex: 2}},
 		{ResizeColumns: &ResizeColumnsOperation{Range: ColumnRange{SheetID: 7, EndIndex: 1}, PixelSize: 120}},
 	})
 	assert.NoError(t, err)
 	log := readTestFile(t, filepath.Join(dir, "log"))
-	assert.Contains(t, log, "sheets update sheet-1 'Data'!A1 --values-json @- --input USER_ENTERED")
+	assert.Contains(t, log, "sheets insert sheet-1 Data cols 2 --count 1 --inherit-from-before=false")
+	assert.Contains(t, log, "sheets update sheet-1 'Data'!B3 --values-json @- --input USER_ENTERED")
 	assert.Contains(t, log, "sheets filter set sheet-1 'Data'!A1:B2 --force")
 	assert.Contains(t, log, "sheets resize-columns sheet-1 'Data'!A:A --width 120")
-	assert.JSONEq(t, `[["name","count"],["alpha","1"]]`, readTestFile(t, filepath.Join(dir, "stdin.2")))
+	assert.JSONEq(t, `[["alpha","1"]]`, readTestFile(t, filepath.Join(dir, "stdin.4")))
 }
 
 func TestPasteValuesPreservesFormulas(t *testing.T) {

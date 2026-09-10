@@ -361,8 +361,8 @@ func (s *refiller) hasFormula(c int) bool {
 // remoteDataHeight returns remote rows covered by the filter or data.
 func (s *refiller) remoteDataHeight() int {
 	count := len(s.remoteRows)
-	if s.remoteSheetData.FilterEndRow > 0 {
-		count = s.remoteSheetData.FilterEndRow
+	if s.remoteSheetData.FilterRange != nil && s.remoteSheetData.FilterRange.EndRowIndex > 0 {
+		count = s.remoteSheetData.FilterRange.EndRowIndex
 	}
 	return min(count, len(s.remoteRows))
 }

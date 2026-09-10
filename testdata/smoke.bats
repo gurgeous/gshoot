@@ -10,6 +10,7 @@ setup() {
   [ "$status" -eq 0 ]
   [[ "$output" == *"Commands:"* ]]
   [[ "$output" == *"up"* ]]
+  [[ "$output" == *"join"* ]]
   [[ "$output" != *"auth login"* ]]
   [[ "$output" != *"welcome"* ]]
 }
@@ -51,5 +52,19 @@ setup() {
   '
   [ "$status" -eq 0 ]
   [[ "$output" == *"up:Upload a CSV"* ]]
+  [[ "$output" == *"join:Join a CSV"* ]]
   [[ "$output" != *"auth:"* ]]
+}
+
+@test "zsh completion offers join flags" {
+  run zsh -fc '
+    function compdef() {}
+    function _arguments() { print -rl -- "$@" }
+    source '"$ROOT"'/extra/_gshoot
+    _gshoot_join
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"--key[Column used to match rows]"* ]]
+  [[ "$output" == *"--columns[Comma-separated CSV columns to join]"* ]]
+  [[ "$output" == *":csv:_files"* ]]
 }

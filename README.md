@@ -53,6 +53,7 @@ for complete setup instructions.
 
 - download a CSV from a Google Sheets file (and maybe a specific sheet)
 - upload a CSV into a Google Sheets file (and maybe replace/merge into an existing sheet)
+- join CSV columns into an existing sheet without overwriting its data
 - `up --replace` mode to overwrite an existing sheet
 - `up --refill` mode to merge data into an existing sheet, leaving other columns untouched
 - `up` has lots of little helpers to make life easier like `--filter`, `--layout`, `--numeric` and `--open`
@@ -66,6 +67,7 @@ Magically upload/download CSVs from Google Sheets.
 
 Commands:
   down           Download a Google Sheet as CSV.
+  join           Join a CSV into an existing Google Sheet.
   up             Upload a CSV to Google Sheets.
   list           List your Google Sheets.
   peek           List sheets in a spreadsheet.
@@ -91,6 +93,25 @@ and `--layout` fetch grid data for the whole spreadsheet.
 
 `gshoot down` is much simpler. By default it downloads the first sheet, but you can override with `--sheet`.
 
+### Join
+
+`gshoot join` mixes CSV data into an existing sheet using a shared key column:
+
+```sh
+gshoot join Zoo prices.csv --key asin
+```
+
+Existing values are never overwritten. CSV-only columns are appended, while a
+column present in both inputs is inserted beside the existing column with a `2`
+suffix (`price` becomes `price2`). A first column named `join` labels each row as
+`left`, `right`, or `match`.
+
+Use `--sheet` to select a sheet, `--columns price,rank` to limit CSV columns, and
+`--force` to skip confirmation. gshoot always previews the join and creates a
+timestamped backup of the spreadsheet before writing. If the sheet has a filter,
+its range is expanded, but existing filtering, sorting, and hidden-row criteria are
+lost when the filter is reapplied.
+
 ### Other Commands
 
 These are a few other commands for convenience:
@@ -111,7 +132,6 @@ These are a few other commands for convenience:
 
 ## Future Work
 
-- `gshoot join` to join a csv into a sheet with a key column
 - `gshoot append` to append a csv to a sheet (cols must be identical)
 - `ghoost hyperlink plaintext_col link_col`, replace plaintext_col with `=hyperlink(plain, link)`. handle blanks, fail fast on bad links too
 
@@ -120,30 +140,46 @@ These are a few other commands for convenience:
 These additions are ordered by priority for gshoot:
 
 - `gog sheets batch-request <id> --requests-json @-` for atomic
-  `spreadsheets.batchUpdate` requests. An upload can require many related edits;
-  sending them together would reduce round trips and prevent a failure from leaving
-  a sheet half-updated.
+  `spreadsheets.batchUpdate` requests. gshoot currently starts a metadata command
+  and a mutation command for every ordinary operation, so 20 format/copy operations
+  mean 40 gog invocations. A batch would reduce those to one and, more importantly,
+  prevent a failure from leaving the sheet half-updated.
 
 - `gog sheets raw --range … --fields …` for bounded grid-data reads. Refill and
-  layout need formulas, formats, and column metadata from one sheet, but currently
-  have to download grid data for the entire spreadsheet.
+  layout each need selected grid data from one sheet, but gshoot must currently run
+  `sheets raw --include-grid-data` for the entire spreadsheet. This is still one
+  request, but a workbook with ten similarly sized sheets can return roughly ten
+  times the needed cell data; large unrelated sheets can make the request fail.
+
+- `gog sheets duplicate-tab <id> <sheet> <new-name> [--index N]` for a
+  `DuplicateSheetRequest`. This would enable complete in-file sheet snapshots;
+  `copy-paste` only copies cell ranges and misses sheet-level state. `join` currently
+  uses `gog sheets copy` to back up the entire spreadsheet instead.
 
 - `gog sheets resize-columns --auto --padding N --max-width N` for bounded layout
-  in one command. gshoot now autosizes, reads the resulting widths, then updates
-  every column separately to add padding and cap overly wide columns.
+  in one command. For 20 columns, gshoot currently starts 43 gog commands: two to
+  autosize, one raw grid-data read, then a metadata read and resize for each column.
+  gog could do the autosize/read/bounded-resize workflow internally in one invocation
+  and roughly three API requests.
+
+- `gog drive ls --order-by modifiedByMeTime desc`. `gshoot list` currently makes one
+  limited `drive ls` request and already selects only the fields it displays, but
+  gog cannot ask Drive to sort first. Fetching everything and sorting locally is the
+  only reliable workaround; without it, the requested limit may not contain the
+  most recently edited files.
 
 - `gog sheets clear --all-cell-data` to clear values, formats, notes, and validation
-  together. Replace mode needs a genuinely blank sheet, which currently takes four
-  commands and can leave old cell state behind if one fails.
+  together. One `--replace` clear currently starts five gog commands: one metadata
+  read, then separate value, format, validation, and note clears. A single clear
+  operation would be faster and could not leave some kinds of old cell state behind.
 
 - `gog sheets resize-grid <id> <sheet> --rows N --columns N` for exact grid
-  dimensions. gshoot currently grows and shrinks rows and columns with separate
-  insert/delete commands, making a simple resize slower and more error-prone.
+  dimensions. Resizing an existing sheet currently takes a metadata read plus as
+  many as two insert/delete commands, one per dimension. This would turn the two
+  mutations into one; the latency saving is modest, but rows and columns would no
+  longer be left at different sizes after a partial failure.
 
 - `gog sheets paste-data` with stdin, delimiter, and paste-type options. This would
-  let gshoot stream CSV/TSV data directly to Sheets instead of converting the whole
-  upload to a JSON values payload first.
-
-- `gog drive ls/search --order-by` and `gog drive search --fields` for
-  `modifiedByMeTime` workflows. gshoot's file list should request only the fields it
-  displays and ask Drive for the most recently edited files in the correct order.
+  not save an API request: gshoot already pastes all values in one call. It would
+  avoid marshaling the complete in-memory CSV/TSV into a second JSON payload, which
+  mainly reduces memory and encoding overhead for large uploads.

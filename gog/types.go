@@ -9,6 +9,7 @@ type File struct {
 	ID               string `json:"id"`
 	Name             string `json:"name"`
 	ModifiedByMeTime string `json:"modifiedByMeTime"`
+	WebViewLink      string `json:"webViewLink"`
 }
 
 // Spreadsheet contains sheet metadata plus optional grid data.
@@ -27,7 +28,7 @@ type Sheet struct {
 
 // SheetData is grid data needed by refill and layout.
 type SheetData struct {
-	FilterEndRow   int
+	FilterRange    *GridRange
 	Rows           []RowData
 	ColumnMetadata []ColumnMetadata
 }
@@ -61,6 +62,7 @@ type Operation struct {
 	ClearCells        *ClearCellsOperation
 	CopyCells         *CopyCellsOperation
 	FormatCells       *FormatCellsOperation
+	InsertDimension   *InsertDimensionOperation
 	PasteRows         *PasteRowsOperation
 	ResizeColumns     *ResizeColumnsOperation
 	SetFilter         *GridRange
@@ -85,8 +87,19 @@ type ClearCellsOperation struct {
 }
 
 type PasteRowsOperation struct {
-	SheetID int64
-	Rows    Rows
+	SheetID     int64
+	RowIndex    int
+	ColumnIndex int
+	Rows        Rows
+}
+
+type InsertDimensionOperation struct {
+	SheetID           int64
+	Dimension         string
+	Start             int
+	Count             int
+	After             bool
+	InheritFromBefore *bool
 }
 
 type FormatCellsOperation struct {
