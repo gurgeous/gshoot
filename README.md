@@ -117,12 +117,33 @@ These are a few other commands for convenience:
 
 ## Potential gogcli improvements
 
-These additions would make gshoot faster and simpler:
+These additions are ordered by priority for gshoot:
 
-- `gog sheets batch-request <id> --requests-json @-` for atomic `spreadsheets.batchUpdate` requests.
-- `gog sheets raw --range … --fields …` for bounded grid-data reads.
-- `gog sheets resize-grid <id> <sheet> --rows N --columns N` for exact grid dimensions.
-- `gog sheets resize-columns --auto --padding N --max-width N` for bounded layout in one command.
-- `gog sheets paste-data` with stdin, delimiter, and paste-type options.
-- `gog sheets clear --all-cell-data` to clear values, formats, notes, and validation together.
-- `gog drive ls/search --order-by` and `gog drive search --fields` for `modifiedByMeTime` workflows.
+- `gog sheets batch-request <id> --requests-json @-` for atomic
+  `spreadsheets.batchUpdate` requests. An upload can require many related edits;
+  sending them together would reduce round trips and prevent a failure from leaving
+  a sheet half-updated.
+
+- `gog sheets raw --range … --fields …` for bounded grid-data reads. Refill and
+  layout need formulas, formats, and column metadata from one sheet, but currently
+  have to download grid data for the entire spreadsheet.
+
+- `gog sheets resize-columns --auto --padding N --max-width N` for bounded layout
+  in one command. gshoot now autosizes, reads the resulting widths, then updates
+  every column separately to add padding and cap overly wide columns.
+
+- `gog sheets clear --all-cell-data` to clear values, formats, notes, and validation
+  together. Replace mode needs a genuinely blank sheet, which currently takes four
+  commands and can leave old cell state behind if one fails.
+
+- `gog sheets resize-grid <id> <sheet> --rows N --columns N` for exact grid
+  dimensions. gshoot currently grows and shrinks rows and columns with separate
+  insert/delete commands, making a simple resize slower and more error-prone.
+
+- `gog sheets paste-data` with stdin, delimiter, and paste-type options. This would
+  let gshoot stream CSV/TSV data directly to Sheets instead of converting the whole
+  upload to a JSON values payload first.
+
+- `gog drive ls/search --order-by` and `gog drive search --fields` for
+  `modifiedByMeTime` workflows. gshoot's file list should request only the fields it
+  displays and ask Drive for the most recently edited files in the correct order.
