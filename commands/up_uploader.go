@@ -158,8 +158,7 @@ func (s *uploader) pasteCSV() error {
 	_, err := s.client.BatchUpdate(s.ctx, s.file.ID, []google.Request{{
 		PasteData: &google.PasteDataRequest{
 			Coordinate: google.GridCoordinate{SheetID: s.id},
-			Data:       util.CSVString(s.rows),
-			Delimiter:  ",",
+			Rows:       s.rows,
 			Type:       pasteType,
 		},
 	}})
@@ -260,12 +259,18 @@ func (s *uploader) applyLayout() error {
 // layoutWidthRequests builds padding requests from autosized column widths.
 func (s *uploader) layoutWidthRequests() ([]google.Request, error) {
 	ncols := len(s.rows[0])
-	spreadsheet, err := s.client.GetSpreadsheetWithGridData(s.ctx, s.file.ID, s.title)
+	spreadsheet, err := s.client.GetSpreadsheetWithGridData(s.ctx, s.file.ID)
 	if err != nil {
 		return nil, err
 	}
 
 	data := spreadsheet.Data[s.id]
+	if data == nil {
+		return nil, fmt.Errorf("sheet %q has no grid data", s.title)
+	}
+	if len(data.ColumnMetadata) < ncols {
+		return nil, fmt.Errorf("sheet %q has column metadata for %d of %d columns", s.title, len(data.ColumnMetadata), ncols)
+	}
 	requests := []google.Request{}
 	for c := range ncols {
 		meta := data.ColumnMetadata[c]

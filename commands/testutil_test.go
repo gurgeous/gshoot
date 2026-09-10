@@ -49,6 +49,7 @@ cat > "$dir/stdin.$n"
 test -f "$dir/response.$n" && cat "$dir/response.$n"
 `
 	assert.NoError(t, os.WriteFile(filepath.Join(bin, "gog"), []byte(script), 0o700))
+	assert.NoError(t, os.WriteFile(filepath.Join(tmp, "log"), nil, 0o600))
 	for i, response := range responses {
 		assert.NoError(t, os.WriteFile(filepath.Join(tmp, "response."+strconv.Itoa(i+1)), []byte(response), 0o600))
 	}

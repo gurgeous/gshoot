@@ -267,11 +267,10 @@ type UpdateCellsRequest struct {
 	Fields string    `json:"fields"`
 }
 
-// PasteDataRequest pastes delimited text into a sheet.
+// PasteDataRequest pastes rows into a sheet.
 type PasteDataRequest struct {
 	Coordinate GridCoordinate `json:"coordinate"`
-	Data       string         `json:"data"`
-	Delimiter  string         `json:"delimiter"`
+	Rows       Rows           `json:"rows"`
 	Type       string         `json:"type"`
 }
 

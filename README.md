@@ -84,6 +84,9 @@ When using `up`, gshoot will find or create the spreadsheet file as necessary. T
 
 Spreadsheet arguments accept an exact Drive name, spreadsheet ID, or Google Sheets URL.
 
+gog currently cannot bound raw grid-data reads by sheet or range, so `--refill`
+and `--layout` fetch grid data for the whole spreadsheet.
+
 ### Down, Down, Down
 
 `gshoot down` is much simpler. By default it downloads the first sheet, but you can override with `--sheet`.
@@ -106,15 +109,10 @@ These are a few other commands for convenience:
 
 These additions would make gshoot faster and simpler:
 
-- `gog sheets batch-request <id> --requests-json @-` for atomic
-  `spreadsheets.batchUpdate` requests.
+- `gog sheets batch-request <id> --requests-json @-` for atomic `spreadsheets.batchUpdate` requests.
 - `gog sheets raw --range … --fields …` for bounded grid-data reads.
-- `gog sheets resize-grid <id> <sheet> --rows N --columns N` for exact grid
-  dimensions.
-- `gog sheets resize-columns --auto --padding N --max-width N` for bounded
-  layout in one command.
+- `gog sheets resize-grid <id> <sheet> --rows N --columns N` for exact grid dimensions.
+- `gog sheets resize-columns --auto --padding N --max-width N` for bounded layout in one command.
 - `gog sheets paste-data` with stdin, delimiter, and paste-type options.
-- `gog sheets clear --all-cell-data` to clear values, formats, notes, and
-  validation together.
-- `gog drive ls/search --order-by` and `gog drive search --fields` for
-  `modifiedByMeTime` workflows.
+- `gog sheets clear --all-cell-data` to clear values, formats, notes, and validation together.
+- `gog drive ls/search --order-by` and `gog drive search --fields` for `modifiedByMeTime` workflows.

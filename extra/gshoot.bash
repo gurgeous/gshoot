@@ -28,6 +28,7 @@ _gshoot() {
     case "${command}" in
       down|d) _gshoot_words "-o --output --sheet --help" ;;
       up|u) _gshoot_words "--sheet --refill --replace --filter --layout --numeric --open --help" ;;
+      list|ls) _gshoot_words "--limit --help" ;;
       wipe) _gshoot_words "-f --force --help" ;;
       *) _gshoot_words "--help" ;;
     esac

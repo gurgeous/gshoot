@@ -11,5 +11,5 @@ func TestListCommand(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Contains(t, stdout, "Alpha")
 	assert.Contains(t, stdout, "Beta")
-	assert.Contains(t, log, "drive ls --all --max 1000")
+	assert.Contains(t, log, "drive ls --all --max 5")
 }

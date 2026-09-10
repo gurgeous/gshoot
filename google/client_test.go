@@ -11,16 +11,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestListSpreadsheetFilesPaginatesAndSorts(t *testing.T) {
-	client, dir := fakeGog(t,
-		`{"files":[{"id":"1","name":"Alpha","modifiedByMeTime":"2026-05-07T11:00:00Z"}],"nextPageToken":"next"}`,
-		`{"files":[{"id":"2","name":"Beta","modifiedByMeTime":"2026-05-07T12:00:00Z"}]}`,
-	)
+func TestListSpreadsheetFilesUsesGogLimitAndOrder(t *testing.T) {
+	client, dir := fakeGog(t, `{"files":[{"id":"1","name":"Alpha"},{"id":"2","name":"Beta"}],"nextPageToken":"next"}`)
 	files, err := client.ListSpreadsheetFiles(context.Background(), 20)
 	assert.NoError(t, err)
-	assert.Equal(t, "Beta", files[0].Name)
+	assert.Equal(t, []*File{{ID: "1", Name: "Alpha"}, {ID: "2", Name: "Beta"}}, files)
 	log := readTestFile(t, filepath.Join(dir, "log"))
-	assert.Contains(t, log, "--page next")
+	assert.Contains(t, log, "drive ls --all --max 20")
+	assert.NotContains(t, log, "--page")
 	assert.Contains(t, log, "modifiedByMeTime")
 }
 
@@ -57,7 +55,7 @@ func TestBatchUpdateUsesNamedGogCommands(t *testing.T) {
 	metadata := `{"spreadsheetId":"sheet-1","title":"Budget","sheets":[{"properties":{"sheetId":7,"title":"Data","gridProperties":{"rowCount":10,"columnCount":5}}}]}`
 	client, dir := fakeGog(t, metadata, `{}`, metadata, `{}`, metadata, `{}`)
 	_, err := client.BatchUpdate(context.Background(), "sheet-1", []Request{
-		{PasteData: &PasteDataRequest{Coordinate: GridCoordinate{SheetID: 7}, Data: "name,count\nalpha,1\n", Delimiter: ",", Type: "PASTE_NORMAL"}},
+		{PasteData: &PasteDataRequest{Coordinate: GridCoordinate{SheetID: 7}, Rows: Rows{{"name", "count"}, {"alpha", "1"}}, Type: "PASTE_NORMAL"}},
 		{SetBasicFilter: &SetBasicFilterRequest{Filter: BasicFilter{Range: GridRange{SheetID: 7, EndRowIndex: 2, EndColumnIndex: 2}}}},
 		{UpdateDimensionProperties: &UpdateDimensionPropertiesRequest{Range: DimensionRange{SheetID: 7, Dimension: "COLUMNS", EndIndex: 1}, Properties: DimensionProperties{PixelSize: 120}}},
 	})
@@ -67,6 +65,21 @@ func TestBatchUpdateUsesNamedGogCommands(t *testing.T) {
 	assert.Contains(t, log, "sheets filter set sheet-1 'Data'!A1:B2 --force")
 	assert.Contains(t, log, "sheets resize-columns sheet-1 'Data'!A:A --width 120")
 	assert.JSONEq(t, `[["name","count"],["alpha","1"]]`, readTestFile(t, filepath.Join(dir, "stdin.2")))
+}
+
+func TestPasteValuesPreservesFormulas(t *testing.T) {
+	metadata := `{"spreadsheetId":"sheet-1","sheets":[{"properties":{"sheetId":7,"title":"Data","gridProperties":{"rowCount":10,"columnCount":5}}}]}`
+	client, dir := fakeGog(t, metadata, `{}`)
+	_, err := client.BatchUpdate(context.Background(), "sheet-1", []Request{{
+		PasteData: &PasteDataRequest{
+			Coordinate: GridCoordinate{SheetID: 7},
+			Rows:       Rows{{"id", "calc"}, {"a", "=A2"}},
+			Type:       "PASTE_VALUES",
+		},
+	}})
+	assert.NoError(t, err)
+	assert.Contains(t, readTestFile(t, filepath.Join(dir, "log")), "--input USER_ENTERED")
+	assert.JSONEq(t, `[["id","calc"],["a","=A2"]]`, readTestFile(t, filepath.Join(dir, "stdin.2")))
 }
 
 func TestAddSheetPreservesExactGridSize(t *testing.T) {

@@ -3,14 +3,12 @@ package google
 import (
 	"bytes"
 	"context"
-	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/url"
 	"os/exec"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -64,7 +62,7 @@ func (c *Client) FindSpreadsheetFile(ctx context.Context, ref string) (*File, er
 		return &File{ID: id, Name: spreadsheet.Title, MimeType: spreadsheetMimeType}, nil
 	}
 
-	files, err := c.listFiles(ctx, "name = '"+driveQueryString(ref)+"'")
+	files, err := c.listFiles(ctx, "name = '"+driveQueryString(ref)+"'", 1000)
 	if err != nil || len(files) == 0 {
 		if err != nil {
 			return nil, err
@@ -91,50 +89,26 @@ func (c *Client) FindOrCreateSpreadsheetFile(ctx context.Context, ref string) (*
 }
 
 func (c *Client) ListSpreadsheetFiles(ctx context.Context, limit int) ([]*File, error) {
-	files, err := c.listFiles(ctx, "")
-	if err != nil {
-		return nil, err
-	}
-	limit = util.Clamp(limit, 1, 100)
-	return files[:min(limit, len(files))], nil
+	return c.listFiles(ctx, "", limit)
 }
 
-func (c *Client) listFiles(ctx context.Context, condition string) ([]*File, error) {
+func (c *Client) listFiles(ctx context.Context, condition string, limit int) ([]*File, error) {
 	query := fmt.Sprintf("mimeType='%s' and trashed=false", spreadsheetMimeType)
 	if condition != "" {
 		query += " and " + condition
 	}
 
-	files := []*File{}
-	page := ""
-	for {
-		var out struct {
-			Files         []*File `json:"files"`
-			NextPageToken string  `json:"nextPageToken"`
-		}
-		args := []string{
-			"drive", "ls", "--all", "--max", "1000", "--query", query,
-			"--fields", "nextPageToken,files(id,name,mimeType,modifiedByMeTime)",
-		}
-		if page != "" {
-			args = append(args, "--page", page)
-		}
-		if err := c.runJSON(ctx, nil, &out, args...); err != nil {
-			return nil, err
-		}
-		files = append(files, out.Files...)
-		page = out.NextPageToken
-		if page == "" {
-			break
-		}
+	var out struct {
+		Files []*File `json:"files"`
 	}
-	slices.SortStableFunc(files, func(a, b *File) int {
-		if n := strings.Compare(b.ModifiedByMeTime, a.ModifiedByMeTime); n != 0 {
-			return n
-		}
-		return strings.Compare(a.Name, b.Name)
-	})
-	return files, nil
+	args := []string{
+		"drive", "ls", "--all", "--max", strconv.Itoa(limit), "--query", query,
+		"--fields", "files(id,name,mimeType,modifiedByMeTime)",
+	}
+	if err := c.runJSON(ctx, nil, &out, args...); err != nil {
+		return nil, err
+	}
+	return out.Files, nil
 }
 
 func driveQueryString(s string) string {
@@ -162,7 +136,7 @@ func (c *Client) GetSpreadsheet(ctx context.Context, id string) (*Spreadsheet, e
 	return c.getSpreadsheet(ctx, id, false)
 }
 
-func (c *Client) GetSpreadsheetWithGridData(ctx context.Context, id string, _ ...string) (*Spreadsheet, error) {
+func (c *Client) GetSpreadsheetWithGridData(ctx context.Context, id string) (*Spreadsheet, error) {
 	return c.getSpreadsheet(ctx, id, true)
 }
 
@@ -183,12 +157,13 @@ func (c *Client) WipeSpreadsheet(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
-	title := "gshoot-wipe"
-	for findSheet(spreadsheet.Sheets, title) != nil {
-		title += "-x"
-	}
+	wipeTitle := ""
 	if sheet := findSheet(spreadsheet.Sheets, "Sheet1"); sheet != nil {
-		if err := c.runJSON(ctx, nil, nil, sheetsCommand, "rename-tab", id, sheet.Title, title); err != nil {
+		wipeTitle = "gshoot-wipe"
+		for findSheet(spreadsheet.Sheets, wipeTitle) != nil {
+			wipeTitle += "-x"
+		}
+		if err := c.runJSON(ctx, nil, nil, sheetsCommand, "rename-tab", id, sheet.Title, wipeTitle); err != nil {
 			return err
 		}
 	}
@@ -197,8 +172,8 @@ func (c *Client) WipeSpreadsheet(ctx context.Context, id string) error {
 	}
 	for _, sheet := range spreadsheet.Sheets {
 		name := sheet.Title
-		if strings.EqualFold(name, "Sheet1") {
-			name = title
+		if wipeTitle != "" && strings.EqualFold(name, "Sheet1") {
+			name = wipeTitle
 		}
 		if err := c.runJSON(ctx, nil, nil, sheetsCommand, "delete-tab", id, name, "--force"); err != nil {
 			return err
@@ -242,7 +217,7 @@ func (c *Client) GetRows(ctx context.Context, id, title string) (Rows, error) {
 	var out struct {
 		Values [][]any `json:"values"`
 	}
-	if err := c.runJSON(ctx, nil, &out, sheetsCommand, "get", id, sheetRange(title)); err != nil {
+	if err := c.runJSON(ctx, nil, &out, sheetsCommand, "get", id, quoteSheet(title)); err != nil {
 		return nil, err
 	}
 	rows := make([][]string, 0, len(out.Values))
@@ -274,13 +249,13 @@ func (c *Client) applyRequest(ctx context.Context, id string, request Request) (
 	if err != nil {
 		return Reply{}, err
 	}
-	sheetName := func(sheetID int64) (string, error) {
+	sheetByID := func(sheetID int64) (*Sheet, error) {
 		for _, sheet := range spreadsheet.Sheets {
 			if sheet.ID == sheetID {
-				return sheet.Title, nil
+				return sheet, nil
 			}
 		}
-		return "", fmt.Errorf("sheet id %d not found", sheetID)
+		return nil, fmt.Errorf("sheet id %d not found", sheetID)
 	}
 
 	switch {
@@ -297,42 +272,48 @@ func (c *Client) applyRequest(ctx context.Context, id string, request Request) (
 			return Reply{}, err
 		}
 		if p.GridProperties != nil {
-			if err := c.resizeGrid(ctx, id, p.Title, p.GridProperties, nil); err != nil {
+			// Google creates regular sheets with this default grid size.
+			current := &Sheet{
+				ID:             out.SheetID,
+				Title:          p.Title,
+				GridProperties: &GridProperties{RowCount: 1000, ColumnCount: 26},
+			}
+			if err := c.resizeGrid(ctx, id, p.Title, p.GridProperties, current); err != nil {
 				return Reply{}, err
 			}
 		}
 		return Reply{AddSheet: &AddSheetReply{Properties: Sheet{ID: out.SheetID, Title: p.Title}}}, nil
 
 	case request.DeleteSheet != nil:
-		name, err := sheetName(request.DeleteSheet.SheetID)
+		sheet, err := sheetByID(request.DeleteSheet.SheetID)
 		if err != nil {
 			return Reply{}, err
 		}
-		return Reply{}, c.runJSON(ctx, nil, nil, sheetsCommand, "delete-tab", id, name, "--force")
+		return Reply{}, c.runJSON(ctx, nil, nil, sheetsCommand, "delete-tab", id, sheet.Title, "--force")
 
 	case request.UpdateSheetProperties != nil:
 		p := request.UpdateSheetProperties.Properties
-		name, err := sheetName(*p.SheetID)
+		sheet, err := sheetByID(*p.SheetID)
 		if err != nil {
 			return Reply{}, err
 		}
 		if strings.Contains(request.UpdateSheetProperties.Fields, "title") {
-			if err := c.runJSON(ctx, nil, nil, sheetsCommand, "rename-tab", id, name, p.Title); err != nil {
+			if err := c.runJSON(ctx, nil, nil, sheetsCommand, "rename-tab", id, sheet.Title, p.Title); err != nil {
 				return Reply{}, err
 			}
-			name = p.Title
+			sheet.Title = p.Title
 		}
 		if p.GridProperties != nil {
-			return Reply{}, c.resizeGrid(ctx, id, name, p.GridProperties, findSheet(spreadsheet.Sheets, name))
+			return Reply{}, c.resizeGrid(ctx, id, sheet.Title, p.GridProperties, sheet)
 		}
 		return Reply{}, nil
 
 	case request.UpdateCells != nil:
-		name, err := sheetName(request.UpdateCells.Range.SheetID)
+		sheet, err := sheetByID(request.UpdateCells.Range.SheetID)
 		if err != nil {
 			return Reply{}, err
 		}
-		rng := gridRange(name, request.UpdateCells.Range, spreadsheet)
+		rng := gridRange(sheet, request.UpdateCells.Range)
 		if err := c.runJSON(ctx, nil, nil, sheetsCommand, "clear", id, rng); err != nil {
 			return Reply{}, err
 		}
@@ -350,41 +331,32 @@ func (c *Client) applyRequest(ctx context.Context, id string, request Request) (
 		return Reply{}, nil
 
 	case request.PasteData != nil:
-		name, err := sheetName(request.PasteData.Coordinate.SheetID)
+		sheet, err := sheetByID(request.PasteData.Coordinate.SheetID)
 		if err != nil {
 			return Reply{}, err
 		}
-		reader := csv.NewReader(strings.NewReader(request.PasteData.Data))
-		rows, err := reader.ReadAll()
+		data, err := json.Marshal(request.PasteData.Rows)
 		if err != nil {
 			return Reply{}, err
 		}
-		data, err := json.Marshal(rows)
-		if err != nil {
-			return Reply{}, err
-		}
-		input := "USER_ENTERED"
-		if request.PasteData.Type == "PASTE_VALUES" {
-			input = "RAW"
-		}
-		cell := a1Cell(name, request.PasteData.Coordinate.RowIndex, request.PasteData.Coordinate.ColumnIndex)
-		return Reply{}, c.runJSON(ctx, bytes.NewReader(data), nil, sheetsCommand, "update", id, cell, "--values-json", "@-", "--input", input)
+		cell := a1Cell(sheet.Title, request.PasteData.Coordinate.RowIndex, request.PasteData.Coordinate.ColumnIndex)
+		return Reply{}, c.runJSON(ctx, bytes.NewReader(data), nil, sheetsCommand, "update", id, cell, "--values-json", "@-", "--input", "USER_ENTERED")
 
 	case request.SetBasicFilter != nil:
 		filter := request.SetBasicFilter.Filter.Range
-		name, err := sheetName(filter.SheetID)
+		sheet, err := sheetByID(filter.SheetID)
 		if err != nil {
 			return Reply{}, err
 		}
-		return Reply{}, c.runJSON(ctx, nil, nil, sheetsCommand, "filter", "set", id, gridRange(name, filter, spreadsheet), "--force")
+		return Reply{}, c.runJSON(ctx, nil, nil, sheetsCommand, "filter", "set", id, gridRange(sheet, filter), "--force")
 
 	case request.RepeatCell != nil:
 		repeat := request.RepeatCell
-		name, err := sheetName(repeat.Range.SheetID)
+		sheet, err := sheetByID(repeat.Range.SheetID)
 		if err != nil {
 			return Reply{}, err
 		}
-		rng := gridRange(name, repeat.Range, spreadsheet)
+		rng := gridRange(sheet, repeat.Range)
 		if repeat.Cell.UserEnteredFormat != nil && repeat.Cell.UserEnteredFormat.NumberFormat != nil {
 			format := repeat.Cell.UserEnteredFormat.NumberFormat
 			return Reply{}, c.runJSON(ctx, nil, nil, sheetsCommand, "number-format", id, rng, "--type", format.Type, "--pattern", format.Pattern)
@@ -393,32 +365,32 @@ func (c *Client) applyRequest(ctx context.Context, id string, request Request) (
 
 	case request.AutoResizeDimensions != nil:
 		dim := request.AutoResizeDimensions.Dimensions
-		name, err := sheetName(dim.SheetID)
+		sheet, err := sheetByID(dim.SheetID)
 		if err != nil {
 			return Reply{}, err
 		}
-		return Reply{}, c.runJSON(ctx, nil, nil, sheetsCommand, "resize-columns", id, columnRange(name, dim), "--auto")
+		return Reply{}, c.runJSON(ctx, nil, nil, sheetsCommand, "resize-columns", id, columnRange(sheet.Title, dim), "--auto")
 
 	case request.UpdateDimensionProperties != nil:
 		update := request.UpdateDimensionProperties
-		name, err := sheetName(update.Range.SheetID)
+		sheet, err := sheetByID(update.Range.SheetID)
 		if err != nil {
 			return Reply{}, err
 		}
-		return Reply{}, c.runJSON(ctx, nil, nil, sheetsCommand, "resize-columns", id, columnRange(name, update.Range), "--width", strconv.Itoa(update.Properties.PixelSize))
+		return Reply{}, c.runJSON(ctx, nil, nil, sheetsCommand, "resize-columns", id, columnRange(sheet.Title, update.Range), "--width", strconv.Itoa(update.Properties.PixelSize))
 
 	case request.CopyPaste != nil:
 		copyReq := request.CopyPaste
-		sourceName, err := sheetName(copyReq.Source.SheetID)
+		source, err := sheetByID(copyReq.Source.SheetID)
 		if err != nil {
 			return Reply{}, err
 		}
-		destName, err := sheetName(copyReq.Destination.SheetID)
+		destination, err := sheetByID(copyReq.Destination.SheetID)
 		if err != nil {
 			return Reply{}, err
 		}
 		return Reply{}, c.runJSON(ctx, nil, nil, sheetsCommand, "copy-paste", id,
-			gridRange(sourceName, copyReq.Source, spreadsheet), gridRange(destName, copyReq.Destination, spreadsheet),
+			gridRange(source, copyReq.Source), gridRange(destination, copyReq.Destination),
 			"--type", strings.TrimPrefix(copyReq.PasteType, "PASTE_"))
 	default:
 		return Reply{}, errors.New("unsupported Sheets update")
@@ -453,7 +425,7 @@ func (c *Client) resizeGrid(ctx context.Context, id, name string, want *GridProp
 			}
 			continue
 		}
-		apiDim := strings.ToUpper(dim.label)
+		apiDim := "ROWS"
 		if dim.label == "cols" {
 			apiDim = "COLUMNS"
 		}
@@ -491,10 +463,6 @@ func (c *Client) runJSON(ctx context.Context, stdin io.Reader, dst any, args ...
 	return nil
 }
 
-func sheetRange(title string) string {
-	return quoteSheet(title)
-}
-
 func quoteSheet(title string) string {
 	return "'" + strings.ReplaceAll(title, "'", "''") + "'"
 }
@@ -503,12 +471,9 @@ func a1Cell(title string, row, column int) string {
 	return fmt.Sprintf("%s!%s%d", quoteSheet(title), columnName(column), row+1)
 }
 
-func gridRange(title string, rng GridRange, spreadsheet *Spreadsheet) string {
-	rows, cols := 1, 1
-	if sheet := findSheet(spreadsheet.Sheets, title); sheet != nil {
-		rows = sheet.GridProperties.RowCount
-		cols = sheet.GridProperties.ColumnCount
-	}
+func gridRange(sheet *Sheet, rng GridRange) string {
+	rows := sheet.GridProperties.RowCount
+	cols := sheet.GridProperties.ColumnCount
 	endRow, endCol := rng.EndRowIndex, rng.EndColumnIndex
 	if endRow == 0 {
 		endRow = rows
@@ -516,7 +481,7 @@ func gridRange(title string, rng GridRange, spreadsheet *Spreadsheet) string {
 	if endCol == 0 {
 		endCol = cols
 	}
-	return fmt.Sprintf("%s!%s%d:%s%d", quoteSheet(title), columnName(rng.StartColumnIndex), rng.StartRowIndex+1, columnName(endCol-1), endRow)
+	return fmt.Sprintf("%s!%s%d:%s%d", quoteSheet(sheet.Title), columnName(rng.StartColumnIndex), rng.StartRowIndex+1, columnName(endCol-1), endRow)
 }
 
 func columnRange(title string, rng DimensionRange) string {

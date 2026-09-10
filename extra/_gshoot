@@ -66,6 +66,7 @@ _gshoot_up() {
 
 _gshoot_list() {
   _arguments -s \
+	'--limit[Maximum number of spreadsheet files to list]:count:' \
     '--help[Show context-sensitive help]'
 }
 
