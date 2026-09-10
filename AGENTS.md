@@ -13,6 +13,7 @@
 - If user-facing text changes, ask before reverting it; usually fix tests instead
 - Use `mv` for file moves/renames; use patches for content edits
 - When creating a PR, write a succinct title/body from the diff vs `main`; do not use auto-filled wip text
+- Never wait for CI before merging; merge immediately when asked
 - Small Go CLI, not a framework or service
 - Be succinct, especially in Markdown
 - Prefer `just` tasks when they exist
