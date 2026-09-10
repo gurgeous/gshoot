@@ -25,6 +25,11 @@ type columnMatch struct {
 	target string
 }
 
+type columnCopy struct {
+	source int
+	target int
+}
+
 type rowCounts struct {
 	left  int
 	right int
@@ -110,11 +115,11 @@ func newJoiner(left, right gog.Rows, key string, columns []string) (*joiner, err
 		rightIndex, matched := selected[header]
 		if !matched {
 			join.leftColumns = append(join.leftColumns, header)
-			continue
+		} else {
+			join.matchColumns = append(join.matchColumns, columnMatch{
+				left: i, right: rightIndex, source: header, target: header + "2",
+			})
 		}
-		join.matchColumns = append(join.matchColumns, columnMatch{
-			left: i, right: rightIndex, source: header, target: header + "2",
-		})
 	}
 	for _, header := range rightHeaders {
 		_, isSelected := selected[header]
@@ -318,20 +323,19 @@ func (j *joiner) joinRows() gog.Rows {
 		matchByLeft[match.left] = match
 	}
 	leftOutput := make([]int, len(j.left[0]))
-	matchOutput := map[int]int{}
+	rightCopies := make([]columnCopy, 0, len(j.matchColumns)+len(j.rightColumns))
 	for i, header := range j.left[0] {
 		leftOutput[i] = len(headers)
 		headers = append(headers, header)
 		if match, ok := matchByLeft[i]; ok {
-			matchOutput[match.right] = len(headers)
+			rightCopies = append(rightCopies, columnCopy{source: match.right, target: len(headers)})
 			headers = append(headers, match.target)
 		}
 	}
 	rightIndexes := j.right.ColumnIndexes()
-	rightOutput := map[int]int{}
 	for _, header := range j.rightColumns {
 		rightIndex := rightIndexes[header]
-		rightOutput[rightIndex] = len(headers)
+		rightCopies = append(rightCopies, columnCopy{source: rightIndex, target: len(headers)})
 		headers = append(headers, header)
 	}
 
@@ -346,7 +350,7 @@ func (j *joiner) joinRows() gog.Rows {
 		out[0] = "left"
 		if matched {
 			out[0] = "match"
-			copyRightValues(out, j.right[rightRow], matchOutput, rightOutput)
+			copyColumns(out, j.right[rightRow], rightCopies)
 		}
 		rows = append(rows, out)
 	}
@@ -360,18 +364,15 @@ func (j *joiner) joinRows() gog.Rows {
 		out := make([]string, len(headers))
 		out[0] = "right"
 		out[leftOutput[j.leftKey]] = key
-		copyRightValues(out, j.right[i], matchOutput, rightOutput)
+		copyColumns(out, j.right[i], rightCopies)
 		rows = append(rows, out)
 	}
 	return rows
 }
 
-// copyRightValues places selected RIGHT values into their output columns.
-func copyRightValues(out, right []string, matchOutput, rightOutput map[int]int) {
-	for source, target := range matchOutput {
-		out[target] = right[source]
-	}
-	for source, target := range rightOutput {
-		out[target] = right[source]
+// copyColumns places selected source values into their output columns.
+func copyColumns(out, source []string, columns []columnCopy) {
+	for _, column := range columns {
+		out[column.target] = source[column.source]
 	}
 }
