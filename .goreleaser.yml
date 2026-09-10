@@ -25,6 +25,8 @@ brews:
   - description: "Magically import/export CSVs from Google Sheets"
     homepage: https://github.com/gurgeous/gshoot
     repository: { owner: "gurgeous", name: "homebrew-tap" }
+    dependencies:
+      - name: "openclaw/tap/gogcli"
     test: system "#{bin}/gshoot --version"
     extra_install: |
       bash_completion.install "extra/gshoot.bash" => "gshoot"

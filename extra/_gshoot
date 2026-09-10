@@ -15,11 +15,13 @@ _gshoot() {
     command)
       local -a commands
       commands=(
-        'auth:Login or logout from Google Sheets'
         'down:Download a Google Sheet as CSV'
+        'd:Alias for down'
         'list:List your Google Sheets'
+        'ls:Alias for list'
         'peek:List sheets in a spreadsheet'
         'up:Upload a CSV to Google Sheets'
+        'u:Alias for up'
         'wipe:Wipe/delete all data from a spreadsheet'
       )
       _describe -t commands command commands && ret=0
@@ -27,49 +29,11 @@ _gshoot() {
     arg)
       curcontext=${curcontext%:*}-$line[1]:
       case $line[1] in
-        auth) _gshoot_auth && ret=0 ;;
-        down) _gshoot_down && ret=0 ;;
-        list) _gshoot_list && ret=0 ;;
+        down|d) _gshoot_down && ret=0 ;;
+        list|ls) _gshoot_list && ret=0 ;;
         peek) _gshoot_peek && ret=0 ;;
-        up) _gshoot_up && ret=0 ;;
+        up|u) _gshoot_up && ret=0 ;;
         wipe) _gshoot_wipe && ret=0 ;;
-      esac
-      ;;
-  esac
-
-  return ret
-}
-
-_gshoot_auth() {
-  local curcontext=$curcontext state line ret=1
-  local -A opt_args
-
-  _arguments -C \
-    '--help[Show context-sensitive help]' \
-    ':command:->command' \
-    '*::arg:->arg' && ret=0
-
-  case $state in
-    command)
-      local -a commands
-      commands=(
-        'login:Login via OAuth'
-        'logout:Logout of OAuth'
-        'status:Show auth status'
-      )
-      _describe -t commands command commands && ret=0
-      ;;
-    arg)
-      case $line[1] in
-        login)
-          _arguments -s \
-            '--help[Show context-sensitive help]' \
-            '--client-secret[Path to a Google Desktop app OAuth client JSON]:file:_files -g "*.json(-.)" "*(-/)"' && ret=0
-          ;;
-        logout|status)
-          _arguments -s \
-            '--help[Show context-sensitive help]' && ret=0
-          ;;
       esac
       ;;
   esac
@@ -102,6 +66,7 @@ _gshoot_up() {
 
 _gshoot_list() {
   _arguments -s \
+	'--limit[Maximum number of spreadsheet files to list]:count:' \
     '--help[Show context-sensitive help]'
 }
 

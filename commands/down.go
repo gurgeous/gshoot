@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/gurgeous/gshoot/google"
+	"github.com/gurgeous/gshoot/gog"
 	"github.com/gurgeous/gshoot/util"
 	"github.com/gurgeous/gshoot/ux"
 )
@@ -16,7 +16,7 @@ import (
 type DownCmd struct {
 	Output      string `short:"o" type:"path" help:"Where to write the CSV."`
 	Sheet       string `help:"Sheet name."`
-	Spreadsheet string `arg:"" name:"spreadsheet" help:"Spreadsheet file name."`
+	Spreadsheet string `arg:"" name:"spreadsheet" help:"Spreadsheet name, ID, or URL."`
 }
 
 func (c *DownCmd) Run() error {
@@ -43,7 +43,7 @@ func (c *DownCmd) Run() error {
 	return util.CSVWrite(writer, rows)
 }
 
-func (c *DownCmd) run0() (rows google.Rows, err error) {
+func (c *DownCmd) run0() (rows gog.Rows, err error) {
 	//
 	// init
 	//

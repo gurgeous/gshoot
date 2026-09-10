@@ -13,7 +13,7 @@ import (
 
 type WipeCmd struct {
 	Force       bool   `short:"f" help:"Skip confirmation."`
-	Spreadsheet string `arg:"" name:"spreadsheet" help:"Spreadsheet file name."`
+	Spreadsheet string `arg:"" name:"spreadsheet" help:"Spreadsheet name, ID, or URL."`
 }
 
 func (c *WipeCmd) Run() (err error) {

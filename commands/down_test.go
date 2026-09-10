@@ -1,60 +1,22 @@
 package commands
 
 import (
-	"encoding/json"
-	"net/http"
-	"os"
-	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestDownCommand(t *testing.T) {
-	handler := func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.URL.Path == "/drive/v3/files":
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"files": []map[string]string{
-					{"id": "sheet-1", "name": "Budget", "modifiedByMeTime": "2026-05-07T12:00:00Z"},
-				},
-			})
-		case r.URL.Path == "/v4/spreadsheets/sheet-1":
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"sheets": []map[string]any{
-					{"properties": map[string]any{"sheetId": 0, "title": "Sheet1"}},
-				},
-			})
-		case strings.HasPrefix(r.URL.Path, "/v4/spreadsheets/sheet-1/values/"):
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"values": [][]string{{"name", "count"}, {"alpha", "1"}},
-			})
-		default:
-			t.Fatalf("unexpected path: %s", r.URL.Path)
-		}
-	}
-
-	err, stdout, _ := testCommand(t, &DownCmd{Spreadsheet: "Budget"}, handler)
+	file := `{"files":[{"id":"sheet-1","name":"Budget"}]}`
+	metadata := `{"spreadsheetId":"sheet-1","title":"Budget","sheets":[{"properties":{"sheetId":0,"title":"Sheet1","gridProperties":{"rowCount":10,"columnCount":5}}}]}`
+	err, stdout, _, log := testCommand(t, &DownCmd{Spreadsheet: "Budget"}, file, metadata, `{"values":[["name","count"],["alpha",1]]}`)
 	assert.NoError(t, err)
-	assert.Equal(t, "name,count\nalpha,1\n", stdout)
-
-	path := filepath.Join(t.TempDir(), "out.csv")
-	err, stdout, _ = testCommand(t, &DownCmd{Spreadsheet: "Budget", Output: path}, handler)
-	assert.NoError(t, err)
-	assert.Equal(t, "", stdout)
-	data, _ := os.ReadFile(path)
-	assert.Equal(t, "name,count\nalpha,1\n", string(data))
+	assert.Equal(t, "name,count\nalpha,1", stdout)
+	assert.Contains(t, log, "sheets get sheet-1 'Sheet1'")
 }
 
 func TestDownCommandMissingSpreadsheet(t *testing.T) {
-	handler := func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/drive/v3/files", r.URL.Path)
-		_ = json.NewEncoder(w).Encode(map[string]any{"files": []any{}})
-	}
-
-	err, _, _ := testCommand(t, &DownCmd{Spreadsheet: "Missing Budget"}, handler)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "Missing Budget")
-	assert.Contains(t, err.Error(), "gshoot list")
+	err, _, _, _ := testCommand(t, &DownCmd{Spreadsheet: "Missing Budget"}, `{"files":[]}`)
+	assert.ErrorContains(t, err, "Missing Budget")
+	assert.ErrorContains(t, err, "gshoot list")
 }

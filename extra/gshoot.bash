@@ -2,18 +2,13 @@ declare -F _init_completion >/dev/null || return 2>/dev/null
 
 _gshoot() {
   local cur prev words cword
-  local command command_index auth_subcommand auth_subcommand_index
-  local commands=(auth down up list peek wipe)
-  local auth_commands=(login logout status)
+  local command command_index
+  local commands=(down d up u list ls peek wipe)
   _init_completion || return
 
   _gshoot_find_command
 
   case "${prev}" in
-    --client-secret)
-      _gshoot_files json
-      return
-      ;;
     --output|-o)
       _gshoot_files csv
       return
@@ -31,16 +26,9 @@ _gshoot() {
     fi
 
     case "${command}" in
-      auth)
-        _gshoot_find_auth_subcommand
-
-        case "${auth_subcommand}" in
-          login) _gshoot_words "--client-secret --help" ;;
-          *) _gshoot_words "--help" ;;
-        esac
-        ;;
-      down) _gshoot_words "-o --output --sheet --help" ;;
-      up) _gshoot_words "--sheet --refill --replace --filter --layout --numeric --open --help" ;;
+      down|d) _gshoot_words "-o --output --sheet --help" ;;
+      up|u) _gshoot_words "--sheet --refill --replace --filter --layout --numeric --open --help" ;;
+      list|ls) _gshoot_words "--limit --help" ;;
       wipe) _gshoot_words "-f --force --help" ;;
       *) _gshoot_words "--help" ;;
     esac
@@ -53,16 +41,7 @@ _gshoot() {
   fi
 
   case "${command}" in
-    auth)
-      _gshoot_find_auth_subcommand
-
-      if [[ -z "${auth_subcommand}" ]]; then
-        _gshoot_words "${auth_commands[*]}"
-      else
-        COMPREPLY=()
-      fi
-      ;;
-    up)
+    up|u)
       if (( cword == command_index + 2 )); then
         _gshoot_files '@(csv|tsv)'
       else
@@ -97,20 +76,6 @@ _gshoot_find_command() {
     _gshoot_contains_word "${words[i]}" "${commands[@]}" || continue
     command="${words[i]}"
     command_index="${i}"
-    return
-  done
-}
-
-_gshoot_find_auth_subcommand() {
-  local i
-
-  auth_subcommand=
-  auth_subcommand_index=0
-
-  for ((i = command_index + 1; i < cword; i++)); do
-    _gshoot_contains_word "${words[i]}" "${auth_commands[@]}" || continue
-    auth_subcommand="${words[i]}"
-    auth_subcommand_index="${i}"
     return
   done
 }
