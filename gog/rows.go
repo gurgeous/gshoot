@@ -48,6 +48,16 @@ func (r Rows) ColumnIndexes() map[string]int {
 	return indexes
 }
 
+// ColumnBlank reports whether every data cell in a column is empty.
+func (r Rows) ColumnBlank(column int) bool {
+	for _, row := range r[1:] {
+		if row[column] != "" {
+			return false
+		}
+	}
+	return true
+}
+
 // UniqueRowIndexes indexes nonblank keys and rejects duplicates.
 func (r Rows) UniqueRowIndexes(column int, label string) (map[string]int, error) {
 	indexes := map[string]int{}

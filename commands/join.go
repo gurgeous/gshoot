@@ -38,7 +38,7 @@ func (c *JoinCmd) Run() (err error) {
 
 	// find spreadsheet
 	cmd.progress.SayFetchSpreadsheet(cmd.file.Name)
-	spreadsheet, err := cmd.client.GetSpreadsheetWithGridData(cmd.ctx, cmd.file.ID)
+	spreadsheet, err := cmd.client.GetSpreadsheet(cmd.ctx, cmd.file.ID)
 	if err != nil {
 		return err
 	}
@@ -74,22 +74,47 @@ func (c *JoinCmd) Run() (err error) {
 		fmt.Fprintln(os.Stderr)
 	}
 
-	// backup
-	fmt.Fprintln(os.Stderr, "creating backup...")
-	backupTitle := fmt.Sprintf("%s backup %s", cmd.file.Name, time.Now().UTC().Format("2006-01-02 150405 UTC"))
-	backup, err := cmd.client.CopySpreadsheet(cmd.ctx, cmd.file.ID, backupTitle)
+	// backup tab
+	fmt.Fprintln(os.Stderr, "creating backup tab...")
+	backupTitle := fmt.Sprintf("%s backup %s", sheet.Title, time.Now().UTC().Format("2006-01-02 150405 UTC"))
+	backup, err := cmd.client.DuplicateTab(cmd.ctx, cmd.file.ID, sheet.Title, backupTitle)
 	if err != nil {
-		return fmt.Errorf("create backup: %w", err)
+		return fmt.Errorf("create backup tab: %w", err)
 	}
-	backupURL := util.SpreadsheetURL(backup.ID) + "/edit"
+	backupURL := fmt.Sprintf("%s/edit#gid=%d", util.SpreadsheetURL(cmd.file.ID), backup.ID)
 
-	// apply
-	cmd.progress = ux.StartProgress(os.Stderr, "joining...")
+	// apply in ordered batches
 	hasFilter := spreadsheet.Data[sheet.ID].FilterRange != nil
-	if _, err := cmd.client.Apply(cmd.ctx, cmd.file.ID, join.operations(sheet.ID, hasFilter)); err != nil {
-		return fmt.Errorf("join failed: %w\nbackup: %s", err, backupURL)
+	plan := join.operations(sheet.ID, hasFilter)
+	columns := len(join.insertedColumns())
+	prepare := fmt.Sprintf("preparing %d columns", columns)
+	if join.rowCounts.right > 0 {
+		rowLabel := "rows"
+		if join.rowCounts.right == 1 {
+			rowLabel = "row"
+		}
+		prepare += fmt.Sprintf(" and %d %s", join.rowCounts.right, rowLabel)
 	}
-	cmd.stop(nil)
+	finish := fmt.Sprintf("resizing %d columns", columns)
+	if hasFilter {
+		finish = "updating filter and " + finish
+	}
+	phases := []struct {
+		description string
+		operations  []gog.Operation
+	}{
+		{description: prepare, operations: plan.prepare},
+		{description: fmt.Sprintf("writing %d rows across %d ranges", len(join.rows), len(plan.values)), operations: plan.values},
+		{description: finish, operations: plan.finish},
+	}
+	for i, phase := range phases {
+		label := fmt.Sprintf("joining (%d/3): %s...", i+1, phase.description)
+		cmd.progress = ux.StartProgress(os.Stderr, label)
+		if err := cmd.client.ApplySheetBatch(cmd.ctx, cmd.file.ID, sheet, phase.operations); err != nil {
+			return fmt.Errorf("join phase %d/3 (%s) failed: %w\nbackup: %s", i+1, phase.description, err, backupURL)
+		}
+		cmd.stop(nil)
+	}
 
 	// done!
 	fmt.Printf("spreadsheet: %s/edit\nbackup: %s\n", util.SpreadsheetURL(cmd.file.ID), backupURL)

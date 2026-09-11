@@ -45,13 +45,26 @@ test -f "$dir/count" && n=$(cat "$dir/count")
 n=$((n + 1))
 echo "$n" > "$dir/count"
 printf '%s\n' "$*" >> "$dir/log"
+previous=
+for arg do
+  if test "$previous" = "--body"; then
+    case "$arg" in @*) cp "${arg#@}" "$dir/body.$n";; esac
+  fi
+  previous="$arg"
+done
 cat > "$dir/stdin.$n"
+if test -f "$dir/error.$n"; then cat "$dir/error.$n" >&2; exit 1; fi
 test -f "$dir/response.$n" && cat "$dir/response.$n"
 `
 	assert.NoError(t, os.WriteFile(filepath.Join(bin, "gog"), []byte(script), 0o700))
 	assert.NoError(t, os.WriteFile(filepath.Join(tmp, "log"), nil, 0o600))
 	for i, response := range responses {
-		assert.NoError(t, os.WriteFile(filepath.Join(tmp, "response."+strconv.Itoa(i+1)), []byte(response), 0o600))
+		name := "response."
+		if strings.HasPrefix(response, "ERROR: ") {
+			name = "error."
+			response = strings.TrimPrefix(response, "ERROR: ")
+		}
+		assert.NoError(t, os.WriteFile(filepath.Join(tmp, name+strconv.Itoa(i+1)), []byte(response), 0o600))
 	}
 	t.Setenv("FAKE_GOG_DIR", tmp)
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))

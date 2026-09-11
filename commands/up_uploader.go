@@ -232,7 +232,7 @@ func (s *uploader) applyLayout() error {
 // layoutWidthOperations builds padding operations from autosized column widths.
 func (s *uploader) layoutWidthOperations() ([]gog.Operation, error) {
 	ncols := len(s.rows[0])
-	spreadsheet, err := s.client.GetSpreadsheetWithGridData(s.ctx, s.file.ID)
+	spreadsheet, err := s.client.GetSpreadsheetWithGridData(s.ctx, s.file.ID, s.title)
 	if err != nil {
 		return nil, err
 	}

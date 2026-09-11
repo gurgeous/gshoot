@@ -82,7 +82,7 @@ func newRefiller(u *uploader) (*refiller, error) {
 	}
 
 	// grid data (formulas, filters, formats, etc)
-	spreadsheet, err := u.client.GetSpreadsheetWithGridData(u.ctx, u.file.ID)
+	spreadsheet, err := u.client.GetSpreadsheetWithGridData(u.ctx, u.file.ID, u.title)
 	if err != nil {
 		return nil, err
 	}

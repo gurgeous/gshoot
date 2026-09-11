@@ -33,7 +33,7 @@ brew install gurgeous/tap/gshoot
 
 Other gshoot builds are on the
 [GitHub releases page](https://github.com/gurgeous/gshoot/releases/latest).
-Install `gog` 0.37.0 or newer separately when not using Homebrew.
+Install `gog` 0.39.2 or newer separately when not using Homebrew.
 
 ## Authentication
 
@@ -87,9 +87,6 @@ When using `up`, gshoot will find or create the spreadsheet file as necessary. T
 Spreadsheet arguments accept an exact Drive name, spreadsheet ID, or Google Sheets URL.
 Set `GSHOOT_DEBUG=1` to print timestamped gog commands to stderr.
 
-gog currently cannot bound raw grid-data reads by sheet or range, so `--refill`
-and `--layout` fetch grid data for the whole spreadsheet.
-
 ### Down, Down, Down
 
 `gshoot down` is much simpler. By default it downloads the first sheet, but you can override with `--sheet`.
@@ -105,11 +102,11 @@ gshoot join Zoo prices.csv --key asin
 Existing values are never overwritten. CSV-only columns are appended, while a
 column present in both inputs is inserted beside the existing column with a `2`
 suffix (`price` becomes `price2`). A column named `join` labels each row as `left`,
-`right`, or `match`. It temporarily follows the first column due to a gog bug.
+`right`, or `match`. Shared CSV columns containing no values are skipped.
 
 Use `--sheet` to select a sheet, `--columns price,rank` to limit CSV columns, and
-`--force` to skip confirmation. gshoot always previews the join and creates a
-timestamped backup of the spreadsheet before writing. If the sheet has a filter,
+`--force` to skip confirmation. gshoot always previews the join and duplicates
+the destination tab as a timestamped backup before writing. If the sheet has a filter,
 its range is expanded, but existing filtering, sorting, and hidden-row criteria are
 lost when the filter is reapplied.
 
@@ -138,8 +135,4 @@ These are a few other commands for convenience:
 
 ## Potential gogcli improvements
 
-- https://github.com/openclaw/gogcli/issues/1102
-- https://github.com/openclaw/gogcli/issues/1103 - WONT FIX
-- https://github.com/openclaw/gogcli/issues/1104
-- https://github.com/openclaw/gogcli/issues/1105
 - https://github.com/openclaw/gogcli/issues/1106

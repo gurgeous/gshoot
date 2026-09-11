@@ -23,6 +23,8 @@ import (
 //
 
 const (
+	columnsDimension    = "cols"
+	sheetsColumns       = "COLUMNS"
 	sheetsCommand       = "sheets"
 	spreadsheetMimeType = "application/vnd.google-apps.spreadsheet"
 )
@@ -51,17 +53,15 @@ func (c *Client) CreateSpreadsheetFile(ctx context.Context, name string) (*File,
 	return &File{ID: out.ID, Name: out.Name}, nil
 }
 
-func (c *Client) CopySpreadsheet(ctx context.Context, id, title string) (*File, error) {
+func (c *Client) DuplicateTab(ctx context.Context, id, source, title string) (*Sheet, error) {
 	var out struct {
-		File *File `json:"file"`
+		SheetID int64  `json:"sheetId"`
+		Title   string `json:"title"`
 	}
-	if err := c.runJSON(ctx, nil, &out, sheetsCommand, "copy", id, title, "--parent", "root"); err != nil {
+	if err := c.runJSON(ctx, nil, &out, sheetsCommand, "duplicate-tab", id, source, title); err != nil {
 		return nil, err
 	}
-	if out.File == nil {
-		return nil, errors.New("gog returned no copied spreadsheet")
-	}
-	return out.File, nil
+	return &Sheet{ID: out.SheetID, Title: out.Title}, nil
 }
 
 // FindSpreadsheetFile accepts a spreadsheet name, ID, or URL.
@@ -120,6 +120,7 @@ func (c *Client) listFiles(ctx context.Context, condition string, limit int) ([]
 	args := []string{
 		"drive", "ls", "--all", "--max", strconv.Itoa(limit), "--query", query,
 		"--fields", "files(id,name,mimeType,modifiedByMeTime)",
+		"--sort", "modifiedByMeTime", "--order", "desc",
 	}
 	if err := c.runJSON(ctx, nil, &out, args...); err != nil {
 		return nil, err
@@ -149,19 +150,15 @@ func spreadsheetID(ref string) string {
 }
 
 func (c *Client) GetSpreadsheet(ctx context.Context, id string) (*Spreadsheet, error) {
-	return c.getSpreadsheet(ctx, id, false)
+	return c.getSpreadsheet(ctx, sheetsCommand, "metadata", id)
 }
 
-func (c *Client) GetSpreadsheetWithGridData(ctx context.Context, id string) (*Spreadsheet, error) {
-	return c.getSpreadsheet(ctx, id, true)
+func (c *Client) GetSpreadsheetWithGridData(ctx context.Context, id, sheet string) (*Spreadsheet, error) {
+	return c.getSpreadsheet(ctx, sheetsCommand, "raw", id, "--sheet", sheet, "--include-grid-data")
 }
 
-func (c *Client) getSpreadsheet(ctx context.Context, id string, grid bool) (*Spreadsheet, error) {
+func (c *Client) getSpreadsheet(ctx context.Context, args ...string) (*Spreadsheet, error) {
 	var out spreadsheetResponse
-	args := []string{sheetsCommand, "metadata", id}
-	if grid {
-		args = []string{sheetsCommand, "raw", id, "--include-grid-data"}
-	}
 	if err := c.runJSON(ctx, nil, &out, args...); err != nil {
 		return nil, err
 	}
@@ -438,7 +435,7 @@ func (c *Client) resizeGrid(ctx context.Context, id, name string, want *GridProp
 		want  int
 	}{
 		{label: "rows", have: current.GridProperties.RowCount, want: want.RowCount},
-		{label: "cols", have: current.GridProperties.ColumnCount, want: want.ColumnCount},
+		{label: columnsDimension, have: current.GridProperties.ColumnCount, want: want.ColumnCount},
 	} {
 		if dim.want == 0 || dim.have == dim.want {
 			continue
@@ -450,8 +447,8 @@ func (c *Client) resizeGrid(ctx context.Context, id, name string, want *GridProp
 			continue
 		}
 		apiDim := "ROWS"
-		if dim.label == "cols" {
-			apiDim = "COLUMNS"
+		if dim.label == columnsDimension {
+			apiDim = sheetsColumns
 		}
 		if err := c.runJSON(ctx, nil, nil, sheetsCommand, "delete-dimension", id, name, "--dimension", apiDim,
 			"--start", strconv.Itoa(dim.want+1), "--end", strconv.Itoa(dim.have), "--force"); err != nil {
