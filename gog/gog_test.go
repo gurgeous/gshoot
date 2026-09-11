@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -19,7 +20,33 @@ func TestListSpreadsheetFilesUsesGogLimitAndOrder(t *testing.T) {
 	log := readTestFile(t, filepath.Join(dir, "log"))
 	assert.Contains(t, log, "drive ls --all --max 20")
 	assert.NotContains(t, log, "--page")
-	assert.Contains(t, log, "modifiedByMeTime")
+	assert.Contains(t, log, "--sort modifiedByMeTime --order desc")
+}
+
+func TestDebugLogsTimestampedWrappedGogCalls(t *testing.T) {
+	client, _ := fakeGog(t, `{"files":[]}`)
+	path := filepath.Join(t.TempDir(), "stderr")
+	stderr, err := os.Create(path)
+	assert.NoError(t, err)
+	original := os.Stderr
+	os.Stderr = stderr
+	t.Cleanup(func() {
+		os.Stderr = original
+		assert.NoError(t, stderr.Close())
+	})
+	t.Setenv("GSHOOT_DEBUG", "1")
+
+	_, err = client.listFiles(context.Background(), strings.Repeat("long condition ", 10), 20)
+	assert.NoError(t, err)
+	assert.NoError(t, stderr.Sync())
+
+	debug := readTestFile(t, path)
+	assert.Regexp(t, `^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z gog `, debug)
+	assert.Contains(t, debug, "drive ls")
+	assert.Contains(t, debug, "--query")
+	for _, line := range strings.Split(debug, "\n") {
+		assert.Less(t, utf8.RuneCountInString(line), 80, line)
+	}
 }
 
 func TestFindSpreadsheetAcceptsNameIDAndURL(t *testing.T) {
@@ -51,20 +78,98 @@ func TestGetRowsUsesQuotedRange(t *testing.T) {
 	assert.Contains(t, readTestFile(t, filepath.Join(dir, "log")), `sheets get sheet-1 'Bob''s Sheet'`)
 }
 
+func TestDuplicateTab(t *testing.T) {
+	client, dir := fakeGog(t, `{"spreadsheetId":"sheet-1","sourceSheetId":7,"sheetId":9,"title":"Data backup","index":1}`)
+	sheet, err := client.DuplicateTab(context.Background(), "sheet-1", "Data", "Data backup")
+	assert.NoError(t, err)
+	assert.Equal(t, &Sheet{ID: 9, Title: "Data backup"}, sheet)
+	assert.Contains(t, readTestFile(t, filepath.Join(dir, "log")), "sheets duplicate-tab sheet-1 Data Data backup")
+}
+
+func TestGridDataIncludesFilterRange(t *testing.T) {
+	client, dir := fakeGog(t, `{"sheets":[{"properties":{"sheetId":7,"title":"Data","gridProperties":{"rowCount":10,"columnCount":5}},"basicFilter":{"range":{"sheetId":7,"startRowIndex":1,"endRowIndex":8,"startColumnIndex":2,"endColumnIndex":5}}}]}`)
+	spreadsheet, err := client.GetSpreadsheetWithGridData(context.Background(), "sheet-1", "Data")
+	assert.NoError(t, err)
+	assert.Equal(t, &GridRange{SheetID: 7, StartRowIndex: 1, EndRowIndex: 8, StartColumnIndex: 2, EndColumnIndex: 5}, spreadsheet.Data[7].FilterRange)
+	assert.Contains(t, readTestFile(t, filepath.Join(dir, "log")), "sheets raw sheet-1 --sheet Data --include-grid-data")
+}
+
 func TestApplyUsesNamedGogCommands(t *testing.T) {
 	metadata := `{"spreadsheetId":"sheet-1","title":"Budget","sheets":[{"properties":{"sheetId":7,"title":"Data","gridProperties":{"rowCount":10,"columnCount":5}}}]}`
-	client, dir := fakeGog(t, metadata, `{}`, metadata, `{}`, metadata, `{}`)
+	client, dir := fakeGog(t, metadata, `{}`, metadata, `{}`, metadata, `{}`, metadata, `{}`)
+	inherit := false
 	_, err := client.Apply(context.Background(), "sheet-1", []Operation{
-		{PasteRows: &PasteRowsOperation{SheetID: 7, Rows: Rows{{"name", "count"}, {"alpha", "1"}}}},
+		{InsertDimension: &InsertDimensionOperation{SheetID: 7, Dimension: "cols", Start: 2, Count: 1, InheritFromBefore: &inherit}},
+		{PasteRows: &PasteRowsOperation{SheetID: 7, RowIndex: 2, ColumnIndex: 1, Rows: Rows{{"alpha", "1"}}}},
 		{SetFilter: &GridRange{SheetID: 7, EndRowIndex: 2, EndColumnIndex: 2}},
 		{ResizeColumns: &ResizeColumnsOperation{Range: ColumnRange{SheetID: 7, EndIndex: 1}, PixelSize: 120}},
 	})
 	assert.NoError(t, err)
 	log := readTestFile(t, filepath.Join(dir, "log"))
-	assert.Contains(t, log, "sheets update sheet-1 'Data'!A1 --values-json @- --input USER_ENTERED")
+	assert.Contains(t, log, "sheets insert sheet-1 Data cols 2 --count 1 --inherit-from-before=false")
+	assert.Contains(t, log, "sheets update sheet-1 'Data'!B3 --values-json @- --input USER_ENTERED")
 	assert.Contains(t, log, "sheets filter set sheet-1 'Data'!A1:B2 --force")
 	assert.Contains(t, log, "sheets resize-columns sheet-1 'Data'!A:A --width 120")
-	assert.JSONEq(t, `[["name","count"],["alpha","1"]]`, readTestFile(t, filepath.Join(dir, "stdin.2")))
+	assert.JSONEq(t, `[["alpha","1"]]`, readTestFile(t, filepath.Join(dir, "stdin.4")))
+}
+
+func TestApplySheetBatchUsesSpreadsheetAndValueBatches(t *testing.T) {
+	client, dir := fakeGog(t, `{}`, `{}`, `{}`)
+	sheet := &Sheet{ID: 7, Title: "Data"}
+
+	err := client.ApplySheetBatch(context.Background(), "sheet-1", sheet, []Operation{
+		{InsertDimension: &InsertDimensionOperation{
+			SheetID: 7, Dimension: "cols", Start: 1, Count: 1,
+		}},
+		{FormatCells: &FormatCellsOperation{
+			Range: GridRange{SheetID: 7, StartColumnIndex: 2, EndColumnIndex: 4},
+		}},
+	})
+	assert.NoError(t, err)
+
+	err = client.ApplySheetBatch(context.Background(), "sheet-1", sheet, []Operation{
+		{PasteRows: &PasteRowsOperation{
+			SheetID: 7, RowIndex: 1, ColumnIndex: 2,
+			Rows: Rows{{"11", "=A2"}, {"12", "=A3"}},
+		}},
+	})
+	assert.NoError(t, err)
+
+	err = client.ApplySheetBatch(context.Background(), "sheet-1", sheet, []Operation{
+		{SetFilter: &GridRange{SheetID: 7, EndRowIndex: 4, EndColumnIndex: 5}},
+		{AutoResizeColumns: &ColumnRange{SheetID: 7, StartIndex: 2, EndIndex: 4}},
+	})
+	assert.NoError(t, err)
+
+	log := readTestFile(t, filepath.Join(dir, "log"))
+	assert.Contains(t, log, "api call sheets v4 sheets.spreadsheets.batchUpdate")
+	assert.Contains(t, log, `--params {"spreadsheetId":"sheet-1"}`)
+	assert.Contains(t, log, "--scope https://www.googleapis.com/auth/spreadsheets --allow-write --force")
+	assert.Contains(t, log, "sheets batch-update sheet-1 --data-json @- --input USER_ENTERED")
+	assert.JSONEq(t, `{
+		"requests": [
+			{"insertDimension":{"range":{"sheetId":7,"dimension":"COLUMNS","startIndex":0,"endIndex":1},"inheritFromBefore":false}},
+			{"repeatCell":{"range":{"sheetId":7,"startColumnIndex":2,"endColumnIndex":4},"cell":{"userEnteredFormat":{}},"fields":"userEnteredFormat"}}
+		]
+	}`, readTestFile(t, filepath.Join(dir, "body.1")))
+	assert.JSONEq(t, `[
+		{"range":"'Data'!C2","values":[["11","=A2"],["12","=A3"]]}
+	]`, readTestFile(t, filepath.Join(dir, "stdin.2")))
+	assert.JSONEq(t, `{
+		"requests": [
+			{"setBasicFilter":{"filter":{"range":{"sheetId":7,"endRowIndex":4,"endColumnIndex":5}}}},
+			{"autoResizeDimensions":{"dimensions":{"sheetId":7,"dimension":"COLUMNS","startIndex":2,"endIndex":4}}}
+		]
+	}`, readTestFile(t, filepath.Join(dir, "body.3")))
+	assert.Equal(t, "-rw-------", readTestFile(t, filepath.Join(dir, "mode.1")))
+	assert.Equal(t, "-rw-------", readTestFile(t, filepath.Join(dir, "mode.3")))
+	for _, field := range strings.Fields(log) {
+		if !strings.HasPrefix(field, "@/") {
+			continue
+		}
+		_, err := os.Stat(strings.TrimPrefix(field, "@"))
+		assert.True(t, os.IsNotExist(err))
+	}
 }
 
 func TestPasteValuesPreservesFormulas(t *testing.T) {
@@ -153,6 +258,18 @@ test -f "$dir/count" && n=$(cat "$dir/count")
 n=$((n + 1))
 echo "$n" > "$dir/count"
 printf '%s\n' "$*" >> "$dir/log"
+previous=
+for arg do
+  if test "$previous" = "--body"; then
+    case "$arg" in
+      @*)
+        ls -l "${arg#@}" | cut -c1-10 > "$dir/mode.$n"
+        cp "${arg#@}" "$dir/body.$n"
+        ;;
+    esac
+  fi
+  previous="$arg"
+done
 cat > "$dir/stdin.$n"
 if test -f "$dir/error.$n"; then cat "$dir/error.$n" >&2; exit 1; fi
 test -f "$dir/response.$n" && cat "$dir/response.$n"

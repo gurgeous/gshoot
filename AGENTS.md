@@ -34,6 +34,9 @@
 - Avoid unnecessary interfaces, clever abstractions, extra globals, and one-off helper layers
 - Keep comments brief and useful
 - Comments wrap at 80 columns
+- Add terse phase comments to long orchestration functions; treat them as a
+  visual table of contents even when they restate the workflow
+- Match the narrative style in `UpCmd.run0` and `JoinCmd.Run`
 - Every non-test `.go` file should have a terse `//` block after imports explaining the file's purpose
 - For shell completion changes, test zsh with a small harness that stubs completion builtins and inspects candidates
 - For completion-only changes, run shell syntax/harness checks instead of `just check`

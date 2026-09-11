@@ -17,6 +17,7 @@ import (
 type CLI struct {
 	Version kong.VersionFlag `short:"v" help:"Print the version number"`
 	Down    DownCmd          `cmd:"" aliases:"d" help:"Download a Google Sheet as CSV."`
+	Join    JoinCmd          `cmd:"" help:"Join a CSV into an existing Google Sheet."`
 	Up      UpCmd            `cmd:"" aliases:"u" help:"Upload a CSV to Google Sheets."`
 	List    ListCmd          `cmd:"" aliases:"ls" help:"List your Google Sheets."`
 	Peek    PeekCmd          `cmd:"" help:"List sheets in a spreadsheet."`

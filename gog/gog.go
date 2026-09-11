@@ -8,9 +8,12 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
+	"unicode"
 
 	"github.com/gurgeous/gshoot/util"
 )
@@ -20,6 +23,8 @@ import (
 //
 
 const (
+	columnsDimension    = "cols"
+	sheetsColumns       = "COLUMNS"
 	sheetsCommand       = "sheets"
 	spreadsheetMimeType = "application/vnd.google-apps.spreadsheet"
 )
@@ -46,6 +51,17 @@ func (c *Client) CreateSpreadsheetFile(ctx context.Context, name string) (*File,
 		return nil, err
 	}
 	return &File{ID: out.ID, Name: out.Name}, nil
+}
+
+func (c *Client) DuplicateTab(ctx context.Context, id, source, title string) (*Sheet, error) {
+	var out struct {
+		SheetID int64  `json:"sheetId"`
+		Title   string `json:"title"`
+	}
+	if err := c.runJSON(ctx, nil, &out, sheetsCommand, "duplicate-tab", id, source, title); err != nil {
+		return nil, err
+	}
+	return &Sheet{ID: out.SheetID, Title: out.Title}, nil
 }
 
 // FindSpreadsheetFile accepts a spreadsheet name, ID, or URL.
@@ -104,6 +120,7 @@ func (c *Client) listFiles(ctx context.Context, condition string, limit int) ([]
 	args := []string{
 		"drive", "ls", "--all", "--max", strconv.Itoa(limit), "--query", query,
 		"--fields", "files(id,name,mimeType,modifiedByMeTime)",
+		"--sort", "modifiedByMeTime", "--order", "desc",
 	}
 	if err := c.runJSON(ctx, nil, &out, args...); err != nil {
 		return nil, err
@@ -133,19 +150,15 @@ func spreadsheetID(ref string) string {
 }
 
 func (c *Client) GetSpreadsheet(ctx context.Context, id string) (*Spreadsheet, error) {
-	return c.getSpreadsheet(ctx, id, false)
+	return c.getSpreadsheet(ctx, sheetsCommand, "metadata", id)
 }
 
-func (c *Client) GetSpreadsheetWithGridData(ctx context.Context, id string) (*Spreadsheet, error) {
-	return c.getSpreadsheet(ctx, id, true)
+func (c *Client) GetSpreadsheetWithGridData(ctx context.Context, id, sheet string) (*Spreadsheet, error) {
+	return c.getSpreadsheet(ctx, sheetsCommand, "raw", id, "--sheet", sheet, "--include-grid-data")
 }
 
-func (c *Client) getSpreadsheet(ctx context.Context, id string, grid bool) (*Spreadsheet, error) {
+func (c *Client) getSpreadsheet(ctx context.Context, args ...string) (*Spreadsheet, error) {
 	var out spreadsheetResponse
-	args := []string{sheetsCommand, "metadata", id}
-	if grid {
-		args = []string{sheetsCommand, "raw", id, "--include-grid-data"}
-	}
 	if err := c.runJSON(ctx, nil, &out, args...); err != nil {
 		return nil, err
 	}
@@ -334,8 +347,23 @@ func (c *Client) applyOperation(ctx context.Context, id string, operation Operat
 		if err != nil {
 			return OperationResult{}, err
 		}
-		cell := quoteSheet(sheet.Title) + "!A1"
+		cell := fmt.Sprintf("%s!%s%d", quoteSheet(sheet.Title), columnName(paste.ColumnIndex), paste.RowIndex+1)
 		return OperationResult{}, c.runJSON(ctx, bytes.NewReader(data), nil, sheetsCommand, "update", id, cell, "--values-json", "@-", "--input", "USER_ENTERED")
+
+	case operation.InsertDimension != nil:
+		insert := operation.InsertDimension
+		sheet, err := sheetByID(insert.SheetID)
+		if err != nil {
+			return OperationResult{}, err
+		}
+		args := []string{sheetsCommand, "insert", id, sheet.Title, insert.Dimension, strconv.Itoa(insert.Start), "--count", strconv.Itoa(insert.Count)}
+		if insert.After {
+			args = append(args, "--after")
+		}
+		if insert.InheritFromBefore != nil {
+			args = append(args, fmt.Sprintf("--inherit-from-before=%t", *insert.InheritFromBefore))
+		}
+		return OperationResult{}, c.runJSON(ctx, nil, nil, args...)
 
 	case operation.SetFilter != nil:
 		sheet, err := sheetByID(operation.SetFilter.SheetID)
@@ -407,7 +435,7 @@ func (c *Client) resizeGrid(ctx context.Context, id, name string, want *GridProp
 		want  int
 	}{
 		{label: "rows", have: current.GridProperties.RowCount, want: want.RowCount},
-		{label: "cols", have: current.GridProperties.ColumnCount, want: want.ColumnCount},
+		{label: columnsDimension, have: current.GridProperties.ColumnCount, want: want.ColumnCount},
 	} {
 		if dim.want == 0 || dim.have == dim.want {
 			continue
@@ -419,8 +447,8 @@ func (c *Client) resizeGrid(ctx context.Context, id, name string, want *GridProp
 			continue
 		}
 		apiDim := "ROWS"
-		if dim.label == "cols" {
-			apiDim = "COLUMNS"
+		if dim.label == columnsDimension {
+			apiDim = sheetsColumns
 		}
 		if err := c.runJSON(ctx, nil, nil, sheetsCommand, "delete-dimension", id, name, "--dimension", apiDim,
 			"--start", strconv.Itoa(dim.want+1), "--end", strconv.Itoa(dim.have), "--force"); err != nil {
@@ -434,6 +462,7 @@ func (c *Client) runJSON(ctx context.Context, stdin io.Reader, dst any, args ...
 	base := make([]string, 0, 3+len(args))
 	base = append(base, "--json", "--no-input", "--color=never")
 	base = append(base, args...)
+	debugGogCall(base)
 	// #nosec G204 -- arguments are passed directly without a shell.
 	cmd := exec.CommandContext(ctx, c.gog, base...)
 	cmd.Stdin = stdin
@@ -454,6 +483,36 @@ func (c *Client) runJSON(ctx context.Context, stdin io.Reader, dst any, args ...
 		return fmt.Errorf("decode gog output: %w", err)
 	}
 	return nil
+}
+
+// debugGogCall logs wrapped gog commands when GSHOOT_DEBUG is enabled.
+func debugGogCall(args []string) {
+	debug := strings.TrimSpace(os.Getenv("GSHOOT_DEBUG"))
+	if debug == "" || debug == "0" || strings.EqualFold(debug, "false") {
+		return
+	}
+
+	quoted := make([]string, len(args))
+	for i, arg := range args {
+		quoted[i] = arg
+		if arg == "" || strings.ContainsAny(arg, " \t\r\n\"\\") {
+			quoted[i] = strconv.Quote(arg)
+		}
+	}
+	line := time.Now().UTC().Format("2006-01-02T15:04:05.000Z") + " gog " + strings.Join(quoted, " ")
+	for len([]rune(line)) >= 80 {
+		runes := []rune(line)
+		cut := 77
+		for i := cut; i > 1; i-- {
+			if unicode.IsSpace(runes[i]) {
+				cut = i
+				break
+			}
+		}
+		fmt.Fprintln(os.Stderr, strings.TrimRightFunc(string(runes[:cut]), unicode.IsSpace)+" \\")
+		line = "  " + strings.TrimLeftFunc(string(runes[cut:]), unicode.IsSpace)
+	}
+	fmt.Fprintln(os.Stderr, line)
 }
 
 func quoteSheet(title string) string {

@@ -1,10 +1,6 @@
 package commands
 
 import (
-	"fmt"
-	"sort"
-	"strings"
-
 	"github.com/gurgeous/gshoot/gog"
 	"github.com/gurgeous/gshoot/util"
 )
@@ -61,7 +57,7 @@ func newRefiller(u *uploader) (*refiller, error) {
 	//
 
 	s.localHeaders = s.localRows[0]
-	if err := validateHeaders(s.localHeaders, "csv"); err != nil {
+	if err := s.localRows.ValidateHeaders("csv"); err != nil {
 		return nil, err
 	}
 
@@ -81,12 +77,12 @@ func newRefiller(u *uploader) (*refiller, error) {
 		return s, nil
 	}
 	s.remoteHeaders = s.remoteRows[0]
-	if err := validateHeaders(s.remoteHeaders, "existing sheet"); err != nil {
+	if err := s.remoteRows.ValidateHeaders("existing sheet"); err != nil {
 		return nil, err
 	}
 
 	// grid data (formulas, filters, formats, etc)
-	spreadsheet, err := u.client.GetSpreadsheetWithGridData(u.ctx, u.file.ID)
+	spreadsheet, err := u.client.GetSpreadsheetWithGridData(u.ctx, u.file.ID, u.title)
 	if err != nil {
 		return nil, err
 	}
@@ -361,8 +357,8 @@ func (s *refiller) hasFormula(c int) bool {
 // remoteDataHeight returns remote rows covered by the filter or data.
 func (s *refiller) remoteDataHeight() int {
 	count := len(s.remoteRows)
-	if s.remoteSheetData.FilterEndRow > 0 {
-		count = s.remoteSheetData.FilterEndRow
+	if s.remoteSheetData.FilterRange != nil && s.remoteSheetData.FilterRange.EndRowIndex > 0 {
+		count = s.remoteSheetData.FilterRange.EndRowIndex
 	}
 	return min(count, len(s.remoteRows))
 }
@@ -382,28 +378,4 @@ func gridRows(data *gog.SheetData) gog.Rows {
 		rows = append(rows, values)
 	}
 	return gog.Rows(util.CSVRectangularize(rows))
-}
-
-// validateHeaders rejects duplicate headers.
-func validateHeaders(headers []string, label string) error {
-	counts := map[string]int{}
-	for _, header := range headers {
-		if header != "" {
-			counts[header]++
-		}
-	}
-	if len(counts) == 0 {
-		return fmt.Errorf("%s has no headers", label)
-	}
-	duplicates := []string{}
-	for header, count := range counts {
-		if count > 1 {
-			duplicates = append(duplicates, header)
-		}
-	}
-	if len(duplicates) > 0 {
-		sort.Strings(duplicates)
-		return fmt.Errorf("%s has duplicate headers: %s", label, strings.Join(duplicates, ", "))
-	}
-	return nil
 }

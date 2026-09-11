@@ -3,7 +3,7 @@ declare -F _init_completion >/dev/null || return 2>/dev/null
 _gshoot() {
   local cur prev words cword
   local command command_index
-  local commands=(down d up u list ls peek wipe)
+  local commands=(down d join up u list ls peek wipe)
   _init_completion || return
 
   _gshoot_find_command
@@ -13,7 +13,7 @@ _gshoot() {
       _gshoot_files csv
       return
       ;;
-    --sheet)
+    --sheet|--key|--columns)
       COMPREPLY=()
       return
       ;;
@@ -27,6 +27,7 @@ _gshoot() {
 
     case "${command}" in
       down|d) _gshoot_words "-o --output --sheet --help" ;;
+      join) _gshoot_words "--key --sheet --columns -f --force --help" ;;
       up|u) _gshoot_words "--sheet --refill --replace --filter --layout --numeric --open --help" ;;
       list|ls) _gshoot_words "--limit --help" ;;
       wipe) _gshoot_words "-f --force --help" ;;
@@ -41,7 +42,7 @@ _gshoot() {
   fi
 
   case "${command}" in
-    up|u)
+    up|u|join)
       if (( cword == command_index + 2 )); then
         _gshoot_files '@(csv|tsv)'
       else

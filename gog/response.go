@@ -30,7 +30,11 @@ type gridPropertiesResponse struct {
 
 type basicFilterResponse struct {
 	Range struct {
-		EndRowIndex int `json:"endRowIndex"`
+		SheetID          int64 `json:"sheetId"`
+		StartRowIndex    int   `json:"startRowIndex"`
+		EndRowIndex      int   `json:"endRowIndex"`
+		StartColumnIndex int   `json:"startColumnIndex"`
+		EndColumnIndex   int   `json:"endColumnIndex"`
 	} `json:"range"`
 }
 
@@ -99,7 +103,12 @@ func (r spreadsheetResponse) spreadsheet() *Spreadsheet {
 		}
 		data := &SheetData{}
 		if item.BasicFilter != nil {
-			data.FilterEndRow = item.BasicFilter.Range.EndRowIndex
+			rng := item.BasicFilter.Range
+			data.FilterRange = &GridRange{
+				SheetID: rng.SheetID, StartRowIndex: rng.StartRowIndex,
+				EndRowIndex: rng.EndRowIndex, StartColumnIndex: rng.StartColumnIndex,
+				EndColumnIndex: rng.EndColumnIndex,
+			}
 		}
 		if len(item.Data) > 0 {
 			data.Rows = item.Data[0].RowData

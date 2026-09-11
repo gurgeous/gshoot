@@ -17,6 +17,7 @@ _gshoot() {
       commands=(
         'down:Download a Google Sheet as CSV'
         'd:Alias for down'
+        'join:Join a CSV into an existing Google Sheet'
         'list:List your Google Sheets'
         'ls:Alias for list'
         'peek:List sheets in a spreadsheet'
@@ -30,6 +31,7 @@ _gshoot() {
       curcontext=${curcontext%:*}-$line[1]:
       case $line[1] in
         down|d) _gshoot_down && ret=0 ;;
+        join) _gshoot_join && ret=0 ;;
         list|ls) _gshoot_list && ret=0 ;;
         peek) _gshoot_peek && ret=0 ;;
         up|u) _gshoot_up && ret=0 ;;
@@ -48,6 +50,18 @@ _gshoot_down() {
     '--sheet[Sheet name]:sheet:' \
     '--help[Show context-sensitive help]' \
     ':spreadsheet:'
+}
+
+_gshoot_join() {
+  _arguments -s \
+    '--key[Column used to match rows]:column:' \
+    '--sheet[Destination sheet name]:sheet:' \
+    '--columns[Comma-separated CSV columns to join]:columns:' \
+    '-f[Skip confirmation]' \
+    '--force[Skip confirmation]' \
+    '--help[Show context-sensitive help]' \
+    ':spreadsheet:' \
+    ':csv:_files -g "*.(csv|tsv)(-.)" "*(-/)"'
 }
 
 _gshoot_up() {

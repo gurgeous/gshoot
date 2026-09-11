@@ -8,11 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestUpCommandRejectsInvalidCSV(t *testing.T) {
-	assert.Error(t, validateHeaders([]string{"", ""}, "csv"))
-	assert.Error(t, validateHeaders([]string{"id", "id"}, "csv"))
-}
-
 func TestUpCommandRejectsConflictingModes(t *testing.T) {
 	err := (&UpCmd{Refill: true, Replace: true}).Run()
 	assert.EqualError(t, err, "use either --refill or --replace")

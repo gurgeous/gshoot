@@ -67,9 +67,13 @@ func srunStart(w io.Writer, opts srunOptions) (_ *srun, err error) {
 }
 
 func (c *srun) stop(err error) {
-	if err == nil {
-		c.progress.Stop()
+	if c.progress == nil {
 		return
 	}
-	c.progress.Cancel()
+	if err == nil {
+		c.progress.Stop()
+	} else {
+		c.progress.Cancel()
+	}
+	c.progress = nil
 }
