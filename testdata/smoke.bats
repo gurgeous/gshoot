@@ -43,6 +43,7 @@ setup() {
 }
 
 @test "zsh completion lists spreadsheet commands" {
+  [ "$(uname -s)" = Darwin ] || skip "zsh completion is tested on macOS"
   run zsh -fc '
     function compdef() {}
     function _arguments() { state=command; return 1 }
@@ -57,6 +58,7 @@ setup() {
 }
 
 @test "zsh completion offers join flags" {
+  [ "$(uname -s)" = Darwin ] || skip "zsh completion is tested on macOS"
   run zsh -fc '
     function compdef() {}
     function _arguments() { print -rl -- "$@" }
