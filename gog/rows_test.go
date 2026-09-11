@@ -21,5 +21,5 @@ func TestRowsIndexes(t *testing.T) {
 	assert.Equal(t, map[string]int{"1": 1, "2": 3}, indexes)
 
 	_, err = (Rows{{"id"}, {"1"}, {"1"}}).UniqueRowIndexes(0, "sheet")
-	assert.EqualError(t, err, `sheet has duplicate key "1"`)
+	assert.EqualError(t, err, "sheet has duplicate key id=1")
 }

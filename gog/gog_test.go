@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -20,6 +21,32 @@ func TestListSpreadsheetFilesUsesGogLimitAndOrder(t *testing.T) {
 	assert.Contains(t, log, "drive ls --all --max 20")
 	assert.NotContains(t, log, "--page")
 	assert.Contains(t, log, "modifiedByMeTime")
+}
+
+func TestDebugLogsTimestampedWrappedGogCalls(t *testing.T) {
+	client, _ := fakeGog(t, `{"files":[]}`)
+	path := filepath.Join(t.TempDir(), "stderr")
+	stderr, err := os.Create(path)
+	assert.NoError(t, err)
+	original := os.Stderr
+	os.Stderr = stderr
+	t.Cleanup(func() {
+		os.Stderr = original
+		assert.NoError(t, stderr.Close())
+	})
+	t.Setenv("GSHOOT_DEBUG", "1")
+
+	_, err = client.listFiles(context.Background(), strings.Repeat("long condition ", 10), 20)
+	assert.NoError(t, err)
+	assert.NoError(t, stderr.Sync())
+
+	debug := readTestFile(t, path)
+	assert.Regexp(t, `^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z gog `, debug)
+	assert.Contains(t, debug, "drive ls")
+	assert.Contains(t, debug, "--query")
+	for _, line := range strings.Split(debug, "\n") {
+		assert.Less(t, utf8.RuneCountInString(line), 80, line)
+	}
 }
 
 func TestFindSpreadsheetAcceptsNameIDAndURL(t *testing.T) {

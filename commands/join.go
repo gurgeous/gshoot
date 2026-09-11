@@ -68,12 +68,14 @@ func (c *JoinCmd) Run() (err error) {
 	cmd.stop(nil)
 	join.preview(os.Stdout)
 	if !c.Force {
+		fmt.Fprintln(os.Stderr)
 		prompt := ux.Warn.Render("join into '"+cmd.file.Name+" / "+sheet.Title+"'?") + " " + ux.Muted.Render("(y/n)")
 		util.Confirm(prompt)
+		fmt.Fprintln(os.Stderr)
 	}
-	cmd.progress = ux.StartProgress(os.Stderr, "creating backup and joining...")
 
 	// backup
+	fmt.Fprintln(os.Stderr, "creating backup...")
 	backupTitle := fmt.Sprintf("%s backup %s", cmd.file.Name, time.Now().UTC().Format("2006-01-02 150405 UTC"))
 	backup, err := cmd.client.CopySpreadsheet(cmd.ctx, cmd.file.ID, backupTitle)
 	if err != nil {
@@ -82,6 +84,7 @@ func (c *JoinCmd) Run() (err error) {
 	backupURL := util.SpreadsheetURL(backup.ID) + "/edit"
 
 	// apply
+	cmd.progress = ux.StartProgress(os.Stderr, "joining...")
 	hasFilter := spreadsheet.Data[sheet.ID].FilterRange != nil
 	if _, err := cmd.client.Apply(cmd.ctx, cmd.file.ID, join.operations(sheet.ID, hasFilter)); err != nil {
 		return fmt.Errorf("join failed: %w\nbackup: %s", err, backupURL)

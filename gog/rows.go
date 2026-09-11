@@ -57,7 +57,7 @@ func (r Rows) UniqueRowIndexes(column int, label string) (map[string]int, error)
 			continue
 		}
 		if _, ok := indexes[key]; ok {
-			return nil, fmt.Errorf("%s has duplicate key %q", label, key)
+			return nil, fmt.Errorf("%s has duplicate key %s=%s", label, r[0][column], key)
 		}
 		indexes[key] = i
 	}

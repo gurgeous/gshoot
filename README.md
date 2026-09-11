@@ -85,6 +85,7 @@ There are three different modes for `gshoot up`.
 When using `up`, gshoot will find or create the spreadsheet file as necessary. The target sheet name comes from the CSV filename, which you can override with `--sheet`. I almost always use `--filter`, `--layout`, `--numeric` and `--open` too.
 
 Spreadsheet arguments accept an exact Drive name, spreadsheet ID, or Google Sheets URL.
+Set `GSHOOT_DEBUG=1` to print timestamped gog commands to stderr.
 
 gog currently cannot bound raw grid-data reads by sheet or range, so `--refill`
 and `--layout` fetch grid data for the whole spreadsheet.
@@ -103,8 +104,8 @@ gshoot join Zoo prices.csv --key asin
 
 Existing values are never overwritten. CSV-only columns are appended, while a
 column present in both inputs is inserted beside the existing column with a `2`
-suffix (`price` becomes `price2`). A first column named `join` labels each row as
-`left`, `right`, or `match`.
+suffix (`price` becomes `price2`). A column named `join` labels each row as `left`,
+`right`, or `match`. It temporarily follows the first column due to a gog bug.
 
 Use `--sheet` to select a sheet, `--columns price,rank` to limit CSV columns, and
 `--force` to skip confirmation. gshoot always previews the join and creates a

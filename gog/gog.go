@@ -8,9 +8,12 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
+	"unicode"
 
 	"github.com/gurgeous/gshoot/util"
 )
@@ -462,6 +465,7 @@ func (c *Client) runJSON(ctx context.Context, stdin io.Reader, dst any, args ...
 	base := make([]string, 0, 3+len(args))
 	base = append(base, "--json", "--no-input", "--color=never")
 	base = append(base, args...)
+	debugGogCall(base)
 	// #nosec G204 -- arguments are passed directly without a shell.
 	cmd := exec.CommandContext(ctx, c.gog, base...)
 	cmd.Stdin = stdin
@@ -482,6 +486,36 @@ func (c *Client) runJSON(ctx context.Context, stdin io.Reader, dst any, args ...
 		return fmt.Errorf("decode gog output: %w", err)
 	}
 	return nil
+}
+
+// debugGogCall logs wrapped gog commands when GSHOOT_DEBUG is enabled.
+func debugGogCall(args []string) {
+	debug := strings.TrimSpace(os.Getenv("GSHOOT_DEBUG"))
+	if debug == "" || debug == "0" || strings.EqualFold(debug, "false") {
+		return
+	}
+
+	quoted := make([]string, len(args))
+	for i, arg := range args {
+		quoted[i] = arg
+		if arg == "" || strings.ContainsAny(arg, " \t\r\n\"\\") {
+			quoted[i] = strconv.Quote(arg)
+		}
+	}
+	line := time.Now().UTC().Format("2006-01-02T15:04:05.000Z") + " gog " + strings.Join(quoted, " ")
+	for len([]rune(line)) >= 80 {
+		runes := []rune(line)
+		cut := 77
+		for i := cut; i > 1; i-- {
+			if unicode.IsSpace(runes[i]) {
+				cut = i
+				break
+			}
+		}
+		fmt.Fprintln(os.Stderr, strings.TrimRightFunc(string(runes[:cut]), unicode.IsSpace)+" \\")
+		line = "  " + strings.TrimLeftFunc(string(runes[cut:]), unicode.IsSpace)
+	}
+	fmt.Fprintln(os.Stderr, line)
 }
 
 func quoteSheet(title string) string {

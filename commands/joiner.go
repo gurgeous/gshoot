@@ -15,6 +15,7 @@ import (
 
 const (
 	columnsDimension = "cols"
+	joinColumnIndex  = 1
 	noneLabel        = "(none)"
 )
 
@@ -89,7 +90,7 @@ func newJoiner(left, right gog.Rows, key string, columns []string) (*joiner, err
 	if err != nil {
 		return nil, err
 	}
-	leftKeys, err := left.UniqueRowIndexes(leftKey, "sheet")
+	leftKeys, err := left.UniqueRowIndexes(leftKey, "google sheet")
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +139,7 @@ func newJoiner(left, right gog.Rows, key string, columns []string) (*joiner, err
 
 	join.rows = join.joinRows()
 	for _, row := range join.rows[1:] {
-		switch row[0] {
+		switch row[joinColumnIndex] {
 		case "left":
 			join.rowCounts.left++
 		case "right":
@@ -159,7 +160,7 @@ func (j *joiner) preview(w io.Writer) {
 	right := strings.Join(j.rightColumns, ", ")
 	matches := make([]string, 0, len(j.matchColumns))
 	for _, column := range j.matchColumns {
-		matches = append(matches, column.source+" -> "+column.target)
+		matches = append(matches, column.source)
 	}
 	if left == "" {
 		left = noneLabel
@@ -171,8 +172,9 @@ func (j *joiner) preview(w io.Writer) {
 	if match == "" {
 		match = noneLabel
 	}
-	fmt.Fprintf(w, "Columns\n  key:   %s\n  left:  %s\n  right: %s\n  match: %s\n", j.key, left, right, match)
-	fmt.Fprintf(w, "Rows\n  left:  %d\n  right: %d\n  match: %d\n", j.rowCounts.left, j.rowCounts.right, j.rowCounts.match)
+	fmt.Fprintf(w, "Column plan\n  key:   %s\n  left:  %s\n  match: %s\n  right: %s\n", j.key, left, match, right)
+	fmt.Fprintf(w, "Row counts\n  left:  %d\n  match: %d\n  right: %d\n", j.rowCounts.left, j.rowCounts.match, j.rowCounts.right)
+	fmt.Fprintln(w, "\nWorkaround: \"join\" is inserted after the first column until gog can insert before column A.")
 }
 
 // operations translates the plan into ordered, non-overwriting mutations.
@@ -184,7 +186,7 @@ func (j *joiner) operations(sheetID int64, hasFilter bool) []gog.Operation {
 	sort.Slice(matches, func(i, k int) bool { return matches[i].left > matches[k].left })
 	for _, column := range matches {
 		operations = append(operations, gog.Operation{InsertDimension: &gog.InsertDimensionOperation{
-			SheetID: sheetID, Dimension: columnsDimension, Start: column.left + 2, Count: 1,
+			SheetID: sheetID, Dimension: columnsDimension, Start: column.left + 1, Count: 1, After: true,
 		}})
 	}
 	if len(j.rightColumns) > 0 {
@@ -192,8 +194,12 @@ func (j *joiner) operations(sheetID int64, hasFilter bool) []gog.Operation {
 			SheetID: sheetID, Dimension: columnsDimension, Start: j.leftWidth + len(j.matchColumns), Count: len(j.rightColumns), After: true,
 		}})
 	}
+	// WORKAROUND: gog v0.37 cannot insert before column A. It converts column 1
+	// to startIndex 0, but the Google client omits that zero from the request and
+	// Sheets rejects the missing field. Keep "join" after the first column until
+	// gog force-sends startIndex 0; then restore it as the first column.
 	operations = append(operations, gog.Operation{InsertDimension: &gog.InsertDimensionOperation{
-		SheetID: sheetID, Dimension: columnsDimension, Start: 1, Count: 1,
+		SheetID: sheetID, Dimension: columnsDimension, Start: 1, Count: 1, After: true,
 	}})
 
 	// insert right-only rows
@@ -247,8 +253,8 @@ func (j *joiner) operations(sheetID int64, hasFilter bool) []gog.Operation {
 // insertedColumns returns the final indexes of every newly inserted column.
 func (j *joiner) insertedColumns() []int {
 	headers := j.rows.ColumnIndexes()
-	// The implicit zero is the leading "join" indicator column.
 	columns := make([]int, 1, 1+len(j.matchColumns)+len(j.rightColumns))
+	columns[0] = headers["join"]
 	for _, match := range j.matchColumns {
 		columns = append(columns, headers[match.target])
 	}
@@ -317,7 +323,7 @@ func (j *joiner) validateOutputColumns(leftHeaders []string) error {
 // joinRows builds output values while preserving LEFT and RIGHT row order.
 func (j *joiner) joinRows() gog.Rows {
 	// build headers and source-to-output column mappings
-	headers := []string{"join"}
+	headers := []string{}
 	matchByLeft := map[int]columnMatch{}
 	for _, match := range j.matchColumns {
 		matchByLeft[match.left] = match
@@ -327,6 +333,9 @@ func (j *joiner) joinRows() gog.Rows {
 	for i, header := range j.left[0] {
 		leftOutput[i] = len(headers)
 		headers = append(headers, header)
+		if i == 0 {
+			headers = append(headers, "join")
+		}
 		if match, ok := matchByLeft[i]; ok {
 			rightCopies = append(rightCopies, columnCopy{source: match.right, target: len(headers)})
 			headers = append(headers, match.target)
@@ -347,9 +356,9 @@ func (j *joiner) joinRows() gog.Rows {
 			out[leftOutput[c]] = value
 		}
 		rightRow, matched := j.rightKeys[j.left[i][j.leftKey]]
-		out[0] = "left"
+		out[joinColumnIndex] = "left"
 		if matched {
-			out[0] = "match"
+			out[joinColumnIndex] = "match"
 			copyColumns(out, j.right[rightRow], rightCopies)
 		}
 		rows = append(rows, out)
@@ -362,7 +371,7 @@ func (j *joiner) joinRows() gog.Rows {
 			continue
 		}
 		out := make([]string, len(headers))
-		out[0] = "right"
+		out[joinColumnIndex] = "right"
 		out[leftOutput[j.leftKey]] = key
 		copyColumns(out, j.right[i], rightCopies)
 		rows = append(rows, out)

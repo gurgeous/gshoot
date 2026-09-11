@@ -30,12 +30,12 @@ func TestJoinerPlansRowsAndColumns(t *testing.T) {
 	assert.Equal(t, []columnMatch{{left: 2, right: 1, source: "price", target: "price2"}}, join.matchColumns)
 	assert.Equal(t, rowCounts{left: 2, right: 2, match: 1}, join.rowCounts)
 	assert.Equal(t, gog.Rows{
-		{"join", "asin", "title", "price", "price2", "rank"},
-		{"match", "a", "Alpha", "10", "11", "1"},
-		{"left", "b", "Beta", "20", "", ""},
-		{"left", "", "Blank", "30", "", ""},
-		{"right", "c", "", "", "31", "3"},
-		{"right", "", "", "", "41", "4"},
+		{"asin", "join", "title", "price", "price2", "rank"},
+		{"a", "match", "Alpha", "10", "11", "1"},
+		{"b", "left", "Beta", "20", "", ""},
+		{"", "left", "Blank", "30", "", ""},
+		{"c", "right", "", "", "31", "3"},
+		{"", "right", "", "", "41", "4"},
 	}, join.rows)
 }
 
@@ -47,8 +47,8 @@ func TestJoinerIgnoresBlankHeaders(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Empty(t, join.leftColumns)
 	assert.Empty(t, join.rightColumns)
-	assert.Equal(t, []string{"join", "id", "", "price", "price2"}, join.rows[0])
-	assert.Equal(t, []string{"match", "1", "keep", "10", "11"}, join.rows[1])
+	assert.Equal(t, []string{"id", "join", "", "price", "price2"}, join.rows[0])
+	assert.Equal(t, []string{"1", "match", "keep", "10", "11"}, join.rows[1])
 }
 
 func TestJoinCommandBacksUpBeforeWriting(t *testing.T) {
@@ -69,26 +69,28 @@ func TestJoinCommandBacksUpBeforeWriting(t *testing.T) {
 		Spreadsheet: "Budget", CSVPath: csv, Key: "id", Force: true,
 	}, responses...)
 	assert.NoError(t, err)
-	assert.Contains(t, stdout, "Columns\n  key:   id")
-	assert.Contains(t, stdout, "Rows\n  left:  1\n  right: 1\n  match: 1")
+	assert.Contains(t, stdout, "Column plan\n  key:   id")
+	assert.Contains(t, stdout, "Row counts\n  left:  1\n  match: 1\n  right: 1")
+	assert.Contains(t, stdout, `Workaround: "join" is inserted after the first column until gog can insert before column A.`)
 	assert.Contains(t, stdout, "spreadsheet: https://docs.google.com/spreadsheets/d/sheet-1/edit")
 	assert.Contains(t, stdout, "backup: https://docs.google.com/spreadsheets/d/backup-1/edit")
-	assert.Contains(t, stderr, "creating backup and joining...")
+	assert.Contains(t, stderr, "creating backup...\njoining...")
+	assert.NotContains(t, stderr, "creating backup and joining")
 	assert.Less(t, strings.Index(log, "sheets copy sheet-1"), strings.Index(log, "sheets insert sheet-1"))
 	assert.Contains(t, log, "sheets filter set sheet-1 'Data'!A1:E4 --force")
 	assert.Equal(t, 4, strings.Count(log, "sheets update sheet-1"))
-	assert.Contains(t, log, "sheets update sheet-1 'Data'!A1 ")
+	assert.Contains(t, log, "sheets update sheet-1 'Data'!B1 ")
 	assert.Contains(t, log, "sheets update sheet-1 'Data'!D1 ")
 	assert.Contains(t, log, "sheets update sheet-1 'Data'!E1 ")
 	assert.Contains(t, log, "sheets update sheet-1 'Data'!A4 ")
-	assert.NotContains(t, log, "sheets update sheet-1 'Data'!B1 ")
+	assert.NotContains(t, log, "sheets update sheet-1 'Data'!A1 ")
 	assert.NotContains(t, log, "sheets update sheet-1 'Data'!C1 ")
 }
 
 func TestJoinCommandDoesNotWriteWhenBackupFails(t *testing.T) {
 	csv := writeCSV(t, "id,price\n1,11\n")
 	raw := `{"title":"Budget","sheets":[{"properties":{"sheetId":7,"title":"Data","gridProperties":{"rowCount":10,"columnCount":5}}}]}`
-	err, _, _, log := testCommand(t, &JoinCmd{
+	err, _, stderr, log := testCommand(t, &JoinCmd{
 		Spreadsheet: "Budget", CSVPath: csv, Key: "id", Force: true,
 	},
 		`{"files":[{"id":"sheet-1","name":"Budget"}]}`,
@@ -97,6 +99,8 @@ func TestJoinCommandDoesNotWriteWhenBackupFails(t *testing.T) {
 		`not-json`,
 	)
 	assert.ErrorContains(t, err, "create backup")
+	assert.Contains(t, stderr, "creating backup...")
+	assert.NotContains(t, stderr, "joining...")
 	assert.NotContains(t, log, "sheets insert")
 }
 
@@ -108,15 +112,17 @@ func TestJoinerPreviewAndOperations(t *testing.T) {
 
 	var preview bytes.Buffer
 	join.preview(&preview)
-	assert.Equal(t, "Columns\n  key:   id\n  left:  name\n  right: rank\n  match: price -> price2\nRows\n  left:  1\n  right: 1\n  match: 1\n", preview.String())
+	assert.Equal(t, "Column plan\n  key:   id\n  left:  name\n  match: price\n  right: rank\nRow counts\n  left:  1\n  match: 1\n  right: 1\n\nWorkaround: \"join\" is inserted after the first column until gog can insert before column A.\n", preview.String())
 
 	operations := join.operations(7, true)
 	assert.Equal(t, "cols", operations[0].InsertDimension.Dimension)
-	assert.Equal(t, 4, operations[0].InsertDimension.Start)
+	assert.Equal(t, 3, operations[0].InsertDimension.Start)
+	assert.True(t, operations[0].InsertDimension.After)
 	assert.Equal(t, "cols", operations[1].InsertDimension.Dimension)
 	assert.Equal(t, 4, operations[1].InsertDimension.Start)
 	assert.True(t, operations[1].InsertDimension.After)
 	assert.Equal(t, 1, operations[2].InsertDimension.Start)
+	assert.True(t, operations[2].InsertDimension.After)
 	assert.Equal(t, "rows", operations[3].InsertDimension.Dimension)
 	assert.Equal(t, 3, operations[3].InsertDimension.Start)
 	assert.True(t, *operations[3].InsertDimension.InheritFromBefore)
@@ -130,14 +136,14 @@ func TestJoinerPreviewAndOperations(t *testing.T) {
 			existingPastes[operation.PasteRows.ColumnIndex] = operation.PasteRows.Rows
 		}
 	}
-	assert.Equal(t, []int{0, 4, 5}, formattedColumns)
+	assert.Equal(t, []int{1, 4, 5}, formattedColumns)
 	assert.Equal(t, map[int]gog.Rows{
-		0: {{"join"}, {"match"}, {"left"}},
+		1: {{"join"}, {"match"}, {"left"}},
 		4: {{"price2"}, {"11"}, {""}},
 		5: {{"rank"}, {"2"}, {""}},
 	}, existingPastes)
 	assert.Equal(t, 3, operations[10].PasteRows.RowIndex)
-	assert.Equal(t, gog.Rows{{"right", "3", "", "", "30", "1"}}, operations[10].PasteRows.Rows)
+	assert.Equal(t, gog.Rows{{"3", "right", "", "", "30", "1"}}, operations[10].PasteRows.Rows)
 	assert.Equal(t, &gog.GridRange{SheetID: 7, EndRowIndex: 4, EndColumnIndex: 6}, operations[11].SetFilter)
 }
 
@@ -150,7 +156,7 @@ func TestJoinerSelectsRightColumns(t *testing.T) {
 	assert.Equal(t, []string{"name"}, join.leftColumns)
 	assert.Equal(t, []string{"note"}, join.rightColumns)
 	assert.Equal(t, "price", join.matchColumns[0].source)
-	assert.Equal(t, []string{"join", "id", "name", "price", "price2", "note"}, join.rows[0])
+	assert.Equal(t, []string{"id", "join", "name", "price", "price2", "note"}, join.rows[0])
 }
 
 func TestJoinerRejectsInvalidInputs(t *testing.T) {
@@ -167,8 +173,8 @@ func TestJoinerRejectsInvalidInputs(t *testing.T) {
 	}{
 		{name: "missing left key", left: gog.Rows{{"name"}, {"Ada"}}, right: validRight, key: "id", contains: `sheet has no "id" column`},
 		{name: "missing right key", left: validLeft, right: gog.Rows{{"name"}, {"Ada"}}, key: "id", contains: `csv has no "id" column`},
-		{name: "duplicate left key", left: gog.Rows{{"id"}, {"1"}, {"1"}}, right: validRight, key: "id", contains: `sheet has duplicate key "1"`},
-		{name: "duplicate right key", left: validLeft, right: gog.Rows{{"id"}, {"1"}, {"1"}}, key: "id", contains: `csv has duplicate key "1"`},
+		{name: "duplicate left key", left: gog.Rows{{"id"}, {"1"}, {"1"}}, right: validRight, key: "id", contains: "google sheet has duplicate key id=1"},
+		{name: "duplicate right key", left: validLeft, right: gog.Rows{{"id"}, {"1"}, {"1"}}, key: "id", contains: "csv has duplicate key id=1"},
 		{name: "no matches", left: validLeft, right: gog.Rows{{"id"}, {"2"}}, key: "id", contains: "no rows match"},
 		{name: "join exists", left: gog.Rows{{"id", "join"}, {"1", "left"}}, right: validRight, key: "id", contains: `column "join" already exists`},
 		{name: "generated exists", left: gog.Rows{{"id", "price", "price2"}, {"1", "10", "old"}}, right: validRight, key: "id", contains: `column "price2" already exists`},
