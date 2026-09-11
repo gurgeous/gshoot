@@ -137,49 +137,8 @@ These are a few other commands for convenience:
 
 ## Potential gogcli improvements
 
-These additions are ordered by priority for gshoot:
-
-- `gog sheets batch-request <id> --requests-json @-` for atomic
-  `spreadsheets.batchUpdate` requests. gshoot currently starts a metadata command
-  and a mutation command for every ordinary operation, so 20 format/copy operations
-  mean 40 gog invocations. A batch would reduce those to one and, more importantly,
-  prevent a failure from leaving the sheet half-updated.
-
-- `gog sheets raw --range … --fields …` for bounded grid-data reads. Refill and
-  layout each need selected grid data from one sheet, but gshoot must currently run
-  `sheets raw --include-grid-data` for the entire spreadsheet. This is still one
-  request, but a workbook with ten similarly sized sheets can return roughly ten
-  times the needed cell data; large unrelated sheets can make the request fail.
-
-- `gog sheets duplicate-tab <id> <sheet> <new-name> [--index N]` for a
-  `DuplicateSheetRequest`. This would enable complete in-file sheet snapshots;
-  `copy-paste` only copies cell ranges and misses sheet-level state. `join` currently
-  uses `gog sheets copy` to back up the entire spreadsheet instead.
-
-- `gog sheets resize-columns --auto --padding N --max-width N` for bounded layout
-  in one command. For 20 columns, gshoot currently starts 43 gog commands: two to
-  autosize, one raw grid-data read, then a metadata read and resize for each column.
-  gog could do the autosize/read/bounded-resize workflow internally in one invocation
-  and roughly three API requests.
-
-- `gog drive ls --order-by modifiedByMeTime desc`. `gshoot list` currently makes one
-  limited `drive ls` request and already selects only the fields it displays, but
-  gog cannot ask Drive to sort first. Fetching everything and sorting locally is the
-  only reliable workaround; without it, the requested limit may not contain the
-  most recently edited files.
-
-- `gog sheets clear --all-cell-data` to clear values, formats, notes, and validation
-  together. One `--replace` clear currently starts five gog commands: one metadata
-  read, then separate value, format, validation, and note clears. A single clear
-  operation would be faster and could not leave some kinds of old cell state behind.
-
-- `gog sheets resize-grid <id> <sheet> --rows N --columns N` for exact grid
-  dimensions. Resizing an existing sheet currently takes a metadata read plus as
-  many as two insert/delete commands, one per dimension. This would turn the two
-  mutations into one; the latency saving is modest, but rows and columns would no
-  longer be left at different sizes after a partial failure.
-
-- `gog sheets paste-data` with stdin, delimiter, and paste-type options. This would
-  not save an API request: gshoot already pastes all values in one call. It would
-  avoid marshaling the complete in-memory CSV/TSV into a second JSON payload, which
-  mainly reduces memory and encoding overhead for large uploads.
+- https://github.com/openclaw/gogcli/issues/1102
+- https://github.com/openclaw/gogcli/issues/1103 - WONT FIX
+- https://github.com/openclaw/gogcli/issues/1104
+- https://github.com/openclaw/gogcli/issues/1105
+- https://github.com/openclaw/gogcli/issues/1106
