@@ -180,6 +180,10 @@ func (p *Progress) SayUploadRows(n int, file, sheet string) {
 	p.set(fmt.Sprintf("uploading %d rows to %s / %s...", n, Brand.Render(file), Success.Render(sheet)))
 }
 
+func (p *Progress) SayAppendRows(n int, file, sheet string) {
+	p.set(fmt.Sprintf("appending %d rows to %s / %s...", n, Brand.Render(file), Success.Render(sheet)))
+}
+
 //
 // rows
 //

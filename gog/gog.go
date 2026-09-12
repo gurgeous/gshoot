@@ -227,10 +227,22 @@ func (c *Client) GetSheets(ctx context.Context, id string) ([]*Sheet, error) {
 }
 
 func (c *Client) GetRows(ctx context.Context, id, title string) (Rows, error) {
+	return c.getRows(ctx, id, quoteSheet(title))
+}
+
+func (c *Client) GetHeader(ctx context.Context, id, title string) ([]string, error) {
+	rows, err := c.getRows(ctx, id, quoteSheet(title)+"!1:1")
+	if err != nil || len(rows) == 0 {
+		return nil, err
+	}
+	return rows[0], nil
+}
+
+func (c *Client) getRows(ctx context.Context, id, rng string) (Rows, error) {
 	var out struct {
 		Values [][]any `json:"values"`
 	}
-	if err := c.runJSON(ctx, nil, &out, sheetsCommand, "get", id, quoteSheet(title)); err != nil {
+	if err := c.runJSON(ctx, nil, &out, sheetsCommand, "get", id, rng); err != nil {
 		return nil, err
 	}
 	rows := make([][]string, 0, len(out.Values))
@@ -242,6 +254,15 @@ func (c *Client) GetRows(ctx context.Context, id, title string) (Rows, error) {
 		rows = append(rows, cells)
 	}
 	return Rows(util.CSVRectangularize(rows)), nil
+}
+
+func (c *Client) AppendRows(ctx context.Context, id, title string, rows Rows) error {
+	data, err := json.Marshal(rows)
+	if err != nil {
+		return err
+	}
+	return c.runJSON(ctx, bytes.NewReader(data), nil, sheetsCommand, "append", id, quoteSheet(title),
+		"--values-json", "@-", "--input", "USER_ENTERED", "--insert", "INSERT_ROWS")
 }
 
 // Apply translates gshoot operations to named gog commands.
