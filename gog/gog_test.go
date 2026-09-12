@@ -134,6 +134,11 @@ func TestApplySheetBatchUsesSpreadsheetAndValueBatches(t *testing.T) {
 		{InsertDimension: &InsertDimensionOperation{
 			SheetID: 7, Dimension: "cols", Start: 1, Count: 1,
 		}},
+		{CopyCells: &CopyCellsOperation{
+			Source:      GridRange{SheetID: 7, EndColumnIndex: 1},
+			Destination: GridRange{SheetID: 7, StartColumnIndex: 1, EndColumnIndex: 2},
+			Type:        "NORMAL",
+		}},
 		{FormatCells: &FormatCellsOperation{
 			Range: GridRange{SheetID: 7, StartColumnIndex: 2, EndColumnIndex: 4},
 		}},
@@ -162,6 +167,7 @@ func TestApplySheetBatchUsesSpreadsheetAndValueBatches(t *testing.T) {
 	assert.JSONEq(t, `{
 		"requests": [
 			{"insertDimension":{"range":{"sheetId":7,"dimension":"COLUMNS","startIndex":0,"endIndex":1},"inheritFromBefore":false}},
+			{"copyPaste":{"source":{"sheetId":7,"endColumnIndex":1},"destination":{"sheetId":7,"startColumnIndex":1,"endColumnIndex":2},"pasteType":"PASTE_NORMAL"}},
 			{"repeatCell":{"range":{"sheetId":7,"startColumnIndex":2,"endColumnIndex":4},"cell":{"userEnteredFormat":{}},"fields":"userEnteredFormat"}}
 		]
 	}`, readTestFile(t, filepath.Join(dir, "body.1")))

@@ -53,6 +53,7 @@ for complete setup instructions.
 
 - download a CSV from a Google Sheets file (and maybe a specific sheet)
 - upload a CSV into a Google Sheets file (and maybe replace/merge into an existing sheet)
+- turn plaintext cells into hyperlinks using URLs from another column
 - join CSV columns into an existing sheet without overwriting its data
 - `up --replace` mode to overwrite an existing sheet
 - `up --refill` mode to merge data into an existing sheet, leaving other columns untouched
@@ -68,6 +69,7 @@ Magically upload/download CSVs from Google Sheets.
 Commands:
   append         Append a CSV to an existing Google Sheet.
   down           Download a Google Sheet as CSV.
+  hyperlink      Transform plaintext cells into hyperlinks.
   join           Join a CSV into an existing Google Sheet.
   up             Upload a CSV to Google Sheets.
   list           List your Google Sheets.
@@ -97,6 +99,16 @@ Set `GSHOOT_DEBUG=1` to print timestamped gog commands to stderr.
 `gshoot append Zoo new.csv` appends the CSV data rows to the first sheet. Use
 `--sheet` to select another sheet. CSV and sheet columns must match exactly,
 including their order.
+
+### Hyperlink
+
+`gshoot hyperlink Zoo name link` transforms nonblank cells in `name` into
+hyperlinks using URLs from `link`. The original column is copied exactly to an
+adjacent `name2` backup column first. Rows with blank text or links are left
+untouched. URLs are passed to Google Sheets without validation.
+
+`gshoot hyperlink Zoo asin` needs no link column; it embeds each ASIN's
+`amazon.com/dp/…` URL directly in the formula.
 
 ### Join
 
@@ -129,16 +141,12 @@ These are a few other commands for convenience:
 
 ### 0.2.0 (unreleased)
 
-- Add `append` and `join` commands
+- Add `append`, `hyperlink`, and `join` commands
 - Use [gogcli](https://gogcli.sh/) as client instead of direct api
 
 ### 0.1.0 (Jun 2026)
 
 - Initial release.
-
-## Future Work
-
-- `ghoost hyperlink plaintext_col link_col`, replace plaintext_col with `=hyperlink(plain, link)`. handle blanks, fail fast on bad links too
 
 ## Potential gogcli improvements
 

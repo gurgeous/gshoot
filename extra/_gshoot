@@ -18,6 +18,7 @@ _gshoot() {
         'append:Append a CSV to an existing Google Sheet'
         'down:Download a Google Sheet as CSV'
         'd:Alias for down'
+        'hyperlink:Transform plaintext cells into hyperlinks'
         'join:Join a CSV into an existing Google Sheet'
         'list:List your Google Sheets'
         'ls:Alias for list'
@@ -33,6 +34,7 @@ _gshoot() {
       case $line[1] in
         append) _gshoot_append && ret=0 ;;
         down|d) _gshoot_down && ret=0 ;;
+        hyperlink) _gshoot_hyperlink && ret=0 ;;
         join) _gshoot_join && ret=0 ;;
         list|ls) _gshoot_list && ret=0 ;;
         peek) _gshoot_peek && ret=0 ;;
@@ -60,6 +62,15 @@ _gshoot_down() {
     '--sheet[Sheet name]:sheet:' \
     '--help[Show context-sensitive help]' \
     ':spreadsheet:'
+}
+
+_gshoot_hyperlink() {
+  _arguments -s \
+    '--sheet[Destination sheet name]:sheet:' \
+    '--help[Show context-sensitive help]' \
+    ':spreadsheet:' \
+    ':plaintext-column:column:' \
+    '::link-column:column:'
 }
 
 _gshoot_join() {

@@ -184,6 +184,18 @@ func (p *Progress) SayAppendRows(n int, file, sheet string) {
 	p.set(fmt.Sprintf("appending %d rows to %s / %s...", n, Brand.Render(file), Success.Render(sheet)))
 }
 
+func (p *Progress) SayBackupColumn(source, backup string) {
+	p.set(fmt.Sprintf("backing up column %s as %s...", Success.Render(source), Success.Render(backup)))
+}
+
+func (p *Progress) SayHyperlinkRows(n int) {
+	label := "rows"
+	if n == 1 {
+		label = "row"
+	}
+	p.set(fmt.Sprintf("transforming %d %s into hyperlinks...", n, label))
+}
+
 //
 // rows
 //
