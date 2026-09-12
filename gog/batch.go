@@ -21,6 +21,7 @@ type spreadsheetBatch struct {
 
 type spreadsheetRequest struct {
 	AutoResizeDimensions *autoResizeDimensionsRequest `json:"autoResizeDimensions,omitempty"`
+	CopyPaste            *copyPasteRequest            `json:"copyPaste,omitempty"`
 	InsertDimension      *insertDimensionRequest      `json:"insertDimension,omitempty"`
 	RepeatCell           *repeatCellRequest           `json:"repeatCell,omitempty"`
 	SetBasicFilter       *setBasicFilterRequest       `json:"setBasicFilter,omitempty"`
@@ -44,6 +45,12 @@ type apiGridRange struct {
 type insertDimensionRequest struct {
 	Range             dimensionRange `json:"range"`
 	InheritFromBefore bool           `json:"inheritFromBefore"`
+}
+
+type copyPasteRequest struct {
+	Source      apiGridRange `json:"source"`
+	Destination apiGridRange `json:"destination"`
+	PasteType   string       `json:"pasteType"`
 }
 
 type repeatCellRequest struct {
@@ -73,7 +80,7 @@ type valueRange struct {
 	Values Rows   `json:"values"`
 }
 
-// ApplySheetBatch applies one join phase with a single Sheets request.
+// ApplySheetBatch applies one sheet phase with a single Sheets request.
 func (c *Client) ApplySheetBatch(ctx context.Context, id string, sheet *Sheet, operations []Operation) error {
 	if len(operations) == 0 {
 		return nil
@@ -91,7 +98,7 @@ func (c *Client) applyValueBatch(ctx context.Context, id string, sheet *Sheet, o
 		if paste == nil {
 			return errors.New("value batch contains a non-value operation")
 		}
-		cell := fmt.Sprintf("%s!%s%d", quoteSheet(sheet.Title), columnName(paste.ColumnIndex), paste.RowIndex+1)
+		cell := fmt.Sprintf("%s!%s%d", quoteSheet(sheet.Title), ColumnName(paste.ColumnIndex), paste.RowIndex+1)
 		ranges = append(ranges, valueRange{Range: cell, Values: paste.Rows})
 	}
 
@@ -157,6 +164,13 @@ func (o Operation) spreadsheetRequest() (spreadsheetRequest, error) {
 			Range:  apiRange(format.Range),
 			Cell:   cellData{UserEnteredFormat: map[string]any{}},
 			Fields: "userEnteredFormat",
+		}}, nil
+
+	case o.CopyCells != nil:
+		copyOp := o.CopyCells
+		return spreadsheetRequest{CopyPaste: &copyPasteRequest{
+			Source: apiRange(copyOp.Source), Destination: apiRange(copyOp.Destination),
+			PasteType: "PASTE_" + copyOp.Type,
 		}}, nil
 
 	case o.SetFilter != nil:

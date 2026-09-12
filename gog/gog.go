@@ -368,7 +368,7 @@ func (c *Client) applyOperation(ctx context.Context, id string, operation Operat
 		if err != nil {
 			return OperationResult{}, err
 		}
-		cell := fmt.Sprintf("%s!%s%d", quoteSheet(sheet.Title), columnName(paste.ColumnIndex), paste.RowIndex+1)
+		cell := fmt.Sprintf("%s!%s%d", quoteSheet(sheet.Title), ColumnName(paste.ColumnIndex), paste.RowIndex+1)
 		return OperationResult{}, c.runJSON(ctx, bytes.NewReader(data), nil, sheetsCommand, "update", id, cell, "--values-json", "@-", "--input", "USER_ENTERED")
 
 	case operation.InsertDimension != nil:
@@ -550,14 +550,15 @@ func gridRange(sheet *Sheet, rng GridRange) string {
 	if endCol == 0 {
 		endCol = cols
 	}
-	return fmt.Sprintf("%s!%s%d:%s%d", quoteSheet(sheet.Title), columnName(rng.StartColumnIndex), rng.StartRowIndex+1, columnName(endCol-1), endRow)
+	return fmt.Sprintf("%s!%s%d:%s%d", quoteSheet(sheet.Title), ColumnName(rng.StartColumnIndex), rng.StartRowIndex+1, ColumnName(endCol-1), endRow)
 }
 
 func columnRange(title string, rng ColumnRange) string {
-	return fmt.Sprintf("%s!%s:%s", quoteSheet(title), columnName(rng.StartIndex), columnName(rng.EndIndex-1))
+	return fmt.Sprintf("%s!%s:%s", quoteSheet(title), ColumnName(rng.StartIndex), ColumnName(rng.EndIndex-1))
 }
 
-func columnName(index int) string {
+// ColumnName converts a zero-based column index to an A1 column name.
+func ColumnName(index int) string {
 	name := ""
 	for index >= 0 {
 		name = string(rune('A'+index%26)) + name

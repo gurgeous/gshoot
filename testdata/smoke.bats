@@ -11,6 +11,7 @@ setup() {
   [[ "$output" == *"Commands:"* ]]
   [[ "$output" == *"up"* ]]
   [[ "$output" == *"append"* ]]
+  [[ "$output" == *"hyperlink"* ]]
   [[ "$output" == *"join"* ]]
   [[ "$output" != *"auth login"* ]]
   [[ "$output" != *"welcome"* ]]
@@ -20,6 +21,12 @@ setup() {
   run "$BIN" down --help
   [ "$status" -eq 0 ]
   [[ "$output" == *"Spreadsheet name, ID, or URL."* ]]
+}
+
+@test "hyperlink link column is optional" {
+  run "$BIN" hyperlink --help
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"[<link-column>]"* ]]
 }
 
 @test "command aliases" {
@@ -55,6 +62,7 @@ setup() {
   [ "$status" -eq 0 ]
   [[ "$output" == *"up:Upload a CSV"* ]]
   [[ "$output" == *"append:Append a CSV"* ]]
+  [[ "$output" == *"hyperlink:Transform plaintext cells"* ]]
   [[ "$output" == *"join:Join a CSV"* ]]
   [[ "$output" != *"auth:"* ]]
 }
@@ -71,6 +79,20 @@ setup() {
   [[ "$output" == *"--key[Column used to match rows]"* ]]
   [[ "$output" == *"--columns[Comma-separated CSV columns to join]"* ]]
   [[ "$output" == *":csv:_files"* ]]
+}
+
+@test "zsh completion offers hyperlink args" {
+  [ "$(uname -s)" = Darwin ] || skip "zsh completion is tested on macOS"
+  run zsh -fc '
+    function compdef() {}
+    function _arguments() { print -rl -- "$@" }
+    source '"$ROOT"'/extra/_gshoot
+    _gshoot_hyperlink
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"--sheet[Destination sheet name]"* ]]
+  [[ "$output" == *":plaintext-column:column:"* ]]
+  [[ "$output" == *"::link-column:column:"* ]]
 }
 
 @test "zsh completion offers append flags" {

@@ -15,14 +15,15 @@ import (
 //
 
 type CLI struct {
-	Version kong.VersionFlag `short:"v" help:"Print the version number"`
-	Append  AppendCmd        `cmd:"" help:"Append a CSV to an existing Google Sheet."`
-	Down    DownCmd          `cmd:"" aliases:"d" help:"Download a Google Sheet as CSV."`
-	Join    JoinCmd          `cmd:"" help:"Join a CSV into an existing Google Sheet."`
-	Up      UpCmd            `cmd:"" aliases:"u" help:"Upload a CSV to Google Sheets."`
-	List    ListCmd          `cmd:"" aliases:"ls" help:"List your Google Sheets."`
-	Peek    PeekCmd          `cmd:"" help:"List sheets in a spreadsheet."`
-	Wipe    WipeCmd          `cmd:"" help:"Wipe/delete all data from a spreadsheet."`
+	Version   kong.VersionFlag `short:"v" help:"Print the version number"`
+	Append    AppendCmd        `cmd:"" help:"Append a CSV to an existing Google Sheet."`
+	Down      DownCmd          `cmd:"" aliases:"d" help:"Download a Google Sheet as CSV."`
+	Hyperlink HyperlinkCmd     `cmd:"" help:"Transform plaintext cells into hyperlinks."`
+	Join      JoinCmd          `cmd:"" help:"Join a CSV into an existing Google Sheet."`
+	Up        UpCmd            `cmd:"" aliases:"u" help:"Upload a CSV to Google Sheets."`
+	List      ListCmd          `cmd:"" aliases:"ls" help:"List your Google Sheets."`
+	Peek      PeekCmd          `cmd:"" help:"List sheets in a spreadsheet."`
+	Wipe      WipeCmd          `cmd:"" help:"Wipe/delete all data from a spreadsheet."`
 }
 
 func Main(args []string, version string) error {
