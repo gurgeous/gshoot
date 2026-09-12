@@ -15,6 +15,7 @@ _gshoot() {
     command)
       local -a commands
       commands=(
+        'append:Append a CSV to an existing Google Sheet'
         'down:Download a Google Sheet as CSV'
         'd:Alias for down'
         'join:Join a CSV into an existing Google Sheet'
@@ -30,6 +31,7 @@ _gshoot() {
     arg)
       curcontext=${curcontext%:*}-$line[1]:
       case $line[1] in
+        append) _gshoot_append && ret=0 ;;
         down|d) _gshoot_down && ret=0 ;;
         join) _gshoot_join && ret=0 ;;
         list|ls) _gshoot_list && ret=0 ;;
@@ -41,6 +43,14 @@ _gshoot() {
   esac
 
   return ret
+}
+
+_gshoot_append() {
+  _arguments -s \
+    '--sheet[Destination sheet name]:sheet:' \
+    '--help[Show context-sensitive help]' \
+    ':spreadsheet:' \
+    ':csv:_files -g "*.(csv|tsv)(-.)" "*(-/)"'
 }
 
 _gshoot_down() {

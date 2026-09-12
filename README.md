@@ -66,6 +66,7 @@ $ gshoot --help
 Magically upload/download CSVs from Google Sheets.
 
 Commands:
+  append         Append a CSV to an existing Google Sheet.
   down           Download a Google Sheet as CSV.
   join           Join a CSV into an existing Google Sheet.
   up             Upload a CSV to Google Sheets.
@@ -90,6 +91,12 @@ Set `GSHOOT_DEBUG=1` to print timestamped gog commands to stderr.
 ### Down, Down, Down
 
 `gshoot down` is much simpler. By default it downloads the first sheet, but you can override with `--sheet`.
+
+### Append
+
+`gshoot append Zoo new.csv` appends the CSV data rows to the first sheet. Use
+`--sheet` to select another sheet. CSV and sheet columns must match exactly,
+including their order.
 
 ### Join
 
@@ -122,6 +129,7 @@ These are a few other commands for convenience:
 
 ### 0.2.0 (unreleased)
 
+- Add `append` and `join` commands
 - Use [gogcli](https://gogcli.sh/) as client instead of direct api
 
 ### 0.1.0 (Jun 2026)
@@ -130,7 +138,6 @@ These are a few other commands for convenience:
 
 ## Future Work
 
-- `gshoot append` to append a csv to a sheet (cols must be identical)
 - `ghoost hyperlink plaintext_col link_col`, replace plaintext_col with `=hyperlink(plain, link)`. handle blanks, fail fast on bad links too
 
 ## Potential gogcli improvements

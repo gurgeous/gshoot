@@ -78,6 +78,19 @@ func TestGetRowsUsesQuotedRange(t *testing.T) {
 	assert.Contains(t, readTestFile(t, filepath.Join(dir, "log")), `sheets get sheet-1 'Bob''s Sheet'`)
 }
 
+func TestGetHeaderAndAppendRows(t *testing.T) {
+	client, dir := fakeGog(t, `{"values":[["id","amount"]]}`, `{}`)
+	header, err := client.GetHeader(context.Background(), "sheet-1", "Bob's Sheet")
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"id", "amount"}, header)
+	assert.NoError(t, client.AppendRows(context.Background(), "sheet-1", "Bob's Sheet", Rows{{"a", "10"}}))
+
+	log := readTestFile(t, filepath.Join(dir, "log"))
+	assert.Contains(t, log, `sheets get sheet-1 'Bob''s Sheet'!1:1`)
+	assert.Contains(t, log, `sheets append sheet-1 'Bob''s Sheet' --values-json @- --input USER_ENTERED --insert INSERT_ROWS`)
+	assert.JSONEq(t, `[["a","10"]]`, readTestFile(t, filepath.Join(dir, "stdin.2")))
+}
+
 func TestDuplicateTab(t *testing.T) {
 	client, dir := fakeGog(t, `{"spreadsheetId":"sheet-1","sourceSheetId":7,"sheetId":9,"title":"Data backup","index":1}`)
 	sheet, err := client.DuplicateTab(context.Background(), "sheet-1", "Data", "Data backup")
