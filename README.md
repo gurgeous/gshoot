@@ -94,52 +94,31 @@ Set `GSHOOT_DEBUG=1` to print timestamped gog commands to stderr.
 
 `gshoot down` is much simpler. By default it downloads the first sheet, but you can override with `--sheet`.
 
-### Append
-
-`gshoot append Zoo new.csv` appends the CSV data rows to the first sheet. Use
-`--sheet` to select another sheet. CSV and sheet columns must match exactly,
-including their order.
-
-### Hyperlink
-
-`gshoot hyperlink Zoo name link` transforms nonblank cells in `name` into
-hyperlinks using URLs from `link`. The original column is copied exactly to an
-adjacent `name2` backup column first. Rows with blank text or links are left
-untouched. URLs are passed to Google Sheets without validation.
-
-`gshoot hyperlink Zoo asin` needs no link column; it embeds each ASIN's
-`amazon.com/dp/…` URL directly in the formula.
-
 ### Join
 
-`gshoot join` mixes CSV data into an existing sheet using a shared key column:
+`gshoot join` mixes CSV data into an existing sheet using a shared key column.
+Join makes a backup first sheet.
 
 ```sh
 gshoot join Zoo prices.csv --key asin
 ```
 
-Existing values are never overwritten. CSV-only columns are appended, while a
-column present in both inputs is inserted beside the existing column with a `2`
-suffix (`price` becomes `price2`). A column named `join` labels each row as `left`,
-`right`, or `match`. Shared CSV columns containing no values are skipped.
-
-Use `--sheet` to select a sheet, `--columns price,rank` to limit CSV columns, and
-`--force` to skip confirmation. gshoot always previews the join and duplicates
-the destination tab as a timestamped backup before writing. If the sheet has a filter,
-its range is expanded, but existing filtering, sorting, and hidden-row criteria are
-lost when the filter is reapplied.
+We never overwrite existing data. Instead we add dup columns which you can
+choose to copy and paste manually.
 
 ### Other Commands
 
 These are a few other commands for convenience:
 
+- `append` - append a csv to a sheet
+- `hyperlink` - tune one col into hyperlinks using another col
 - `list` - list recently edited spreadsheet files
 - `peek` - list the sheets in a spreadsheet file
 - `wipe` - delete all sheets from a spreadsheet file
 
 ## Changelog
 
-### 0.2.0 (unreleased)
+### 0.2.0 (Sep 2026)
 
 - Add `append`, `hyperlink`, and `join` commands
 - Use [gogcli](https://gogcli.sh/) as client instead of direct api
