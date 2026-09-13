@@ -25,10 +25,10 @@ func HelpPrinter(options kong.HelpOptions, ctx *kong.Context) error {
 
 	// now add color with Restyle
 	styles := []RestyleRule{
-		{Re: regexp.MustCompile(`(?m)^[A-Z][A-Za-z ]*:`), Style: Success},              // `Usage:`
-		{Re: regexp.MustCompile(`(?m)^  ([a-z]+(?: [a-z]+)?)\s{2,}.*$`), Style: Brand}, // `  down ...`
-		{Re: regexp.MustCompile(regexp.QuoteMeta("gshoot")), Style: Brand},             // gshoot
-		{Re: regexp.MustCompile(`(?:^|\s)(-{1,2}[A-Za-z0-9=-]+)`), Style: Warn},        // --xxxx=
+		{Re: regexp.MustCompile(`(?m)^[A-Z][A-Za-z ]*:`), Style: Success},                                                              // `Usage:`
+		{Re: regexp.MustCompile(`(?m)^  ([a-z][a-z0-9-]*(?: \([^)]+\))?(?: [a-z][a-z0-9-]*(?: \([^)]+\))?)*)\s{2,}.*$`), Style: Brand}, // `down (d)`
+		{Re: regexp.MustCompile(regexp.QuoteMeta("gshoot")), Style: Brand},                                                             // gshoot
+		{Re: regexp.MustCompile(`(?:^|\s)(-{1,2}[A-Za-z0-9=-]+)`), Style: Warn},                                                        // --xxxx=
 	}
 	help := Restyle(buf.String(), styles)
 	_, _ = fmt.Fprint(ctx.Stdout, help)

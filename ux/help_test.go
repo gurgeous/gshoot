@@ -29,6 +29,7 @@ func TestColorizeColorsSectionsCommandsAndFlags(t *testing.T) {
 		"",
 		"Commands:",
 		"  down           Download a Google Sheet as CSV.",
+		"  up (u)         Upload a CSV to Google Sheets.",
 	}, "\n") + "\n"
 
 	colored := Restyle(help, helpRules())
@@ -38,6 +39,7 @@ func TestColorizeColorsSectionsCommandsAndFlags(t *testing.T) {
 	assert.Contains(t, colored, Success.Render("Flags:"))
 	assert.Contains(t, colored, Brand.Render("gshoot")+" up")
 	assert.Contains(t, colored, Brand.Render("down"))
+	assert.Contains(t, colored, Brand.Render("up (u)"))
 	assert.Contains(t, colored, Warn.Render("--help"))
 	assert.Contains(t, colored, Warn.Render("--sheet=STRING"))
 	assert.Contains(t, colored, "<spreadsheet>")
@@ -56,7 +58,7 @@ func TestColorHelpLeavesCommandLikeProseAlone(t *testing.T) {
 func helpRules() []RestyleRule {
 	return []RestyleRule{
 		{Re: regexp.MustCompile(`(?m)^[A-Z][A-Za-z ]*:`), Style: Success},
-		{Re: regexp.MustCompile(`(?m)^  ([a-z]+(?: [a-z]+)?)\s{2,}.*$`), Style: Brand},
+		{Re: regexp.MustCompile(`(?m)^  ([a-z][a-z0-9-]*(?: \([^)]+\))?(?: [a-z][a-z0-9-]*(?: \([^)]+\))?)*)\s{2,}.*$`), Style: Brand},
 		{Re: regexp.MustCompile(regexp.QuoteMeta("gshoot")), Style: Brand},
 		{Re: regexp.MustCompile(`(?:^|\s)(-{1,2}[A-Za-z0-9=-]+)`), Style: Warn},
 	}
