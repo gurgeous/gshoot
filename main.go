@@ -1,12 +1,15 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"runtime/debug"
 	"strings"
 
 	"github.com/gurgeous/gshoot/commands"
+	"github.com/gurgeous/gshoot/gog"
 	"github.com/gurgeous/gshoot/ux"
 )
 
@@ -21,9 +24,27 @@ var commit, date, version string
 func main() {
 	err := commands.Main(os.Args[1:], versionString())
 	if err != nil {
-		fmt.Fprintln(os.Stderr, fatalText(err))
+		reportError(os.Stderr, err)
 		os.Exit(1)
 	}
+}
+
+func reportError(w io.Writer, err error) {
+	if _, ok := errors.AsType[*gog.AuthError](err); !ok {
+		fmt.Fprintln(w, fatalText(err))
+		return
+	}
+
+	const friendly = `
+Uh oh, it looks like gog auth isn't working. Try "gog drive ls". Once you have
+that working, come back and try gshoot again.
+`
+
+	fmt.Fprintln(w, ux.Warn.Render(err.Error()))
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, ux.Warn.Render(strings.TrimSpace(friendly)))
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, fatalText(errors.New("gog authentication failed")))
 }
 
 func fatalText(err error) string {

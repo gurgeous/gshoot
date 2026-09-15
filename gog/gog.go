@@ -33,6 +33,15 @@ type Client struct {
 	gog string
 }
 
+// AuthError is a gog failure that appears related to authentication.
+type AuthError struct {
+	Message string
+}
+
+func (e *AuthError) Error() string {
+	return "gog: " + e.Message
+}
+
 // NewClient locates gog. gog owns authentication and account selection.
 func NewClient(_ context.Context) (*Client, error) {
 	path, err := exec.LookPath("gog")
@@ -495,6 +504,9 @@ func (c *Client) runJSON(ctx context.Context, stdin io.Reader, dst any, args ...
 		if msg == "" {
 			msg = err.Error()
 		}
+		if looksLikeAuthError(msg) {
+			return &AuthError{Message: msg}
+		}
 		return fmt.Errorf("gog: %s", msg)
 	}
 	if dst == nil || stdout.Len() == 0 {
@@ -504,6 +516,19 @@ func (c *Client) runJSON(ctx context.Context, stdin io.Reader, dst any, args ...
 		return fmt.Errorf("decode gog output: %w", err)
 	}
 	return nil
+}
+
+func looksLikeAuthError(message string) bool {
+	message = strings.ToLower(message)
+	return strings.Contains(message, "authentication") ||
+		strings.Contains(message, "auth required") ||
+		strings.Contains(message, "no auth for") ||
+		strings.Contains(message, "oauth") ||
+		strings.Contains(message, "missing --account") ||
+		strings.Contains(message, "keyring") ||
+		strings.Contains(message, "refresh token") ||
+		strings.Contains(message, "invalid_grant") ||
+		strings.Contains(message, "invalid_rapt")
 }
 
 // debugGogCall logs wrapped gog commands when GSHOOT_DEBUG is enabled.

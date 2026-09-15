@@ -252,6 +252,17 @@ func TestGogErrorIncludesStderr(t *testing.T) {
 	assert.NoError(t, os.WriteFile(filepath.Join(dir, "error.1"), []byte("authentication required"), 0o600))
 	_, err := client.GetSpreadsheet(context.Background(), "sheet-1")
 	assert.EqualError(t, err, "gog: authentication required")
+	var authErr *AuthError
+	assert.ErrorAs(t, err, &authErr)
+	assert.Equal(t, "authentication required", authErr.Message)
+}
+
+func TestGogOrdinaryErrorIsNotAuthError(t *testing.T) {
+	client, dir := fakeGog(t, "")
+	assert.NoError(t, os.WriteFile(filepath.Join(dir, "error.1"), []byte("API quota exceeded"), 0o600))
+	_, err := client.GetSpreadsheet(context.Background(), "sheet-1")
+	var authErr *AuthError
+	assert.NotErrorAs(t, err, &authErr)
 }
 
 func TestNewClientRequiresGog(t *testing.T) {
