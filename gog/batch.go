@@ -15,10 +15,6 @@ import (
 // Batch-compatible sheet operations through gog's Sheets API commands.
 //
 
-type spreadsheetBatch struct {
-	Requests []spreadsheetRequest `json:"requests"`
-}
-
 type spreadsheetRequest struct {
 	AutoResizeDimensions *autoResizeDimensionsRequest `json:"autoResizeDimensions,omitempty"`
 	CopyPaste            *copyPasteRequest            `json:"copyPaste,omitempty"`
@@ -121,12 +117,13 @@ func (c *Client) applySpreadsheetBatch(ctx context.Context, id string, operation
 		requests = append(requests, request)
 	}
 
-	body, err := json.Marshal(spreadsheetBatch{Requests: requests})
+	body, err := json.Marshal(requests)
 	if err != nil {
 		return err
 	}
 	debugBatch("spreadsheet", len(requests), len(body))
-	return c.spreadsheetBatchUpdate(ctx, id, body)
+	return c.runJSON(ctx, bytes.NewReader(body), nil, sheetsCommand, "batch-request", id,
+		"--requests-json", "@-", "--force")
 }
 
 func (o Operation) spreadsheetRequest() (spreadsheetRequest, error) {
@@ -195,31 +192,6 @@ func apiRange(r GridRange) apiGridRange {
 		SheetID: r.SheetID, StartRowIndex: r.StartRowIndex, EndRowIndex: r.EndRowIndex,
 		StartColumnIndex: r.StartColumnIndex, EndColumnIndex: r.EndColumnIndex,
 	}
-}
-
-func (c *Client) spreadsheetBatchUpdate(ctx context.Context, id string, body []byte) error {
-	file, err := os.CreateTemp("", "gshoot-api-*.json")
-	if err != nil {
-		return fmt.Errorf("create gog API body: %w", err)
-	}
-	path := file.Name()
-	defer func() { _ = os.Remove(path) }()
-
-	if _, err := file.Write(body); err != nil {
-		_ = file.Close()
-		return fmt.Errorf("write gog API body: %w", err)
-	}
-	if err := file.Close(); err != nil {
-		return fmt.Errorf("close gog API body: %w", err)
-	}
-
-	params, err := json.Marshal(map[string]string{"spreadsheetId": id})
-	if err != nil {
-		return err
-	}
-	return c.runJSON(ctx, nil, nil, "api", "call", "sheets", "v4", "sheets.spreadsheets.batchUpdate",
-		"--params", string(params), "--body", "@"+path,
-		"--scope", "https://www.googleapis.com/auth/spreadsheets", "--allow-write", "--force")
 }
 
 func debugBatch(method string, count, size int) {

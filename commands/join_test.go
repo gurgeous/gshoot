@@ -105,8 +105,8 @@ func TestJoinCommandBacksUpBeforeWriting(t *testing.T) {
 	assert.Contains(t, stderr, "joining (2/3): writing 4 rows across 4 ranges...")
 	assert.Contains(t, stderr, "joining (3/3): updating filter and resizing 3 columns...")
 	assert.NotContains(t, stderr, "creating backup tab and joining")
-	assert.Less(t, strings.Index(log, "sheets duplicate-tab sheet-1 Data Data backup"), strings.Index(log, "api call sheets v4"))
-	assert.Equal(t, 2, strings.Count(log, "api call sheets v4 sheets.spreadsheets.batchUpdate"))
+	assert.Less(t, strings.Index(log, "sheets duplicate-tab sheet-1 Data Data backup"), strings.Index(log, "sheets batch-request"))
+	assert.Equal(t, 2, strings.Count(log, "sheets batch-request"))
 	assert.Contains(t, log, "sheets batch-update sheet-1 --data-json @- --input USER_ENTERED")
 	assert.Contains(t, log, "sheets metadata sheet-1")
 	assert.NotContains(t, log, "sheets raw")
@@ -146,7 +146,7 @@ func TestJoinCommandStopsAfterFailedBatch(t *testing.T) {
 	assert.ErrorContains(t, err, "backup: https://docs.google.com/spreadsheets/d/sheet-1/edit#gid=9")
 	assert.Contains(t, stderr, "joining (2/3): writing 4 rows across 4 ranges...")
 	assert.NotContains(t, stderr, "joining (3/3)")
-	assert.Equal(t, 1, strings.Count(log, "api call sheets v4 sheets.spreadsheets.batchUpdate"))
+	assert.Equal(t, 1, strings.Count(log, "sheets batch-request"))
 }
 
 func TestJoinerPreviewAndOperations(t *testing.T) {

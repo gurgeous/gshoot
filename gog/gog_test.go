@@ -160,35 +160,20 @@ func TestApplySheetBatchUsesSpreadsheetAndValueBatches(t *testing.T) {
 	assert.NoError(t, err)
 
 	log := readTestFile(t, filepath.Join(dir, "log"))
-	assert.Contains(t, log, "api call sheets v4 sheets.spreadsheets.batchUpdate")
-	assert.Contains(t, log, `--params {"spreadsheetId":"sheet-1"}`)
-	assert.Contains(t, log, "--scope https://www.googleapis.com/auth/spreadsheets --allow-write --force")
+	assert.Contains(t, log, "sheets batch-request sheet-1 --requests-json @- --force")
 	assert.Contains(t, log, "sheets batch-update sheet-1 --data-json @- --input USER_ENTERED")
-	assert.JSONEq(t, `{
-		"requests": [
+	assert.JSONEq(t, `[
 			{"insertDimension":{"range":{"sheetId":7,"dimension":"COLUMNS","startIndex":0,"endIndex":1},"inheritFromBefore":false}},
 			{"copyPaste":{"source":{"sheetId":7,"endColumnIndex":1},"destination":{"sheetId":7,"startColumnIndex":1,"endColumnIndex":2},"pasteType":"PASTE_NORMAL"}},
 			{"repeatCell":{"range":{"sheetId":7,"startColumnIndex":2,"endColumnIndex":4},"cell":{"userEnteredFormat":{}},"fields":"userEnteredFormat"}}
-		]
-	}`, readTestFile(t, filepath.Join(dir, "body.1")))
+		]`, readTestFile(t, filepath.Join(dir, "stdin.1")))
 	assert.JSONEq(t, `[
 		{"range":"'Data'!C2","values":[["11","=A2"],["12","=A3"]]}
 	]`, readTestFile(t, filepath.Join(dir, "stdin.2")))
-	assert.JSONEq(t, `{
-		"requests": [
+	assert.JSONEq(t, `[
 			{"setBasicFilter":{"filter":{"range":{"sheetId":7,"endRowIndex":4,"endColumnIndex":5}}}},
 			{"autoResizeDimensions":{"dimensions":{"sheetId":7,"dimension":"COLUMNS","startIndex":2,"endIndex":4}}}
-		]
-	}`, readTestFile(t, filepath.Join(dir, "body.3")))
-	assert.Equal(t, "-rw-------", readTestFile(t, filepath.Join(dir, "mode.1")))
-	assert.Equal(t, "-rw-------", readTestFile(t, filepath.Join(dir, "mode.3")))
-	for _, field := range strings.Fields(log) {
-		if !strings.HasPrefix(field, "@/") {
-			continue
-		}
-		_, err := os.Stat(strings.TrimPrefix(field, "@"))
-		assert.True(t, os.IsNotExist(err))
-	}
+		]`, readTestFile(t, filepath.Join(dir, "stdin.3")))
 }
 
 func TestPasteValuesPreservesFormulas(t *testing.T) {
@@ -288,18 +273,6 @@ test -f "$dir/count" && n=$(cat "$dir/count")
 n=$((n + 1))
 echo "$n" > "$dir/count"
 printf '%s\n' "$*" >> "$dir/log"
-previous=
-for arg do
-  if test "$previous" = "--body"; then
-    case "$arg" in
-      @*)
-        ls -l "${arg#@}" | cut -c1-10 > "$dir/mode.$n"
-        cp "${arg#@}" "$dir/body.$n"
-        ;;
-    esac
-  fi
-  previous="$arg"
-done
 cat > "$dir/stdin.$n"
 if test -f "$dir/error.$n"; then cat "$dir/error.$n" >&2; exit 1; fi
 test -f "$dir/response.$n" && cat "$dir/response.$n"

@@ -9,11 +9,16 @@ setup() {
   BIN="$ROOT/bin/gshoot"
   F="gshoot-smoke"
   F_UPPER="GSHOOT-SMOKE"
-  cd "$BATS_TEST_TMPDIR"
+  cd "$BATS_TEST_TMPDIR" || return 1
 }
 
 banner() {
   printf '\e[1;38;5;231;48;2;64;160;43m[%s] live: %-62s\e[0m\n' "$(date '+%H:%M:%S')" "$1" >&3
+}
+
+quota_pause() {
+  banner "Sheets quota cooldown (60s)..."
+  sleep 60
 }
 
 run_ok() {
@@ -68,7 +73,11 @@ normalize_file() {
 # test
 #
 
-@test 'live google workflow (takes around 45s)' {
+@test 'live google workflow' {
+  # Check required gog support before wiping the scratch spreadsheet.
+  run gog sheets batch-request --help
+  [ "$status" -eq 0 ]
+
   # verify gog auth before touching the scratch spreadsheet
   banner "preflight w/ list..."
   run "$BIN" list
@@ -79,15 +88,23 @@ normalize_file() {
   fi
 
   # reset scratch file
-  run_ok wipe -f "$F" && [[ "$output" == *"$F"* ]]
+  run_ok wipe -f "$F"
+  [[ "$output" == *"$F"* ]]
+
+  # Wipe cost depends on existing tabs. Start the fixed fixtures fresh.
+  quota_pause
+  # Next group: about 40 Sheets reads / 18 writes, including gog lookups.
 
   #
   # list/peek
   #
 
-  run_ok list && [[ "$output" == *"$F"* ]]
-  run_ok peek "$F" && [[ "$output" == *"Sheet1 "* ]]
-  run_ok peek "$F_UPPER" && [[ "$output" == *"Sheet1 "* ]]
+  run_ok list
+  [[ "$output" == *"$F"* ]]
+  run_ok peek "$F"
+  [[ "$output" == *"Sheet1 "* ]]
+  run_ok peek "$F_UPPER"
+  [[ "$output" == *"Sheet1 "* ]]
 
   #
   # up
@@ -98,7 +115,8 @@ normalize_file() {
   Cara,3,miami
   Drew,4,seattle
   "
-  run_ok up "$F" default.csv && [[ "$output" == *"docs.google.com"* ]]
+  run_ok up "$F" default.csv
+  [[ "$output" == *"docs.google.com"* ]]
   run_ok down --sheet default -o default.out.csv "$F"
   file_eq_file default.csv default.out.csv
 
@@ -111,10 +129,98 @@ normalize_file() {
   Adam,1,denver
   Bob,2,austin
   "
-  run_ok up --replace --sheet basic "$F" basic.csv && [[ "$output" == *"docs.google.com"* ]]
-  run_ok peek "$F" && [[ "$output" == *"basic "* ]]
+  run_ok up --replace --filter --layout --numeric --sheet basic "$F" basic.csv
+  [[ "$output" == *"docs.google.com"* ]]
+  run_ok peek "$F"
+  [[ "$output" == *"basic "* ]]
   run_ok down --sheet basic -o basic.out.csv "$F"
   file_eq_file basic.csv basic.out.csv
+
+  quota_pause
+  # Append + join + hyperlinks: about 45 reads / 26 writes.
+
+  #
+  # append: matching columns append rows; mismatches leave the sheet alone
+  #
+
+  write_file append.csv "
+  name,score,city
+  Eve,5,boston
+  "
+  run_ok append --sheet basic "$F" append.csv
+  write_file mismatch.csv "
+  name,city,score
+  Nope,boston,6
+  "
+  run "$BIN" append --sheet basic "$F" mismatch.csv
+  [ "$status" -ne 0 ]
+  run_ok down --sheet basic -o append.out.csv "$F"
+  file_eq "
+  name,score,city
+  Adam,1,denver
+  Bob,2,austin
+  Eve,5,boston
+  " append.out.csv
+
+  #
+  # join: structural/value batches, filter, and duplicate-tab backup
+  #
+
+  write_file join-left.csv "
+  id,price
+  a,10
+  b,20
+  "
+  write_file join-right.csv "
+  id,price,rank
+  a,11,2
+  c,30,1
+  "
+  run_ok up --replace --filter --sheet join-data "$F" join-left.csv
+  run_ok join --force --sheet join-data --key id "$F" join-right.csv
+  run_ok down --sheet join-data -o join.out.csv "$F"
+  file_eq "
+  join,id,price,price2,rank
+  match,a,10,11,2
+  left,b,20,,
+  right,c,,30,1
+  " join.out.csv
+  run_ok peek "$F"
+  backup_title="$(printf '%s\n' "$output" | sed -n 's/.*\(join-data backup [0-9-]* [0-9]* UTC\).*/\1/p')"
+  [ -n "$backup_title" ]
+  run_ok down --sheet "$backup_title" -o backup.out.csv "$F"
+  file_eq_file join-left.csv backup.out.csv
+
+  #
+  # hyperlink: explicit links, blanks, adjacent backup, and inferred ASINs
+  #
+
+  write_file links.csv "
+  name,link,asin
+  Widget,https://example.com/widget,B012345678
+  Skip,,
+  ,https://example.com/blank,
+  "
+  run_ok up --replace --sheet links "$F" links.csv
+  sheet_url="$(printf '%s\n' "$output" | sed -n '\|^https://docs.google.com/spreadsheets/d/|p')"
+  [ -n "$sheet_url" ]
+  run_ok hyperlink --sheet links "$F" name link
+  run_ok hyperlink --sheet links "$F" asin
+  run_ok down --sheet links -o links.out.csv "$F"
+  file_eq "
+  name,name2,link,asin,asin2
+  Widget,Widget,https://example.com/widget,B012345678,B012345678
+  Skip,Skip,,,
+  ,,https://example.com/blank,,
+  " links.out.csv
+  # Displayed values alone would pass even if no hyperlinks were written.
+  run gog --plain --no-input --color=never sheets get "$sheet_url" 'links!A2:E2' --render FORMULA
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'=HYPERLINK(C2,"Widget")'* ]]
+  [[ "$output" == *'=HYPERLINK("https://www.amazon.com/dp/B012345678","B012345678")'* ]]
+
+  quota_pause
+  # Refill grow: about 29 reads / 15 writes.
 
   #
   # up --refill grow
@@ -142,6 +248,9 @@ normalize_file() {
   b,Bob,20
   c,Cara,30
   " refill.out.csv
+
+  quota_pause
+  # Refill shrink + keep: about 46 reads / 24 writes.
 
   #
   # up --refill shrink
@@ -192,6 +301,9 @@ normalize_file() {
   ,KEEP Bob,
   ,KEEP Cara,
   " refill-keep.out.csv
+
+  quota_pause
+  # Refill blank remote rows: about 24 reads / 13 writes.
 
   #
   # up --refill shrink remote rows if blank
