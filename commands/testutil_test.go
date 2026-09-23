@@ -45,13 +45,6 @@ test -f "$dir/count" && n=$(cat "$dir/count")
 n=$((n + 1))
 echo "$n" > "$dir/count"
 printf '%s\n' "$*" >> "$dir/log"
-previous=
-for arg do
-  if test "$previous" = "--body"; then
-    case "$arg" in @*) cp "${arg#@}" "$dir/body.$n";; esac
-  fi
-  previous="$arg"
-done
 cat > "$dir/stdin.$n"
 if test -f "$dir/error.$n"; then cat "$dir/error.$n" >&2; exit 1; fi
 test -f "$dir/response.$n" && cat "$dir/response.$n"

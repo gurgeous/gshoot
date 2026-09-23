@@ -125,7 +125,7 @@ func TestHyperlinkCommand(t *testing.T) {
 	assert.Equal(t, "transformed: 1\nhttps://docs.google.com/spreadsheets/d/sheet-1/edit#gid=7", stdout)
 	assert.Contains(t, stderr, "backing up column")
 	assert.Contains(t, stderr, "transforming 1 row")
-	assert.Equal(t, 1, strings.Count(log, "api call sheets v4 sheets.spreadsheets.batchUpdate"))
+	assert.Equal(t, 1, strings.Count(log, "sheets batch-request"))
 	assert.Equal(t, 1, strings.Count(log, "sheets batch-update sheet-1"))
 }
 
@@ -139,7 +139,7 @@ func TestHyperlinkCommandNoEligibleRowsDoesNotWrite(t *testing.T) {
 	)
 	assert.NoError(t, err)
 	assert.Equal(t, "transformed: 0\nhttps://docs.google.com/spreadsheets/d/sheet-1/edit#gid=7", stdout)
-	assert.NotContains(t, log, "api call")
+	assert.NotContains(t, log, "sheets batch-request")
 	assert.NotContains(t, log, "sheets batch-update")
 }
 
@@ -154,6 +154,6 @@ func TestHyperlinkCommandPreservesBackupWhenFormulaWriteFails(t *testing.T) {
 		`ERROR: Google API error (429 rateLimitExceeded): quota exceeded`,
 	)
 	assert.ErrorContains(t, err, `backup column "name2" is intact`)
-	assert.Equal(t, 1, strings.Count(log, "api call sheets v4 sheets.spreadsheets.batchUpdate"))
+	assert.Equal(t, 1, strings.Count(log, "sheets batch-request"))
 	assert.Equal(t, 1, strings.Count(log, "sheets batch-update sheet-1"))
 }

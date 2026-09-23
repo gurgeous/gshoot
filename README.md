@@ -33,7 +33,8 @@ brew install gurgeous/tap/gshoot
 
 Other gshoot builds are on the
 [GitHub releases page](https://github.com/gurgeous/gshoot/releases/latest).
-Install `gog` 0.39.2 or newer separately when not using Homebrew.
+Install `gog` separately when not using Homebrew. Join and hyperlink require
+`gog sheets batch-request` (currently in gogcli main, planned for 0.41.1).
 
 ## Authentication
 
@@ -117,6 +118,11 @@ These are a few other commands for convenience:
 - `wipe` - delete all sheets from a spreadsheet file
 
 ## Changelog
+
+### 0.3.0 (Sep 2026)
+
+- Use `gog sheets batch-request`
+- Guidance for gog authentication errors
 
 ### 0.2.0 (Sep 2026)
 
